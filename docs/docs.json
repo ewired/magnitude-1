@@ -1,9 +1,12 @@
 {
     "$schema": "https://mintlify.com/docs.json",
     "name": "Magnitude",
-    "theme": "maple",
-    "description": "Open source AI coding agent for your terminal",
-    "logo": "/logo.svg",
+    "theme": "linden",
+    "description": "Opinionated coding agent for open models",
+    "logo": {
+        "light": "/wordmark-black.svg",
+        "dark": "/wordmark-white.svg"
+    },
     "favicon": "/logo.svg",
     "icons": {
         "library": "lucide"
@@ -36,8 +39,8 @@
         ],
         "primary": {
             "type": "button",
-            "label": "GitHub",
-            "href": "https://github.com/magnitudedev/magnitude"
+            "label": "Sign up",
+            "href": "https://app.magnitude.dev"
         }
     },
     "navigation": {
@@ -60,57 +63,14 @@
                 }
             ]
         },
-        "groups": [
-            {
-                "group": "Getting Started",
-                "pages": [
-                    "getting-started/introduction",
-                    "getting-started/setup"
-                ]
-            },
-            {
-                "group": "Configuration",
-                "pages": [
-                    "configuration/providers",
-                    "configuration/models",
-                    "configuration/preferences",
-                    "configuration/skills"
-                ]
-            },
-            {
-                "group": "Working with Magnitude",
-                "pages": [
-                    "working-with-magnitude/interface",
-                    "working-with-magnitude/workspace-and-files",
-                    "working-with-magnitude/commands",
-                    "working-with-magnitude/sessions"
-                ]
-            },
-            {
-                "group": "Core Concepts",
-                "pages": [
-                    "core-concepts/agent-loop",
-                    "core-concepts/workers",
-                    "core-concepts/browser-agent"
-                ]
-            },
-            {
-                "group": "Tools Reference",
-                "pages": [
-                    "tools-reference/file-tools",
-                    "tools-reference/shell",
-
-                    "tools-reference/web-search"
-                ]
-            },
-            {
-                "group": "Contributing",
-                "pages": [
-                    "contributing/setup",
-                    "contributing/architecture",
-                    "contributing/releases"
-                ]
-            }
+        "pages": [
+            "why-magnitude",
+            "get-started",
+            "using-magnitude",
+            "coding-plan",
+            "agent-team",
+            "configuration",
+            "open-source"
         ]
     },
     "styling": {
