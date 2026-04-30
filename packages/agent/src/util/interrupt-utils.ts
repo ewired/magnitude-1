@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
 import type { TurnOutcomeEvent } from '../events'
-import { isValidVariant, type AgentVariant } from '../agents/variants'
+import { isRoleId, type RoleId } from '../agents/role-validation'
 import { getAgentDefinition } from '../agents/registry'
 import { CanonicalTurnProjection } from '../projections/canonical-turn'
 import { AgentStatusProjection, getAgentByForkId } from '../projections/agent-status'
@@ -18,14 +18,14 @@ export const buildInterruptedTurnOutcome = (params: {
   yield* canonicalProjection.getFork(forkId)
   const agentState = yield* agentProjection.get
 
-  const variant: AgentVariant = forkId
+  const roleId: RoleId = forkId
     ? (() => {
         const role = getAgentByForkId(agentState, forkId)?.role
-        return role && isValidVariant(role) ? role : 'worker'
+        return role && isRoleId(role) ? role : 'engineer'
       })()
-    : 'lead'
+    : 'leader'
 
-  getAgentDefinition(variant)
+  getAgentDefinition(roleId)
 
   const event: TurnOutcomeEvent = {
     type: 'turn_outcome',

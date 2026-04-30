@@ -16,7 +16,7 @@ import { CompactionProjection } from './compaction'
 
 import { SessionContextProjection } from './session-context'
 import { ReplayProjection } from './replay'
-import { ConfigAmbient, getSlotConfig } from '../ambient/config-ambient'
+import { ConfigAmbient, getRoleConfig } from '../ambient/config-ambient'
 import { getForkInfo } from '../agents/registry'
 
 // =============================================================================
@@ -114,7 +114,7 @@ function buildSnapshot(
       const ambientService = yield* AmbientServiceTag
       const configState = ambientService.getValue(ConfigAmbient)
       const info = getForkInfo(statusState, forkId)
-      const limits = info ? getSlotConfig(configState, info.slot) : getSlotConfig(configState, 'lead')
+      const limits = info ? getRoleConfig(configState, info.roleId) : getRoleConfig(configState, 'leader')
       contextUsage = {
         currentTokens: compactionForkState.tokenEstimate,
         hardCap: limits.hardCap,

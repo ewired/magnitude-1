@@ -186,7 +186,7 @@ describe('turn control interrupts', () => {
         parentForkId: null,
         agentId: 'test-subagent',
         name: 'test-subagent',
-        role: 'subagent',
+        role: 'engineer',
         context: '',
         mode: 'spawn',
         taskId: 'test-task',

@@ -20,7 +20,7 @@ import { SkillsAmbient } from '../ambient/skills-ambient'
 import { UserPresenceProjection } from './user-presence'
 import { UserMessageResolutionProjection } from './user-message-resolution'
 import { TaskGraphProjection, type TaskGraphState, type TaskRecord } from './task-graph'
-import { isValidVariant } from '../agents/variants'
+import { isRoleId } from '../agents/role-validation'
 import { getAgentDefinition } from '../agents/registry'
 import { formatUserPresence, formatUserReturnedAfterAbsence } from '../prompts/presence'
 import { ContentPart, ImageMediaType, textParts, wrapTextParts } from '../content'
@@ -327,9 +327,9 @@ function findTaskForAgent(state: TaskGraphState, args: { agentId: string, forkId
 }
 
 function getAgentDefinitionForFork(read: <T>(projection: T) => any, forkId: string | null) {
-  if (forkId === null) return getAgentDefinition('lead')
+  if (forkId === null) return getAgentDefinition('leader')
   const role = getAgentByForkId(read(AgentStatusProjection), forkId)?.role
-  return role && isValidVariant(role) ? getAgentDefinition(role) : undefined
+  return role && isRoleId(role) ? getAgentDefinition(role) : undefined
 }
 
 function toToolErrorResult(args: {
@@ -433,19 +433,6 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
       const content = buildSessionContextContent(event.context)
       const sessionMsg: Message = { type: 'session_context', source: 'system', content: textParts(content) }
       return { ...fork, messages: [sessionMsg, ...fork.messages] }
-    },
-
-    oneshot_task: ({ event, fork }) => {
-      const taskMessage: Message = {
-        type: 'session_context',
-        source: 'system',
-        content: textParts(
-          '<task>\n'
-          + event.prompt
-          + '\n</task>\n\n<critical-reminder>Thoroughly and efficiently complete this task. Be strategic and creative, try multiple approaches in parallel when appropriate, but ensure that the task is fully complete and the environment is clean before you finish.</critical-reminder>',
-        ),
-      }
-      return { ...fork, messages: [...fork.messages, taskMessage] }
     },
 
     skill_activated: ({ event, fork }) => {
@@ -785,9 +772,6 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
             switch (feedback._tag) {
               case 'InvalidMessageDestination':
                 nextFork = enqueueResult(nextFork, toResultError({ message: feedback.message }), event.timestamp)
-                break
-              case 'OneshotLivenessRetriggered':
-                nextFork = enqueueResult(nextFork, { kind: 'oneshot_liveness' }, event.timestamp)
                 break
               case 'YieldWorkerRetriggered':
                 nextFork = enqueueResult(nextFork, { kind: 'yield_worker_retrigger' }, event.timestamp)

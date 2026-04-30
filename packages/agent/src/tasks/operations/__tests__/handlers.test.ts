@@ -70,7 +70,7 @@ function runOp<A>(
 
   return Effect.runPromise(
     effect.pipe(
-      Effect.provideService(Fork.ForkContext, { forkId: null, slot: 'lead' }),
+      Effect.provideService(Fork.ForkContext, { forkId: null, roleId: 'leader' }),
       Effect.provideService(TaskGraphStateReaderTag, mkTaskReader(state)),
       Effect.provideService(ConversationStateReaderTag, {
         getState: () => Effect.succeed({
@@ -132,6 +132,7 @@ describe('task operation handlers validation', () => {
       kind: 'spawn_worker',
       id: 't2',
       message: 'Test instruction',
+      role: 'engineer',
       spawnWorker: () => Effect.succeed('fork-2'),
     }, mkCtx()), state, published)
 
@@ -147,7 +148,7 @@ describe('task operation handlers validation', () => {
         ['t3', {
           id: 't3', title: 'Task', status: 'pending',
           parentId: null, childIds: [], assignee: 'worker',
-          worker: { agentId: 'worker-3', forkId: 'fork-3', role: 'worker' as const, message: 'Existing' },
+          worker: { agentId: 'worker-3', forkId: 'fork-3', role: 'engineer' as const, message: 'Existing' },
           createdAt: 0, updatedAt: 0, completedAt: null,
         }],
       ]),
@@ -158,6 +159,7 @@ describe('task operation handlers validation', () => {
       kind: 'spawn_worker',
       id: 't3',
       message: 'Test instruction',
+      role: 'engineer',
       spawnWorker: () => Effect.succeed('fork-3-new'),
     }, mkCtx()), state, published)
 
@@ -196,7 +198,7 @@ describe('task operation handlers validation', () => {
         ['t5', {
           id: 't5', title: 'Task', status: 'pending',
           parentId: null, childIds: [], assignee: 'worker',
-          worker: { agentId: 'worker-5', forkId: 'fork-5', role: 'worker' as const, message: 'Existing' },
+          worker: { agentId: 'worker-5', forkId: 'fork-5', role: 'engineer' as const, message: 'Existing' },
           createdAt: 0, updatedAt: 0, completedAt: null,
         }],
       ]),

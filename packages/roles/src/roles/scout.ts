@@ -10,7 +10,7 @@ export function createScoutRole(): RoleDefinition {
     id: 'scout',
     prompt: definePrompt<'SKILLS_SECTION'>(scoutPromptRaw),
     defaultRecipient: 'parent',
-    protocolRole: 'subagent',
+    agentKind: 'worker',
     spawnable: true,
     policy: [
       denyForbiddenCommands(),

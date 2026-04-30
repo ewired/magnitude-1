@@ -9,7 +9,6 @@
 
 import { INSPECT_CHAR_LIMIT, INSPECT_TOKEN_LIMIT } from '../constants'
 import { INTERRUPT_MESSAGE } from '../prompts/constants'
-import { ONESHOT_LIVENESS_REMINDER } from '../prompts/error-states'
 import { ContentPartBuilder, type ContentPart } from '../content'
 import { imagePlaceholder } from './render'
 import type {
@@ -89,11 +88,6 @@ export function formatError(message: string): string {
 /** Noop turn — agent continued without taking any task/tool operations */
 export function formatNoop(): string {
   return `<noop>No actions were taken. Use ${'<' + 'magnitude:yield_user/>'} if you have nothing more to do.</noop>`
-}
-
-/** Oneshot liveness reminder rendered as result feedback */
-export function formatOneshotLiveness(): string {
-  return `<error>${ONESHOT_LIVENESS_REMINDER}</error>`
 }
 
 /** Yield worker retrigger reminder — lead yielded to workers but none are active */

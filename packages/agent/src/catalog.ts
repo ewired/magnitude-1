@@ -45,10 +45,6 @@ import {
   spawnWorkerTool,
   killWorkerTool,
 } from './tools/task-tools'
-import {
-  agentCreateTool,
-  agentKillTool,
-} from './tools/agent-tools'
 import { messageWorkerTool } from './tools/agent-communication'
 
 
@@ -81,8 +77,6 @@ import { createTaskModel } from './models/create-task'
 import { updateTaskModel } from './models/update-task'
 import { spawnWorkerModel } from './models/spawn-worker'
 import { killWorkerModel } from './models/kill-worker'
-import { agentCreateModel } from './models/agent-create'
-import { agentKillModel } from './models/agent-kill'
 import { skillTool } from './tools/skill-tool'
 import { skillActivationModel } from './models/skill-activation'
 import { messageWorkerModel } from './models/message-worker'
@@ -111,9 +105,6 @@ export const catalog = defineCatalog({
   newTab: { tool: newTabTool, state: newTabModel, group: 'browser' },
   screenshot: { tool: screenshotTool, state: screenshotModel, group: 'browser' },
   evaluate: { tool: evaluateTool, state: evaluateModel, group: 'browser' },
-
-  agentCreate: { tool: agentCreateTool, state: agentCreateModel },
-  agentKill: { tool: agentKillTool, state: agentKillModel },
 
   createTask: { tool: createTaskTool, state: createTaskModel, display: false },
   updateTask: { tool: updateTaskTool, state: updateTaskModel, display: false },

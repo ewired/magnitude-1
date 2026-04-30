@@ -10,7 +10,7 @@ export function createScientistRole(): RoleDefinition {
     id: 'scientist',
     prompt: definePrompt<'SKILLS_SECTION'>(scientistPromptRaw),
     defaultRecipient: 'parent',
-    protocolRole: 'subagent',
+    agentKind: 'worker',
     spawnable: true,
     policy: [
       denyForbiddenCommands(),

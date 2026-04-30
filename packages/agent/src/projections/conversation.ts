@@ -47,8 +47,6 @@ export const ConversationProjection = Projection.define<AppEvent, ConversationSt
   },
 
   eventHandlers: {
-    oneshot_task: ({ state }) => state,
-
     message_start: ({ event, state }) => {
       if (event.forkId !== null) return state
       if (event.destination.kind !== 'user') return state

@@ -10,7 +10,7 @@ export function createCriticRole(): RoleDefinition {
     id: 'critic',
     prompt: definePrompt<'SKILLS_SECTION'>(criticPromptRaw),
     defaultRecipient: 'parent',
-    protocolRole: 'subagent',
+    agentKind: 'worker',
     spawnable: true,
     policy: [
       denyForbiddenCommands(),

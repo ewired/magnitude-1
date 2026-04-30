@@ -2,7 +2,7 @@ import { describe, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { expect } from 'vitest'
 import { CHARS_PER_TOKEN_XML } from '../../src/constants'
-import { getAgentDefinition, getAgentSlot } from '../../src/agents'
+import { getAgentDefinition, ROLE_IDS, type RoleId } from '../../src/agents'
 import { renderSystemPrompt } from '../../src/prompts/system-prompt'
 import { buildResolvedToolSet } from '../../src/tools/resolved-toolset'
 import type { ConfigState } from '../../src/ambient/config-ambient'
@@ -22,15 +22,13 @@ import {
 } from './helpers'
 
 // Create a mock config state for testing
+const defaultRoleConfig = { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 }
 const mockConfigState: ConfigState = {
-  bySlot: {
-    lead: { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 },
-    worker: { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 },
-  },
+  byRole: Object.fromEntries(ROLE_IDS.map(s => [s, defaultRoleConfig])) as Record<RoleId, typeof defaultRoleConfig>,
 }
 
-const leadDef = getAgentDefinition('lead')
-const leadToolSet = buildResolvedToolSet(leadDef, mockConfigState, getAgentSlot('lead'))
+const leadDef = getAgentDefinition('leader')
+const leadToolSet = buildResolvedToolSet(leadDef, mockConfigState, 'leader')
 const leadSystemPromptTokens = Math.ceil(renderSystemPrompt(leadDef, new Map(), leadToolSet).length / CHARS_PER_TOKEN_XML)
 
 describe('compaction/projection-transitions', () => {

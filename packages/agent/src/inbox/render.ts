@@ -4,7 +4,7 @@ import {
   WORKER_PROGRESS_USER_MESSAGE_REMINDER,
 } from '../prompts/lead-communication-reminders'
 import type { AgentAtom, ResultEntry, TimelineEntry } from './types'
-import { formatError, formatInterrupted, formatNoop, formatOneshotLiveness, formatResults, formatYieldWorkerRetrigger } from './render-results'
+import { formatError, formatInterrupted, formatNoop, formatResults, formatYieldWorkerRetrigger } from './render-results'
 import { renderCompactToolCall } from './render-tool-call'
 
 import { taskIdleReminder, taskCompleteReminder } from '../prompts/tasks/index'
@@ -219,7 +219,6 @@ export function formatInbox(input: FormatInboxInput): ContentPart[] {
       if (result.kind === 'turn_results') builder.pushParts(formatResults(result.items, input.supportsVision))
       else if (result.kind === 'interrupted') builder.pushText(formatInterrupted())
       else if (result.kind === 'error') builder.pushText(formatError(result.message))
-      else if (result.kind === 'oneshot_liveness') builder.pushText(formatOneshotLiveness())
       else if (result.kind === 'yield_worker_retrigger') builder.pushText(formatYieldWorkerRetrigger())
       else builder.pushText(formatNoop())
     }

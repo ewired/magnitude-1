@@ -10,7 +10,7 @@ export function createArtisanRole(): RoleDefinition {
     id: 'artisan',
     prompt: definePrompt<'SKILLS_SECTION'>(artisanPromptRaw),
     defaultRecipient: 'parent',
-    protocolRole: 'subagent',
+    agentKind: 'worker',
     spawnable: true,
     policy: [
       denyForbiddenCommands(),

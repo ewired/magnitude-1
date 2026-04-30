@@ -7,6 +7,7 @@ import { buildAgentContext, buildConversationSummary } from '../../prompts'
 import { buildTaskAssignedValidated } from './builders'
 import { taskNotFound } from './errors'
 import type { TaskDirectiveContext } from './handler'
+import type { RoleId } from '../../agents/role-validation'
 
 const { ForkContext } = Fork
 
@@ -14,6 +15,7 @@ export interface SpawnWorkerDirective<R = never> {
   readonly kind: 'spawn_worker'
   readonly id: string
   readonly message: string
+  readonly role: RoleId
   readonly spawnWorker: (params: {
     parentForkId: string | null
     name: string
@@ -45,8 +47,6 @@ export const handleSpawnWorkerDirective = <R>(
       const err = taskNotFound(directive.id)
       return { success: false, code: err.code, error: err.message } as const
     }
-
-    const parsedAssignee = 'worker' as const
 
     const bus = yield* WorkerBusTag<AppEvent>()
     const { forkId: parentForkId } = yield* ForkContext
@@ -83,10 +83,10 @@ export const handleSpawnWorkerDirective = <R>(
 
     yield* bus.publish(buildTaskAssignedValidated({
       taskId: directive.id,
-      assignee: parsedAssignee,
-      workerRole: parsedAssignee,
+      assignee: 'worker',
+      workerRole: directive.role,
       message: directive.message,
-      workerInfo: { agentId, forkId, role: parsedAssignee },
+      workerInfo: { agentId, forkId, role: directive.role },
       replacedWorker,
     }, { forkId: parentForkId, timestamp, graph: { tasks: new Map() } }))
 

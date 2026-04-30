@@ -57,7 +57,7 @@ describe('memory transcript', () => {
         parentForkId: null,
         agentId: 'a1',
         name: 'Explorer',
-        role: 'explorer',
+        role: 'scout',
         context: 'ctx',
         mode: 'clone',
         taskId: 'task1',

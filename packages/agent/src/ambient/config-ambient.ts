@@ -3,9 +3,9 @@ import { Effect } from 'effect'
 import { ProviderState } from '@magnitudedev/providers'
 import type { ProviderStateShape } from '@magnitudedev/providers/src/runtime/contracts'
 
-import { MAGNITUDE_SLOTS, type MagnitudeSlot } from '../model-slots'
+import { ROLE_IDS, type RoleId } from '../agents/role-validation'
 
-export interface SlotConfig {
+export interface RoleConfig {
   readonly providerId: string | null
   readonly modelId: string | null
   readonly hardCap: number
@@ -13,60 +13,60 @@ export interface SlotConfig {
 }
 
 export interface ConfigState {
-  readonly bySlot: Readonly<Record<MagnitudeSlot, SlotConfig>>
+  readonly byRole: Readonly<Record<RoleId, RoleConfig>>
 }
 
-export function getSlotConfig(state: ConfigState, slot: MagnitudeSlot): SlotConfig {
-  return state.bySlot[slot]
+export function getRoleConfig(state: ConfigState, roleId: RoleId): RoleConfig {
+  return state.byRole[roleId]
 }
 
 export function buildConfigState(opts: {
-  providerState: ProviderStateShape<MagnitudeSlot>
+  providerState: ProviderStateShape<RoleId>
 }) {
   const { providerState } = opts
 
   return Effect.gen(function* () {
     const entries = yield* Effect.forEach(
-      MAGNITUDE_SLOTS,
-      (slot) =>
+      ROLE_IDS,
+      (roleId) =>
         Effect.gen(function* () {
-          const peek = yield* providerState.peek(slot)
-          const { hardCap, softCap } = yield* providerState.contextLimits(slot)
+          const peek = yield* providerState.peek(roleId)
+          const { hardCap, softCap } = yield* providerState.contextLimits(roleId)
 
-          const config: SlotConfig = {
+          const config: RoleConfig = {
             providerId: peek?.model.providerId ?? null,
             modelId: peek?.model.id ?? null,
             hardCap,
             softCap,
           }
 
-          return [slot, config] as const
+          return [roleId, config] as const
         }),
     )
 
-    const bySlot = {} as Record<MagnitudeSlot, SlotConfig>
-    for (const [slot, config] of entries) {
-      bySlot[slot] = config
+    const byRole = {} as Record<RoleId, RoleConfig>
+    for (const [roleId, config] of entries) {
+      byRole[roleId] = config
     }
 
     return {
-      bySlot,
+      byRole,
     }
   })
 }
 
-export const ConfigAmbient = Ambient.define<ConfigState, ProviderStateShape<MagnitudeSlot>>({
+export const ConfigAmbient = Ambient.define<ConfigState, ProviderStateShape<RoleId>>({
   name: 'Config',
   initial: Effect.gen(function* () {
     const providerState = yield* ProviderState
     return yield* buildConfigState({
-      providerState: providerState as ProviderStateShape<MagnitudeSlot>,
+      providerState: providerState as ProviderStateShape<RoleId>,
     })
   }),
 })
 
 export function publishConfig(opts: {
-  providerState: ProviderStateShape<MagnitudeSlot>
+  providerState: ProviderStateShape<RoleId>
 }) {
   return Effect.gen(function* () {
     const ambientService = yield* AmbientServiceTag
@@ -78,6 +78,6 @@ export function publishConfig(opts: {
 export const publishConfigFromProviders = Effect.gen(function* () {
   const providerState = yield* ProviderState
   yield* publishConfig({
-    providerState: providerState as ProviderStateShape<MagnitudeSlot>,
+    providerState: providerState as ProviderStateShape<RoleId>,
   })
 })

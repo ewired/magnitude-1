@@ -7,20 +7,18 @@ const YIELD_INVOKE   = '<' + P + 'yield_invoke/>'
 const YIELD_WORKER   = '<' + P + 'yield_worker/>'
 const YIELD_PARENT   = '<' + P + 'yield_parent/>'
 const LEAD_YIELD_TAGS    = [P + 'yield_user', P + 'yield_invoke', P + 'yield_worker'] as const
-const SUBAGENT_YIELD_TAGS = [P + 'yield_parent', P + 'yield_invoke'] as const
+const WORKER_YIELD_TAGS = [P + 'yield_parent', P + 'yield_invoke'] as const
 const TAG_THINK     = P + 'think'
 const TAG_MESSAGE   = P + 'message'
 const TAG_INVOKE    = P + 'invoke'
 const TAG_PARAMETER = P + 'parameter'
 import protocolRaw from './protocol/xml-act-protocol.txt'
-import turnControlOneshotRaw from './protocol/turn-control-oneshot.txt'
 import turnControlLeadRaw from './protocol/turn-control-lead.txt'
 import turnControlSubagentRaw from './protocol/turn-control-subagent.txt'
 import taskRoutingLeadRaw from './protocol/task-routing-lead.txt'
 import taskRoutingWorkerRaw from './protocol/task-routing-worker.txt'
 
 const PROTOCOL_RAW = protocolRaw
-const TURN_CONTROL_ONESHOT_RAW = turnControlOneshotRaw
 const TURN_CONTROL_LEAD_RAW = turnControlLeadRaw
 const TURN_CONTROL_SUBAGENT_RAW = turnControlSubagentRaw
 const TASK_ROUTING_LEAD_RAW = taskRoutingLeadRaw
@@ -44,20 +42,18 @@ function renderLensesExample(lenses: ThinkingLens[]): string {
  */
 export function getProtocol(
   lenses: ThinkingLens[],
-  role: 'lead' | 'subagent' | 'oneshot' = 'lead',
+  role: 'lead' | 'worker' = 'lead',
   defaultRecipient: 'user' | 'parent' = 'user',
 ): string {
-  const turnControlSection = role === 'subagent'
+  const turnControlSection = role === 'worker'
     ? TURN_CONTROL_SUBAGENT_RAW
-    : role === 'oneshot'
-    ? TURN_CONTROL_ONESHOT_RAW
     : TURN_CONTROL_LEAD_RAW
-  const taskAndRoutingSection = role === 'subagent'
+  const taskAndRoutingSection = role === 'worker'
     ? TASK_ROUTING_WORKER_RAW
     : TASK_ROUTING_LEAD_RAW
 
-  const yieldTags = role === 'subagent'
-    ? SUBAGENT_YIELD_TAGS
+  const yieldTags = role === 'worker'
+    ? WORKER_YIELD_TAGS
     : LEAD_YIELD_TAGS
   const yieldOptions = yieldTags.map(t => `<${t}/>`).join(' | ')
 

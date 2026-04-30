@@ -17,6 +17,7 @@ import type {
 import type { ToolKey } from './catalog'
 import type { ObservationPart } from '@magnitudedev/roles'
 import type { Skill } from '@magnitudedev/skills'
+import type { RoleId } from '@magnitudedev/roles'
 import type { TaskAssignee } from './tasks/types'
 
 
@@ -79,9 +80,7 @@ export interface SessionContext {
   readonly folderStructure: string  // Truncated tree output
   readonly agentsFile: { readonly filename: string; readonly content: string } | null  // Agent instruction file if present
   readonly skills: readonly { readonly name: string; readonly description: string; readonly path: string }[] | null  // Available agent skills
-  readonly oneshot?: {
-    readonly prompt: string
-  }
+
 }
 
 export interface SessionInitialized {
@@ -408,7 +407,7 @@ export interface AgentCreated {
   readonly parentForkId: string | null
   readonly agentId: string
   readonly name: string
-  readonly role: string
+  readonly role: RoleId
   readonly context: string
   readonly mode: 'clone' | 'spawn'
   readonly taskId: string
@@ -475,12 +474,12 @@ export interface TaskAssigned {
   readonly forkId: string | null
   readonly taskId: string
   readonly assignee: TaskAssignee
-  readonly workerRole?: string
+  readonly workerRole?: RoleId
   readonly message: string
   readonly workerInfo?: {
     readonly agentId: string
     readonly forkId: string
-    readonly role: string
+    readonly role: RoleId
   }
   readonly replacedWorker?: {
     readonly agentId: string
@@ -587,13 +586,6 @@ export interface UserReturnConfirmed {
 
 
 
-export interface OneshotTask {
-  readonly type: 'oneshot_task'
-  readonly forkId: null
-  readonly prompt: string
-}
-
-
 export type SkillActivated =
   | {
       readonly type: 'skill_activated'
@@ -616,7 +608,6 @@ export type SkillActivated =
 
 export type AppEvent =
   | SessionInitialized
-  | OneshotTask
   | UserMessage
   | ObservationsCaptured
   | UserBashCommand

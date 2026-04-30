@@ -14,6 +14,7 @@ import { AmbientServiceTag, Fork } from '@magnitudedev/event-core'
 import { ProviderState } from '@magnitudedev/providers'
 import { ConfigAmbient } from '../ambient/config-ambient'
 import { WebSearchService } from '../services/web-search-service'
+import { isRoleId, type RoleId } from '../agents/role-validation'
 
 const { ForkContext } = Fork
 
@@ -47,16 +48,22 @@ export const webSearchTool = defineTool({
       const webSearchService = yield* WebSearchService
       const configState = ambientService.getValue(ConfigAmbient)
 
-      // Get current slot from fork context
+      // Get current role from fork context
       const forkCtx = yield* ForkContext
-      const slot = forkCtx.slot as 'lead' | 'worker'
+      if (!isRoleId(forkCtx.roleId)) {
+        return yield* Effect.fail({
+          _tag: 'WebSearchError' as const,
+          message: `Unknown role: ${forkCtx.roleId}`,
+        })
+      }
+      const roleId: RoleId = forkCtx.roleId
       
-      const slotConfig = configState.bySlot[slot]
-      const isMagnitudeProvider = slotConfig.providerId === 'magnitude'
+      const roleConfig = configState.byRole[roleId]
+      const isMagnitudeProvider = roleConfig.providerId === 'magnitude'
 
       if (isMagnitudeProvider) {
-        // Get Magnitude API key from ProviderState for THIS slot
-        const peekResult = yield* providerState.peek(slot)
+        // Get Magnitude API key from ProviderState for THIS role
+        const peekResult = yield* providerState.peek(roleId)
         if (!peekResult || !peekResult.auth) {
           return yield* Effect.fail({
             _tag: 'WebSearchError' as const,

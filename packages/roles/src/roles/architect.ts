@@ -10,7 +10,7 @@ export function createArchitectRole(): RoleDefinition {
     id: 'architect',
     prompt: definePrompt<'SKILLS_SECTION'>(architectPromptRaw),
     defaultRecipient: 'parent',
-    protocolRole: 'subagent',
+    agentKind: 'worker',
     spawnable: true,
     policy: [
       denyForbiddenCommands(),

@@ -72,7 +72,7 @@ export class ResponseBuilder {
   /**
    * Convenience: create a task and spawn a worker for it. The resulting agent's
    * agentId equals the task id. The `type` parameter is accepted but ignored —
-   * lead can only spawn workers in the current variant model.
+   * lead can only spawn workers in the current role's model.
    */
   createAgent(agentId: string, _type: string, title: string, message: string): this {
     this.tools.push(xmlInvoke('create_task', { id: agentId, title }))

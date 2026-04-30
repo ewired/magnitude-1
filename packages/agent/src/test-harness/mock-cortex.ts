@@ -8,21 +8,19 @@ import { drainTurnEventStream } from '../workers/turn-event-drain'
 import { MockTurnScriptTag, type MockTurnResponse } from './turn-script'
 import { YIELD_USER } from '@magnitudedev/xml-act'
 import { buildResolvedToolSet, type ResolvedToolSet } from '../tools/resolved-toolset'
-import { getAgentDefinition, getAgentSlot } from '../agents/registry'
+import { getAgentDefinition } from '../agents/registry'
 import type { ConfigState } from '../ambient/config-ambient'
+import { ROLE_IDS, type RoleId } from '../agents/role-validation'
 
-// Mock config state for testing
+// Mock config state for testing — provides a default config for every role
+const defaultRoleConfig = { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 }
 const mockConfigState: ConfigState = {
-  bySlot: {
-    lead: { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 },
-    worker: { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 },
-  },
+  byRole: Object.fromEntries(ROLE_IDS.map(s => [s, defaultRoleConfig])) as Record<RoleId, typeof defaultRoleConfig>,
 }
 
-function createMockToolSet(variant: 'lead' | 'worker'): ResolvedToolSet {
-  const agentDef = getAgentDefinition(variant)
-  const slot = getAgentSlot(variant)
-  return buildResolvedToolSet(agentDef, mockConfigState, slot)
+function createMockToolSet(roleId: RoleId): ResolvedToolSet {
+  const agentDef = getAgentDefinition(roleId)
+  return buildResolvedToolSet(agentDef, mockConfigState, roleId)
 }
 
 function frameToChunks(frame: MockTurnResponse): readonly string[] {
@@ -72,7 +70,7 @@ export const MockCortex = Worker.defineForked<AppEvent>()({
             Stream.tap((chunk) => sink.emit({ _tag: 'RawResponseChunk', text: chunk }))
           )
 
-          const variant = forkId === null ? 'lead' : 'worker'
+          const variant: RoleId = forkId === null ? 'leader' : 'engineer'
           const executeResult = yield* execManager.execute(
             xmlStream,
             {

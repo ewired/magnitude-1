@@ -38,6 +38,7 @@ import type { TurnEvent, TurnEventSink } from '../execution/types'
 import { buildRegisteredTools } from '../tools/tool-registry'
 import { buildResolvedToolSet } from '../tools/resolved-toolset'
 import { getAgentDefinition, getForkInfo } from '../agents/registry'
+
 import { ExecutionManager } from '../execution/types'
 import type { ExecuteResult } from '../execution/types'
 import { ConfigAmbient } from '../ambient/config-ambient'
@@ -110,14 +111,14 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         const forkInfo = getForkInfo(agentState, forkId)
         if (!forkInfo) return
 
-        const { variant, slot: modelSlot } = forkInfo
-        const agentDef = getAgentDefinition(variant)
+        const { roleId } = forkInfo
+        const agentDef = getAgentDefinition(roleId)
 
         // ──────────────────────────────────────────────────────────────────────
         // 2. Resolve native model
         // ──────────────────────────────────────────────────────────────────────
         const modelResolver = yield* NativeModelResolver
-        const resolveResult = yield* modelResolver.resolve(modelSlot).pipe(Effect.either)
+        const resolveResult = yield* modelResolver.resolve(roleId).pipe(Effect.either)
 
         if (resolveResult._tag === 'Left') {
           const err = resolveResult.left
@@ -155,7 +156,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         const ambientService = yield* AmbientServiceTag
         const configState    = ambientService.getValue(ConfigAmbient)
 
-        const toolSet = buildResolvedToolSet(agentDef, configState, modelSlot)
+        const toolSet = buildResolvedToolSet(agentDef, configState, roleId)
 
         const workerBus = yield* WorkerBusTag<AppEvent>()
         const forkLayer = execManager.getForkLayer(forkId)
@@ -201,7 +202,8 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // ──────────────────────────────────────────────────────────────────────
         // 7. Message destination based on agent role
         // ──────────────────────────────────────────────────────────────────────
-        const messageDestination = variant === 'worker' ? 'parent' : 'user'
+        const agentKind = agentDef.agentKind
+        const messageDestination = agentKind === 'worker' ? 'parent' : 'user'
 
         // ──────────────────────────────────────────────────────────────────────
         // 8. Run turn via TurnEngine

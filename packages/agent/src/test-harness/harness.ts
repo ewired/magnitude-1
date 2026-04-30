@@ -44,7 +44,7 @@ import { SessionTitleWorker } from '../workers/session-title-worker'
 import { ExecutionManagerLive } from '../execution/execution-manager'
 import { BrowserServiceLive } from '../services/browser-service'
 import { ModelCatalog, makeProviderRuntimeLive, makeTestResolver, type TestModelConfig } from '@magnitudedev/providers'
-import type { MagnitudeSlot } from '../model-slots'
+import type { RoleId } from '../agents/role-validation'
 import { registerApprovalBridge } from '../execution/approval-bridge'
 
 // Testing services
@@ -110,7 +110,7 @@ export interface HarnessOptions {
   model?: TestModelConfig
 }
 
-type MagnitudeAgentDef = RoleDefinition<import('../catalog').AgentCatalog, MagnitudeSlot, PolicyContext>
+type MagnitudeAgentDef = RoleDefinition<import('../catalog').AgentCatalog, RoleId, PolicyContext>
 
 const DEFAULT_TIMEOUT_MS = 10_000
 
@@ -314,7 +314,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
       refresh: () => Effect.void,
       getModels: () => Effect.succeed([]),
     })
-    const providerRuntime = makeProviderRuntimeLive<MagnitudeSlot>(testModelCatalogLayer)
+    const providerRuntime = makeProviderRuntimeLive<RoleId>(testModelCatalogLayer)
     const ephemeralSessionContextLayer = Layer.succeed(EphemeralSessionContextTag, {
       disableShellSafeguards: false,
       disableCwdSafeguards: false,

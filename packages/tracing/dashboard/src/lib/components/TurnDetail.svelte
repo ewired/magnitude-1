@@ -221,7 +221,7 @@
       <span class="ml-2 font-mono">{trace.provider ?? '—'}</span>
     </div>
     <div>
-      <span class="text-[var(--text-muted)]">Slot</span>
+      <span class="text-[var(--text-muted)]">Role</span>
       <span class="ml-2 font-mono">{trace.slot}</span>
     </div>
     <div>

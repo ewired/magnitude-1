@@ -1,7 +1,7 @@
 /**
  * NativeModelResolverLive — real implementation of NativeModelResolver.
  *
- * Reads ProviderState for the slot's model + stored auth, falls back to env
+ * Reads ProviderState for the roleId's model + stored auth, falls back to env
  * for API-key providers, then constructs a NativeBoundModel using:
  *  - OpenAIChatCompletionsDriver (from @magnitudedev/drivers)
  *  - NativeChatCompletionsCodec  (from @magnitudedev/codecs)
@@ -30,22 +30,22 @@ export const NativeModelResolverLive = Layer.effect(
     const catalog = yield* ProviderCatalog
 
     return {
-      resolve: (slot: string) =>
+      resolve: (roleId: string) =>
         Effect.gen(function* () {
-          // 1. Get model selection for this slot
-          const slotData = yield* state.peek(slot)
-          if (!slotData) {
-            return yield* Effect.fail(new NativeModelNotConfigured({ slot }))
+          // 1. Get model selection for this roleId
+          const roleIdData = yield* state.peek(roleId)
+          if (!roleIdData) {
+            return yield* Effect.fail(new NativeModelNotConfigured({ roleId }))
           }
 
-          const { model } = slotData
+          const { model } = roleIdData
 
           // Resolve auth: prefer stored auth, then env
-          let auth = slotData.auth
+          let auth = roleIdData.auth
           if (!auth) {
             const provider = yield* catalog.getProvider(model.providerId)
             if (!provider) {
-              return yield* Effect.fail(new NativeModelNotConfigured({ slot }))
+              return yield* Effect.fail(new NativeModelNotConfigured({ roleId }))
             }
             // Try env keys from authMethods
             for (const method of provider.authMethods) {
@@ -63,7 +63,7 @@ export const NativeModelResolverLive = Layer.effect(
           }
 
           if (!auth) {
-            return yield* Effect.fail(new NativeModelNotConfigured({ slot }))
+            return yield* Effect.fail(new NativeModelNotConfigured({ roleId }))
           }
 
           // 4. Get provider base URL

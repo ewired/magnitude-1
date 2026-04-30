@@ -10,7 +10,7 @@ export function createLeaderRole(): RoleDefinition {
     id: 'leader',
     prompt: definePrompt<'SKILLS_SECTION'>(leaderPromptRaw),
     defaultRecipient: 'user',
-    protocolRole: 'lead',
+    agentKind: 'lead',
     spawnable: false,
     policy: [
       denyForbiddenCommands(),

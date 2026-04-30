@@ -10,7 +10,7 @@ export function createAdvisorRole(): RoleDefinition {
     id: 'advisor',
     prompt: definePrompt<'SKILLS_SECTION'>(advisorPromptRaw),
     defaultRecipient: 'parent',
-    protocolRole: 'subagent',
+    agentKind: 'peer',
     spawnable: true,
     policy: [
       denyForbiddenCommands(),

@@ -51,7 +51,7 @@ const BENCH_AGENT_CONFIG = {
   slot: 'primary' as const,
   systemPrompt: ROLE_DESCRIPTION,
   defaultRecipient: 'parent' as const,
-  protocolRole: 'subagent' as const,
+  agentKind: 'worker' as const,
   initialContext: { parentConversation: false },
 }
 

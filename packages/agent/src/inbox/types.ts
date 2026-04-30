@@ -115,7 +115,6 @@ export type ResultEntry =
   | { readonly kind: 'interrupted' }
   | { readonly kind: 'error'; readonly message: string }
   | { readonly kind: 'noop' }
-  | { readonly kind: 'oneshot_liveness' }
   | { readonly kind: 'yield_worker_retrigger' }
 
 // ---------------------------------------------------------------------------

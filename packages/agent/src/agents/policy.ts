@@ -1,7 +1,11 @@
 import { Effect } from 'effect'
-import type { Decision, Policy, PolicyHandler } from '@magnitudedev/roles'
 import type { ToolCatalog } from '@magnitudedev/tools'
 import type { Schema } from '@effect/schema'
+
+// Policy types — local definitions until harness integration (Phase 3)
+export type Decision = { decision: 'allow' } | { decision: 'deny'; reason: string }
+export type PolicyHandler<I = unknown, C = unknown> = (input: I, ctx: C) => Effect.Effect<Decision | null>
+export type Policy<_T = unknown, C = unknown> = Array<Record<string, PolicyHandler<unknown, C> | undefined>>
 import {
   classifyShellCommand,
   isGitAllowed,

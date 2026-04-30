@@ -6,10 +6,6 @@
 
 export type { StorageClient } from '@magnitudedev/storage'
 
-// Model Slots
-export { MAGNITUDE_SLOTS, isMagnitudeSlot } from './model-slots'
-export type { MagnitudeSlot } from './model-slots'
-
 // Agent
 export { CodingAgent, createCodingAgentClient } from './coding-agent'
 export type { CreateClientOptions } from './coding-agent'
@@ -47,10 +43,11 @@ export type {
 } from './events'
 
 // Agents
-export type { AgentVariant } from './agents/variants'
-export { isValidVariant, getSpawnableVariants } from './agents/variants'
+export type { RoleId } from './agents/role-validation'
+export { isRoleId, isSpawnableRole, getSpawnableRoles, ROLE_IDS } from './agents/role-validation'
+export type { AgentRoleDefinition } from './agents/registry'
 export type { PolicyContext } from './agents/types'
-export { getAgentDefinition, registerAgentDefinition, clearAgentOverrides } from './agents/registry'
+export { getAgentDefinition, getForkInfo, registerAgentDefinition, clearAgentOverrides } from './agents/registry'
 
 // Constants
 export { PROSE_DELIM_OPEN, PROSE_DELIM_CLOSE, DEFAULT_CHAT_NAME, USER_BLUR_DEBOUNCE_MS } from './constants'

@@ -140,7 +140,10 @@ function deriveWorkerState(args: {
   const activeSpawnToolCallId = findActiveToolCallId(toolHandles, 'spawnWorker', task.id)
   if (activeSpawnToolCallId) {
     const handle = toolHandles[activeSpawnToolCallId]
-    return { status: 'spawning', toolCallId: activeSpawnToolCallId, role: 'worker' as const }
+    const spawnRole = handle?.toolKey === 'spawnWorker'
+      ? (handle.state as import('../models/spawn-worker').SpawnWorkerState).role ?? null
+      : null
+    return { status: 'spawning', toolCallId: activeSpawnToolCallId, role: spawnRole }
   }
 
   if (task.worker) {

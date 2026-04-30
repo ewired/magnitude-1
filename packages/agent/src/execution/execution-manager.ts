@@ -25,8 +25,8 @@ import type {
 import { catalog, isToolKey, type ToolKey } from '../catalog'
 import { buildRegisteredTools } from '../tools/tool-registry'
 
-import { isValidVariant, type AgentVariant } from '../agents/variants'
-import { getAgentDefinition, getAgentSlot } from '../agents/registry'
+import { isRoleId, type RoleId } from '../agents/role-validation'
+import { getAgentDefinition } from '../agents/registry'
 import { buildPolicyInterceptor, type AgentResolver } from './permission-gate'
 export { IDENTICAL_RESPONSE_BREAKER_THRESHOLD } from './types'
 import { createApprovalState, ApprovalStateTag, type ApprovalStateService } from './approval-state'
@@ -49,7 +49,6 @@ import { AgentRoutingProjection, type AgentRoutingState, getRoutingEntryByForkId
 import { AgentStatusProjection, type AgentStatusState, getActiveAgent, getAgentByForkId } from '../projections/agent-status'
 import { TurnProjection, type ForkTurnState } from '../projections/turn'
 import { SessionContextProjection, type SessionContextState } from '../projections/session-context'
-// ReplayProjection kept for backward compat but not used in execute()
 import { TaskGraphProjection, type TaskGraphState, type TaskStatus } from '../projections/task-graph'
 
 import type { RoleDefinition, BoundObservable } from '@magnitudedev/roles'
@@ -97,7 +96,7 @@ import { persistResult } from '../runtime/result-persistence'
  */
 function makeForkLayers(
   forkId: string | null,
-  slot: string,
+  roleId: string,
 
   sessionContextProjection: Projection.ProjectionInstance<SessionContextState>,
   agentProjection: Projection.ProjectionInstance<AgentRoutingState>,
@@ -148,14 +147,14 @@ function makeForkLayers(
   const providedInterceptor: ToolInterceptor = {
     beforeExecute: (ctx) =>
       policyInterceptor(ctx).pipe(
-        Effect.provideService(ForkContext, { forkId, slot }),
+        Effect.provideService(ForkContext, { forkId, roleId }),
         Effect.provideService(PolicyContextProviderTag, policyCtxProvider),
         Effect.provideService(ApprovalStateTag, approvalState),
       ),
   }
 
   return Layer.mergeAll(
-    Layer.succeed(ForkContext, { forkId, slot }),
+    Layer.succeed(ForkContext, { forkId, roleId }),
 
     agentRegistryStateReaderLayer,
     conversationStateReaderLayer,
@@ -189,13 +188,12 @@ const makeExecutionManager = Effect.gen(function* () {
   // Bound observables map
   const boundObservables = new Map<string | null, BoundObservable[]>()
 
-  // Session-level oneshot mode flag (set once during root fork init, never changes)
-  let oneshotEnabled = false
+
 
   // Approval state for gated tool calls
   const approvalState = createApprovalState()
-  // Maps forkId → variant, populated when forks are created.
-  const forkAgentVariants = new Map<string, AgentVariant>()
+  // Maps forkId → roleId, populated when forks are created.
+  const forkRoles = new Map<string, RoleId>()
 
   // Pre-built teardown effects (captured at initFork time with services already provided)
   const forkTeardowns = new Map<string, Effect.Effect<void>>()
@@ -214,10 +212,10 @@ const makeExecutionManager = Effect.gen(function* () {
    */
   const resolveAgent: AgentResolver = (forkId) => {
     if (forkId !== null) {
-      const variant = forkAgentVariants.get(forkId) ?? 'worker'
-      return getAgentDefinition(variant)
+      const roleId = forkRoles.get(forkId) ?? 'engineer'
+      return getAgentDefinition(roleId)
     }
-    return getAgentDefinition('lead')
+    return getAgentDefinition('leader')
   }
 
   // Build the policy interceptor (shared across all forks, resolves agent dynamically)
@@ -246,15 +244,15 @@ const makeExecutionManager = Effect.gen(function* () {
       const agentStatusProjectionInst = yield* AgentStatusProjection.Tag
       const workingStateProjectionInst = yield* TurnProjection.Tag
       const agentState = yield* agentStatusProjectionInst.get
-      let variant: AgentVariant
+      let roleId: RoleId
       if (forkId) {
         const agentInstance = getAgentByForkId(agentState, forkId)
         const role = agentInstance?.role
-        variant = role && isValidVariant(role) ? role : 'worker'
+        roleId = role && isRoleId(role) ? role as RoleId : 'engineer'
       } else {
-        variant = 'lead'
+        roleId = 'leader'
       }
-      const agentDef = getAgentDefinition(variant)
+      const agentDef = getAgentDefinition(roleId)
 
       // Get cached fork layers (must be initialized via initFork)
       const layers = forkLayers.get(forkId)
@@ -670,7 +668,7 @@ const makeExecutionManager = Effect.gen(function* () {
                     triggeredByUser,
                     directUserRepliesSent,
                   }, { forkId, timestamp: Date.now(), graph: { tasks: new Map() }, skills }).pipe(
-                    Effect.provideService(ForkContext, { forkId, slot: options.toolSet.slot }),
+                    Effect.provideService(ForkContext, { forkId, roleId: options.toolSet.roleId }),
                     Effect.provide(executionLayer),
                   )
 
@@ -773,15 +771,6 @@ const makeExecutionManager = Effect.gen(function* () {
                       willContinue = turnResult.action === 'continue'
                     }
 
-                    // Oneshot liveness guard: prevent stalling when nothing is active
-                    if (!willContinue && oneshotEnabled) {
-                      const pCtx = yield* policyCtxProvider.get
-                      if (pCtx.activeAgentCount === 0) {
-                        feedback.push({ _tag: 'OneshotLivenessRetriggered' })
-                        willContinue = true
-                      }
-                    }
-
                     executionResult = completed(willContinue ? Math.max(outcome.toolCallsCount, 1) : 0)
                     break
                   }
@@ -858,7 +847,7 @@ const makeExecutionManager = Effect.gen(function* () {
       }
     }),
 
-    initFork: (forkId, variant) => (Effect.gen(function* () {
+    initFork: (forkId, roleId) => (Effect.gen(function* () {
       yield* WorkerBusTag<AppEvent>()
 
       const sessionContextProjection = yield* SessionContextProjection.Tag
@@ -879,15 +868,9 @@ const makeExecutionManager = Effect.gen(function* () {
       }
       const cwd = sessionState.context.cwd
       const workspacePath = sessionState.context.workspacePath
-      if (forkId === null) {
-        oneshotEnabled = !!sessionState.context?.oneshot
-      }
-
-      const slot = getAgentSlot(variant)
-      
       let layers = makeForkLayers(
         forkId,
-        slot,
+        roleId,
         sessionContextProjection, agentProjection, agentStatusProjection,
         workingStateProjection, taskGraphProjection,
         conversationProjection,
@@ -898,7 +881,7 @@ const makeExecutionManager = Effect.gen(function* () {
       forkWorkspacePaths.set(forkId, workspacePath)
 
       // Inject role-specific setup layer when the role defines a setup function
-      const roleDef = getAgentDefinition(variant)
+      const roleDef = getAgentDefinition(roleId)
       if (roleDef.setup && forkId) {
         const setupLayer = (yield* roleDef.setup({ forkId, cwd, workspacePath })) as Layer.Layer<never>
         layers = Layer.merge(layers, setupLayer)
@@ -919,9 +902,9 @@ const makeExecutionManager = Effect.gen(function* () {
         forkIdleReleases.set(forkId, browserService.release(forkId) as Effect.Effect<void>)
       }
 
-      // Store variant for agent resolution
+      // Store roleId for agent resolution
       if (forkId !== null) {
-        forkAgentVariants.set(forkId, variant)
+        forkRoles.set(forkId, roleId)
       }
 
       const projectionReader: ProjectionReader = {
@@ -935,7 +918,7 @@ const makeExecutionManager = Effect.gen(function* () {
       forkLayers.set(forkId, layers)
 
       // Bind observables
-      const agentDef = getAgentDefinition(variant)
+      const agentDef = getAgentDefinition(roleId)
       const agentObservables = agentDef.observables.map((obs) =>
         bindObservable(obs, () => Effect.succeed(layers as Layer.Layer<unknown>))
       )
@@ -955,7 +938,7 @@ const makeExecutionManager = Effect.gen(function* () {
       forkWorkspacePaths.delete(forkId)
 
       boundObservables.delete(forkId)
-      forkAgentVariants.delete(forkId)
+      forkRoles.delete(forkId)
       forkIdleReleases.delete(forkId)
       identicalContinueTracker.delete(forkId)
     }),
@@ -968,11 +951,11 @@ const makeExecutionManager = Effect.gen(function* () {
       message: string
       outputSchema?: JsonSchema | undefined
       mode: 'clone' | 'spawn'
-      role: AgentVariant
+      role: RoleId
       taskId: string
     }) => Effect.gen(function* () {
       const forkId = createId()
-      forkAgentVariants.set(forkId, params.role)
+      forkRoles.set(forkId, params.role)
       const workerBus = yield* WorkerBusTag<AppEvent>()
       const context = yield* buildForkContext(params)
 

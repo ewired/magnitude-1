@@ -5,12 +5,14 @@ export interface SpawnWorkerState extends BaseState {
   toolKey: 'spawnWorker'
   id?: string
   message?: string
+  role?: string
   title?: string
 }
 
 const initial: Omit<SpawnWorkerState, 'phase' | 'toolKey'> = {
   id: undefined,
   message: undefined,
+  role: undefined,
   title: undefined,
 }
 
@@ -23,6 +25,7 @@ export const spawnWorkerModel = defineStateModel('spawnWorker', spawnWorkerTool)
       case 'ToolInputFieldChunk':
         if (event.field === 'id') return { ...state, phase: 'streaming', id: (state.id ?? '') + event.delta }
         if (event.field === 'message') return { ...state, phase: 'streaming', message: (state.message ?? '') + event.delta }
+        if (event.field === 'role') return { ...state, phase: 'streaming', role: (state.role ?? '') + event.delta }
         return state
       case 'ToolInputReady':
         return {
@@ -30,6 +33,7 @@ export const spawnWorkerModel = defineStateModel('spawnWorker', spawnWorkerTool)
           phase: 'streaming',
           id: event.input.id ?? state.id,
           message: event.input.message ?? state.message,
+          role: event.input.role ?? state.role,
         }
       case 'ToolExecutionStarted':
         return { ...state, phase: 'executing' }

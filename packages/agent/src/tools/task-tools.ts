@@ -11,6 +11,7 @@ import { formatTaskOutsideSubtreeError } from '../prompts/error-states'
 import type { TaskRecord } from '../projections/task-graph'
 import { AmbientServiceTag } from '@magnitudedev/event-core'
 import { SkillsAmbient } from '../ambient/skills-ambient'
+import { isSpawnableRole, getSpawnableRoles, type RoleId } from '../agents/role-validation'
 
 const TaskToolErrorSchema = ToolErrorSchema('TaskToolError', {})
 
@@ -148,6 +149,7 @@ export const spawnWorkerTool = defineTool({
   inputSchema: Schema.Struct({
     id: Schema.String.annotations({ description: 'Task ID to spawn a worker for' }),
     message: Schema.String.annotations({ description: 'Initial instruction message for the worker' }),
+    role: Schema.optional(Schema.String.annotations({ description: 'Worker role (e.g., engineer, scout, architect, critic, scientist, artisan). Defaults to engineer.' })),
   }),
   outputSchema: Schema.Struct({
     id: Schema.String,
@@ -156,11 +158,21 @@ export const spawnWorkerTool = defineTool({
   errorSchema: TaskToolErrorSchema,
   execute: (input, _ctx) =>
     Effect.gen(function* () {
+      const roleStr = input.role ?? 'engineer'
+      if (!isSpawnableRole(roleStr)) {
+        return yield* Effect.fail({
+          _tag: 'TaskToolError' as const,
+          message: `Invalid worker role "${roleStr}". Valid roles: ${getSpawnableRoles().join(', ')}`,
+        })
+      }
+      const role: RoleId = roleStr
+
       const execManager = yield* ExecutionManager
       const result = yield* runDirective({
         kind: 'spawn_worker',
         id: input.id,
         message: input.message,
+        role,
         spawnWorker: (params): ReturnType<typeof execManager.fork> =>
           execManager.fork({
             parentForkId: params.parentForkId,
@@ -169,7 +181,7 @@ export const spawnWorkerTool = defineTool({
             prompt: params.prompt,
             message: params.message,
             mode: 'spawn',
-            role: 'worker',
+            role,
             taskId: params.taskId,
           }),
       })

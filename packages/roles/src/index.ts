@@ -1,6 +1,6 @@
 // Types
-export type { Slot, PolicyContext, PolicyRule, RoleDefinition } from './types'
-export { SLOTS, isSlot } from './types'
+export type { RoleId, PolicyContext, PolicyRule, RoleDefinition } from './types'
+export { ROLE_IDS, isRoleId } from './types'
 
 // Policy
 export {

@@ -1,14 +1,7 @@
 /**
  * NativeModelResolver — Context.Tag for resolving NativeBoundModels.
  *
- * This is a thin wrapper introduced in Phase 5 as the contract between
- * Cortex and the provider layer.  Phase 6 provides a full implementation
- * that reads from the catalog + ProtocolBindings.
- *
- * Until Phase 6 is complete, the stub implementation returns
- * `Effect.fail(new NativeModelNotConfigured({ slot }))` so that the native
- * cortex path fails gracefully and the system can still run on the xml-act
- * path if needed.
+ * Resolves a roleId to a NativeBoundModel by reading provider config and auth.
  */
 
 import { Context, Effect, Layer, Schema } from 'effect'
@@ -20,7 +13,7 @@ import type { NativeBoundModel } from './native-bound-model'
 
 export class NativeModelNotConfigured extends Schema.TaggedError<NativeModelNotConfigured>()(
   'NativeModelNotConfigured',
-  { slot: Schema.String },
+  { roleId: Schema.String },
 ) {}
 
 // =============================================================================
@@ -29,7 +22,7 @@ export class NativeModelNotConfigured extends Schema.TaggedError<NativeModelNotC
 
 export interface NativeModelResolverShape {
   readonly resolve: (
-    slot: string,
+    roleId: string,
   ) => Effect.Effect<NativeBoundModel, NativeModelNotConfigured>
 }
 

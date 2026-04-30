@@ -1,4 +1,4 @@
-import type { RoleDefinition, Slot } from '../types'
+import type { RoleDefinition, RoleId } from '../types'
 import { createLeaderRole } from './leader'
 import { createScoutRole } from './scout'
 import { createArchitectRole } from './architect'
@@ -8,7 +8,7 @@ import { createScientistRole } from './scientist'
 import { createArtisanRole } from './artisan'
 import { createAdvisorRole } from './advisor'
 
-export function createRoles(): Record<Slot, RoleDefinition> {
+export function createRoles(): Record<RoleId, RoleDefinition> {
   return {
     leader: createLeaderRole(),
     scout: createScoutRole(),

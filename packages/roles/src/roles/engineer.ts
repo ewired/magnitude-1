@@ -10,7 +10,7 @@ export function createEngineerRole(): RoleDefinition {
     id: 'engineer',
     prompt: definePrompt<'SKILLS_SECTION'>(engineerPromptRaw),
     defaultRecipient: 'parent',
-    protocolRole: 'subagent',
+    agentKind: 'worker',
     spawnable: true,
     policy: [
       denyForbiddenCommands(),

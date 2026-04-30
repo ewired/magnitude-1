@@ -2,19 +2,18 @@ import { describe, expect, test } from 'vitest'
 import { serializeCanonicalTurn, type CanonicalTrace } from '../src/projections/canonical-xml'
 import { YIELD_USER, YIELD_INVOKE } from '@magnitudedev/xml-act'
 import { buildResolvedToolSet } from '../src/tools/resolved-toolset'
-import { getAgentDefinition, getAgentSlot } from '../src/agents/registry'
+import { getAgentDefinition } from '../src/agents/registry'
+import { ROLE_IDS, type RoleId } from '../src/agents/role-validation'
 
+const defaultRoleConfig = { providerId: 'openai', modelId: 'gpt-5', hardCap: 100000, softCap: 80000 }
 const mockConfigState = {
-  bySlot: {
-    lead: { providerId: 'openai', modelId: 'gpt-5', hardCap: 100000, softCap: 80000 },
-    worker: { providerId: 'openai', modelId: 'gpt-5-mini', hardCap: 100000, softCap: 80000 },
-  },
-} as const
+  byRole: Object.fromEntries(ROLE_IDS.map(s => [s, defaultRoleConfig])) as Record<RoleId, typeof defaultRoleConfig>,
+}
 
 const leadToolSet = buildResolvedToolSet(
-  getAgentDefinition('lead'),
+  getAgentDefinition('leader'),
   mockConfigState,
-  getAgentSlot('lead'),
+  'leader',
 )
 
 const withYield = (s: string) => `${s}\n${YIELD_USER}`

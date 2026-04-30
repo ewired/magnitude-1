@@ -1,10 +1,10 @@
-import type { AgentVariant } from '../agents/variants'
+import type { RoleId } from '../agents/role-validation'
 import { clearAgentOverrides, registerAgentDefinition, getAgentDefinition } from '../agents/registry'
 import { runWithGlobalAgentTestGuard } from './global-test-guard'
 
-type AgentDefinitionForVariant = ReturnType<typeof getAgentDefinition>
+type AgentDefinitionForRole = ReturnType<typeof getAgentDefinition>
 
-export type AgentOverrideMap = Partial<Record<AgentVariant, AgentDefinitionForVariant>>
+export type AgentOverrideMap = Partial<Record<RoleId, AgentDefinitionForRole>>
 
 export async function withAgentOverrides<T>(
   overrides: AgentOverrideMap,
@@ -12,9 +12,9 @@ export async function withAgentOverrides<T>(
 ): Promise<T> {
   return runWithGlobalAgentTestGuard('agent-overrides', async () => {
     try {
-      for (const [variant, definition] of Object.entries(overrides)) {
+      for (const [roleId, definition] of Object.entries(overrides)) {
         if (!definition) continue
-        registerAgentDefinition(variant, definition)
+        registerAgentDefinition(roleId, definition)
       }
 
       return await fn()

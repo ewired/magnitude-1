@@ -38,7 +38,6 @@ export type TurnTrigger =
   | { readonly _tag: 'chain_continue'; readonly chainId: string }
   | { readonly _tag: 'subagent_completed'; readonly agentId: string; readonly turnId: string }
   | { readonly _tag: 'wake' }
-  | { readonly _tag: 'oneshot' }
   | { readonly _tag: 'agent_created'; readonly agentId: string }
 
 export interface PendingInboundCommunication {
@@ -186,11 +185,6 @@ export const TurnProjection = Projection.defineForked<AppEvent, TurnLifecycleSta
       return TurnLifecycle.hold(afterClear, {
         softInterrupted: false,
       })
-    },
-
-    oneshot_task: ({ fork }) => {
-      const next = enqueueTrigger(fork, { _tag: 'oneshot' })
-      return next
     },
 
     wake: ({ fork }) => {

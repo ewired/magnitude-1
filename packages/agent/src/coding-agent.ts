@@ -43,7 +43,7 @@ import { LifecycleCoordinator } from './workers/lifecycle-coordinator'
 import { Autopilot } from './workers/autopilot'
 import { CompactionWorker } from './workers/compaction-worker'
 import { ApprovalWorker } from './workers/approval-worker'
-import { isValidVariant, type AgentVariant } from './agents/variants'
+import { isRoleId, type RoleId } from './agents/role-validation'
 import { UserPresenceWorker } from './workers/user-presence-worker'
 import { FileMentionResolver } from './workers/file-mention-resolver'
 import { SessionTitleWorker } from './workers/session-title-worker'
@@ -69,7 +69,7 @@ import { NativeModelResolverLive } from './engine/native-model-resolver-live'
 
 // Providers
 import { bootstrapProviderRuntime, makeModelResolver, makeNoopTracer, makeProviderRuntimeLive, makeTracePersister, type ProviderRuntime } from '@magnitudedev/providers'
-import { MAGNITUDE_SLOTS, type MagnitudeSlot } from './model-slots'
+import { ROLE_IDS } from './agents/role-validation'
 import type { StorageClient } from '@magnitudedev/storage'
 import { initLogger, logger } from '@magnitudedev/logger'
 import { writeTrace, initTraceSession } from '@magnitudedev/tracing'
@@ -159,7 +159,7 @@ export interface CreateClientOptions {
   /**
    * Storage client for config, sessions, memory, and memory jobs.
    */
-  storage: StorageClient<MagnitudeSlot>
+  storage: StorageClient<RoleId>
 
   /**
    * Enable LLM call tracing to ~/.magnitude/traces/
@@ -177,7 +177,7 @@ export interface CreateClientOptions {
    * When provided, provider bootstrap is skipped and the caller is responsible
    * for initializing model selections/auth inside the runtime.
    */
-  providerRuntime?: ProviderRuntime<MagnitudeSlot>
+  providerRuntime?: ProviderRuntime<RoleId>
 
   /**
    * Disable shell command classification safeguards for this runtime only.
@@ -206,10 +206,10 @@ export interface CreateClientOptions {
 export async function createCodingAgentClient(options: CreateClientOptions) {
 
   // Bootstrap provider runtime from stored config / env vars unless the caller
-  // supplied a pre-configured runtime (e.g. headless oneshot mode).
-  const providerRuntime = options.providerRuntime ?? makeProviderRuntimeLive<MagnitudeSlot>()
+  // supplied a pre-configured runtime.
+  const providerRuntime = options.providerRuntime ?? makeProviderRuntimeLive<RoleId>()
   if (!options.providerRuntime) {
-    await Effect.runPromise(bootstrapProviderRuntime<MagnitudeSlot>({ slots: MAGNITUDE_SLOTS }).pipe(Effect.provide(providerRuntime)))
+    await Effect.runPromise(bootstrapProviderRuntime<RoleId>({ slots: ROLE_IDS }).pipe(Effect.provide(providerRuntime)))
   }
 
   // Enable tracing in debug mode
@@ -218,7 +218,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     initTraceSession(traceSessionId, { cwd: process.cwd(), platform: process.platform, gitBranch: null })
   }
 
-  const tracerLayer = options.debug ? makeTracePersister((trace) => writeTrace(trace as any)) : makeNoopTracer()
+  const tracerLayer = options.debug ? makeTracePersister((trace) => writeTrace(trace)) : makeNoopTracer()
   const ephemeralSessionContextLayer = Layer.succeed(EphemeralSessionContextTag, {
     disableShellSafeguards: options.disableShellSafeguards ?? false,
     disableCwdSafeguards: options.disableCwdSafeguards ?? false,
@@ -227,7 +227,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
     Layer.provide(BrowserServiceLive, providerRuntime),
     Layer.provide(WebSearchServiceLive, FetchHttpClient.layer),
-    Layer.provide(makeModelResolver<MagnitudeSlot>(), providerRuntime),
+    Layer.provide(makeModelResolver<RoleId>(), providerRuntime),
     Layer.provide(NativeModelResolverLive, providerRuntime),
     TurnEngineLive,
     FetchHttpClient.layer,
@@ -340,13 +340,13 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
       // Create root sandbox (hydration happens lazily in execute())
       const sessionContextState = yield* (yield* SessionContextProjection.Tag).get
-      const rootVariant = sessionContextState.context?.oneshot ? 'lead-oneshot' : 'lead'
+      const rootVariant: RoleId = 'leader'
       yield* executionManager.initFork(null, rootVariant)
 
       // Create execution resources for all known agents.
       const agentState = yield* agentStatusProjection.get
       for (const [, agent] of agentState.agents) {
-        if (!isValidVariant(agent.role)) {
+        if (!isRoleId(agent.role)) {
           continue
         }
         yield* executionManager.initFork(agent.forkId, agent.role)

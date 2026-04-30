@@ -1,19 +1,7 @@
 import type { AuthApplicator, BoundModel } from '@magnitudedev/ai'
-import type { MagnitudeModelSpec, MagnitudeConnectionError, MagnitudeStreamError, ModelProfile, RoleId } from '@magnitudedev/magnitude-client'
+import type { MagnitudeModelSpec, MagnitudeConnectionError, MagnitudeStreamError, ModelProfile, RoleId as ClientRoleId } from '@magnitudedev/magnitude-client'
 import { createRoleSpec } from '@magnitudedev/magnitude-client'
-import type { Slot } from './types'
-
-/** Maps role slot to magnitude-client role ID. */
-const SLOT_TO_ROLE: Record<Slot, RoleId> = {
-  leader: 'leader',
-  scout: 'scout',
-  architect: 'architect',
-  engineer: 'engineer',
-  critic: 'critic',
-  scientist: 'scientist',
-  artisan: 'artisan',
-  advisor: 'advisor',
-}
+import type { RoleId } from './types'
 
 /**
  * A model override entry with explicit auth and metadata.
@@ -25,25 +13,24 @@ export interface ModelOverrideEntry {
 }
 
 /**
- * Per-slot model overrides.
+ * Per-role model overrides.
  */
-export type ModelOverrides = Partial<Record<Slot, ModelOverrideEntry>>
+export type ModelOverrides = Partial<Record<RoleId, ModelOverrideEntry>>
 
 /**
- * Resolve a bound model for a given slot.
+ * Resolve a bound model for a given role.
  */
 export function resolveModel(
-  slot: Slot,
+  roleId: RoleId,
   endpoint: string,
   auth: AuthApplicator,
   overrides?: ModelOverrides,
 ): BoundModel<{}, MagnitudeConnectionError, MagnitudeStreamError> {
-  if (overrides?.[slot]) {
-    const override = overrides[slot]!
+  if (overrides?.[roleId]) {
+    const override = overrides[roleId]!
     return override.spec.bind({ auth: override.auth ?? auth })
   }
 
-  const roleId = SLOT_TO_ROLE[slot]
-  const spec = createRoleSpec(roleId, endpoint)
+  const spec = createRoleSpec(roleId as ClientRoleId, endpoint)
   return spec.bind({ auth })
 }

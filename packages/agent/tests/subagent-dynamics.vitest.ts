@@ -29,7 +29,7 @@ describe('subagent dynamics', () => {
 
       const created = yield* h.wait.event(
         'agent_created',
-        (e) => e.agentId === 'test-explorer' && e.role === 'worker',
+        (e) => e.agentId === 'test-explorer' && e.role === 'engineer',
       )
 
       expect(created.type).toBe('agent_created')

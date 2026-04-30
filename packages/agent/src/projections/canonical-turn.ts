@@ -4,8 +4,8 @@ import type { AppEvent, MessageDestination } from '../events'
 import { serializeCanonicalTurn, type CanonicalTrace } from './canonical-xml'
 import { buildResolvedToolSet, type ResolvedToolSet } from '../tools/resolved-toolset'
 import { ConfigAmbient } from '../ambient/config-ambient'
-import { isValidVariant, type AgentVariant } from '../agents/variants'
-import { getAgentDefinition, getAgentSlot } from '../agents/registry'
+import { isRoleId, type RoleId } from '../agents/role-validation'
+import { getAgentDefinition } from '../agents/registry'
 import { AgentStatusProjection, getAgentByForkId } from './agent-status'
 
 
@@ -174,17 +174,15 @@ export const CanonicalTurnProjection = Projection.defineForked<AppEvent, Canonic
       let canonicalXml: string
       if (clean) {
         const agentState = read(AgentStatusProjection)
-        const variant: AgentVariant = event.forkId
+        const roleId: RoleId = event.forkId
           ? (() => {
               const role = getAgentByForkId(agentState, event.forkId)?.role
-              return role && isValidVariant(role) ? role : 'worker'
+              return role && isRoleId(role) ? role : 'engineer'
             })()
-          : 'lead'
-        const agentDef = getAgentDefinition(variant)
-        const slot = getAgentSlot(variant)
-
+          : 'leader'
+        const agentDef = getAgentDefinition(roleId)
         const configState = ambient.get(ConfigAmbient)
-        const toolSet = buildResolvedToolSet(agentDef, configState, slot)
+        const toolSet = buildResolvedToolSet(agentDef, configState, roleId)
 
         const trace: CanonicalTrace = {
           lenses: fork.lenses,

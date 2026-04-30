@@ -17,10 +17,9 @@ export function compilePromptTemplate(raw: string): string {
     .replaceAll('{{TOOLING_SECTION}}', toolingSectionRaw)
 }
 
-function mapProtocolMode(roleDef: RoleDefinition): 'lead' | 'subagent' | 'oneshot' {
-  if (roleDef.protocolRole === 'oneshot-lead') return 'oneshot'
-  if (roleDef.protocolRole === 'lead') return 'lead'
-  return 'subagent'
+function mapProtocolMode(roleDef: RoleDefinition): 'lead' | 'worker' {
+  if (roleDef.agentKind === 'lead') return 'lead'
+  return 'worker'
 }
 
 export function renderSystemPrompt(

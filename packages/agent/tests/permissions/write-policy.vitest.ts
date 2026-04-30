@@ -73,7 +73,7 @@ describe('write policy permissions', () => {
 
       // Lead spawns an explorer
       yield* harness.script.next({
-        ...agentCreateTurn('worker-test', 'worker', 'Test', 'Write a report'),
+        ...agentCreateTurn('worker-test', 'engineer', 'Test', 'Write a report'),
       }, null)
 
       yield* harness.user('explore and write report')
@@ -101,7 +101,7 @@ describe('write policy permissions', () => {
 
       // Lead spawns a worker
       yield* harness.script.next({
-        ...agentCreateTurn('worker-cwd', 'worker', 'Test', 'Try writing to cwd'),
+        ...agentCreateTurn('worker-cwd', 'engineer', 'Test', 'Try writing to cwd'),
       }, null)
 
       yield* harness.user('explore')

@@ -15,7 +15,7 @@ import type { MessageDestination, TurnOutcome } from '../events'
 import type { TurnEngineError } from '../engine/turn-engine'
 import type { CallUsage, ModelError } from '@magnitudedev/providers'
 import type { Projection, WorkerBusService, AmbientService } from '@magnitudedev/event-core'
-import type { AgentVariant } from '../agents/variants'
+import type { RoleId } from '../agents/role-validation'
 import type { AgentRoutingState } from '../projections/agent-routing'
 import type { AgentStatusState } from '../projections/agent-status'
 import type { TaskGraphState } from '../projections/task-graph'
@@ -138,7 +138,7 @@ export interface ExecutionManagerService {
 
   readonly initFork: (
     forkId: string | null,
-    variant: AgentVariant
+    variant: RoleId
   ) => Effect.Effect<
     void,
     never,
@@ -165,7 +165,7 @@ export interface ExecutionManagerService {
     message: string
     outputSchema?: JsonSchema | undefined
     mode: 'clone' | 'spawn'
-    role: AgentVariant
+    role: RoleId
     taskId: string
   }) => Effect.Effect<
     string,

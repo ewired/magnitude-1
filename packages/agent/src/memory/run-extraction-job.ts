@@ -2,7 +2,7 @@ import { Effect, Layer } from 'effect'
 import { logger } from '@magnitudedev/logger'
 import { createStorageClient } from '@magnitudedev/storage'
 import { bootstrapProviderRuntime, ModelResolver, makeModelResolver, makeNoopTracer, makeProviderRuntimeLive, ExtractMemoryDiff } from '@magnitudedev/providers'
-import { MAGNITUDE_SLOTS, type MagnitudeSlot } from '../model-slots'
+import { ROLE_IDS, type RoleId } from '../agents/role-validation'
 import { applyMemoryDiff, enforceLineBudget, ensureMemoryFile, readMemory, writeMemory, type MemoryDiff } from './memory-file'
 import { withTraceScope } from '../tracing/scoped-tracer'
 import { buildExtractionTranscript, readEventsJsonl } from './transcript'
@@ -18,13 +18,13 @@ function parseJsonDiff(raw: unknown): MemoryDiff | null {
 }
 
 export async function runExtractionJobFromFile(jobFilePath: string): Promise<void> {
-  const storage = await createStorageClient<MagnitudeSlot>()
+  const storage = await createStorageClient<RoleId>()
   const job = await storage.memoryJobs.read({ filePath: jobFilePath })
   await storage.memoryJobs.markRunning(job.jobId, job)
 
   try {
-    const providerRuntime = makeProviderRuntimeLive<MagnitudeSlot>()
-    await Effect.runPromise(bootstrapProviderRuntime<MagnitudeSlot>({ slots: MAGNITUDE_SLOTS }).pipe(Effect.provide(providerRuntime)))
+    const providerRuntime = makeProviderRuntimeLive<RoleId>()
+    await Effect.runPromise(bootstrapProviderRuntime<RoleId>({ slots: ROLE_IDS }).pipe(Effect.provide(providerRuntime)))
 
     await ensureMemoryFile(storage)
     const [events, currentMemory] = await Promise.all([
@@ -35,12 +35,12 @@ export async function runExtractionJobFromFile(jobFilePath: string): Promise<voi
     const transcript = buildExtractionTranscript(events)
 
     const tracerLayer = makeNoopTracer()
-    const resolverLayer = Layer.provide(makeModelResolver<MagnitudeSlot>(), providerRuntime)
+    const resolverLayer = Layer.provide(makeModelResolver<RoleId>(), providerRuntime)
 
     const result = await Effect.runPromise(
       Effect.gen(function* () {
         const runtime = yield* ModelResolver
-        const model = yield* runtime.resolve('lead')
+        const model = yield* runtime.resolve('leader')
         return yield* withTraceScope(
           { metadata: { callType: 'extract-memory-diff', forkId: null } },
           model.invoke(
