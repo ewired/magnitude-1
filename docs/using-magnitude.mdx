@@ -1,0 +1,92 @@
+---
+title: Using Magnitude
+description: "How to work with Magnitude day-to-day"
+icon: terminal
+---
+
+## Chatting with the leader
+
+You only ever talk to the leader. The leader handles the conversation, decides what to do, and delegates work to specialists when it needs to. You don't pick agents, route tasks, or configure workflows. Just describe what you want.
+
+The leader is built to gather context and confirm its approach before making changes. Before acting on something non-trivial, it explores the code, communicates its assumptions, and checks in. This means you can redirect early instead of undoing later.
+
+For simple questions and small fixes, it just answers or makes the change. The depth of the process scales with the size of the task.
+
+## File mentions
+
+Type `@` in the input to mention files or directories. A picker appears with project file autocomplete. Mentioned files are included as context for the agent.
+
+You can also paste or drag images into the input. Large text pastes (over 1000 characters) are automatically collapsed into paste segments so they don't clutter the chat.
+
+## Workspace and file links
+
+Each session runs inside a workspace, referenced as `$M`. The workspace is per-session and ephemeral. Agents use it for scratch work, plans, research notes, and shared context between specialists.
+
+Your project is exposed inside the workspace at `$M/project`, which is a symlink to your actual project directory. Real files stay in their original location.
+
+Assistant messages can include clickable file links:
+
+- Project files: `[app](cli/src/app.tsx)`
+- Workspace files: `[plan]($M/plan.md)`
+- Heading links: `[Approach]($M/plan.md#Approach)`
+
+Selecting a file link opens the file viewer side panel. Open files refresh as their contents change.
+
+## Sessions
+
+Magnitude saves every conversation automatically. Resume in three ways:
+
+- `magnitude --resume` resumes the most recent session immediately
+- `/resume` opens a picker of recent conversations
+- `Ctrl+R` opens the same recent conversations overlay
+
+Sessions live in `~/.magnitude/sessions/` in timestamped directories.
+
+When a conversation gets long, Magnitude compacts context automatically to stay within model limits. Old messages are summarized and recent ones are kept. The session continues without interruption. You may briefly see an indicator in the context bar while compaction runs. Each specialist compacts its context independently.
+
+## Bash mode
+
+Run shell commands directly without leaving Magnitude. Enter bash mode with `/bash` or by starting your input with `!`. The leader will be able to see the command and output.
+
+## History
+
+Use the Up and Down arrow keys on an empty input to browse your conversation history.
+
+The context bar near the input shows token usage so you can track how much context is in play.
+
+## Slash commands
+
+| Command | Aliases | Description |
+|---|---|---|
+| `/new` | | Start a new conversation |
+| `/resume` | | Open recent conversations |
+| `/exit` | `/quit`, `/q` | Exit Magnitude |
+| `/bash` | | Enter bash mode |
+| `/init` | | Generate AGENTS.md for your project |
+| `/settings` | `/s` | Open settings |
+| `/browser-setup` | | Set up browser agent (Chromium) |
+
+Type `/` to see all available commands with autocomplete.
+
+## Keyboard shortcuts
+
+| Shortcut | Context | Action |
+|---|---|---|
+| `Enter` | Chat input | Send message |
+| `Shift+Enter` | Chat input | New line |
+| `Ctrl+C` | Streaming | Interrupt |
+| `Ctrl+C` | Idle (2x) | Exit |
+| `Esc` | Running agents | Interrupt agents (2x to kill all) |
+| `Ctrl+R` | Any | Toggle recent conversations |
+
+### Multiline input
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+A` | Jump to start of line |
+| `Ctrl+E` | Jump to end of line |
+| `Ctrl+U` | Delete everything before cursor on current line |
+| `Ctrl+K` | Delete everything after cursor on current line |
+| `Ctrl+W` | Delete the word before cursor |
+| `Ctrl+D` | Delete the word after cursor |
+| `Ctrl+Y` | Paste back the last deleted text |

@@ -7,14 +7,14 @@
 </p>
 
 <p align="center">
-  <strong>Open source coding agent for open source models</strong>
+  <strong>Opinionated coding agent for open models</strong>
 </p>
 
-Magnitude is ruthlessly optimized for coding with open source models. How we do that:
-- **Custom response handling** — Native thinking and tool calls require the model template, provider, and harness to line up perfectly. Often they don't, and things break. We solve this with a custom response format, grammar, and streaming parser which work consistently across open models.
-- **Efficient subagents** — Our subagents work async and can be configured with a different model. Plan with a strong model while it delegates to faster/cheaper ones.
-- **Flexible behavior** — Instead of baking behavior into a system prompt meant for a specific model, Magnitude uses skills as a core part of its workflow. Use the robust defaults or tweak them to fit your workflow.
-- **Purpose-built provider** — Our [provider](https://app.magnitude.dev) enables grammar-constrained decoding with our response format for maximum reliability, on a flat-rate plan with generous limits. We also support major open model providers (OpenRouter, Vercel, Z.AI, etc.) and first-class local inference via llama.cpp, Ollama, and LMStudio.
+Magnitude gets the most out of open models for coding. We do the testing, tuning, and curation so you don't have to. You get a coding agent that just works, on the best open models, for $20/month.
+
+- **Specialized agents.** Each running on the open model best suited to its role.
+- **Best models, always.** We benchmark constantly. New model wins, you get it.
+- **Verified providers.** Only the ones serving the models correctly and fast.
 
 <p align="center">
   <img src="interface.png" alt="Magnitude interface" width="100%" />
@@ -22,70 +22,36 @@ Magnitude is ruthlessly optimized for coding with open source models. How we do 
 
 ## Get started
 
-Download Magnitude from your favorite package manager:
-```
-npm i -g @magnitudedev/cli
-```
+1. Sign up at [app.magnitude.dev](https://app.magnitude.dev) to get your free API key
+2. Run `npm i -g @magnitudedev/cli` then `magnitude`
+3. Paste in your API key and click enter
 
-Start Magnitude in your favorite terminal emulator:
-```
-magnitude
-```
+3 day free trial, no card required. Add a card to continue at $20/month.
 
 > If you are on Windows, you will need to use `wsl`. We do not have native Windows support yet.
 
-This will start a setup wizard for configuring your provider + choosing models. We recommend the [Magnitude Provider](https://app.magnitude.dev). However, we have support for most major providers, including OpenRouter, Vercel AI Gateway, and Fireworks. You can also run models locally with LMStudio, Ollama, llama.cpp, or any OpenAI-compatible provider.
+## Specialized agents
 
-## Customizing skills
+Magnitude is a curated system of specialized agents, each with its own defined role. These agents are made up of a system prompt, specific context, scoped toolsets, and a dedicated model + reasoning level. Here's the agents we include:
 
-Magnitude ships with 14 built-in skills that activate automatically when relevant. On first run, built-in skills are copied to  `~/.magnitude/skills/` . You can edit these files directly to customize them.
+- **Leader.** Talks to the user and delegates work. **Model:** Kimi K2.6.
+- **Scout.** Fast and efficient exploration. **Model:** MiniMax M2.7.
+- **Architect.** Plans and high-level design thinking. **Model:** Kimi K2.6.
+- **Engineer.** Concrete planning and implementation. **Model:** DeepSeek V4 Pro.
+- **Critic.** Critical and detail-oriented analysis. **Model:** GLM 5.1.
+- **Scientist.** Empirical debugging and information gathering. **Model:** DeepSeek V4 Pro.
+- **Artisan.** Tasteful and creative work. **Model:** Kimi K2.6.
+- **Advisor.** Smart peer of the leader, always available. **Model:** GLM 5.1.
 
-- **bug** - Fixing unexpected behavior, errors, or test failures
-- **feature** - Building new functionality end-to-end
-- **refactor** - Restructuring code without changing behavior
-- **scan** - Quick, targeted information gathering
-- **explore-codebase** - Mapping how systems work
-- **explore-docs** - Researching external APIs and libraries
-- **research** - Investigation requiring evidence-backed findings
-- **plan** - Designing before implementing complex work
-- **ideate** - Exploring options and tradeoffs
-- **implement** - Executing when objectives are already clear
-- **review** - Independent verification of work
-- **debug** - Hypothesis-driven root cause isolation
-- **approve** - User decision points
-- **other** - Catch-all for uncategorized work
-
-You can also provide project-specific skills in `(cwd)/.magnitude/skills/` which will override the global ones. Skills follow the standard [Agent Skills](https://agentskills.io/home) format.
-
-## Applying grammars
-
-Magnitude uses a formal [GBNF](https://github.com/ggml-org/llama.cpp/blob/master/grammars/README.md) grammar, which constrains the model's vocabulary during generation to only our response format. This helps further reduce edge cases.
-
-The grammar is generated automatically from the tool definitions. It's sent to providers that support it (Magnitude Provider, Fireworks, and llama.cpp) and silently skipped for providers that don't. Set `MAGNITUDE_ENABLE_GRAMMAR=false`  to disable grammar constraints entirely.
-
-## Magnitude Provider
-
-We offer a $20/mo coding plan. This includes:
-- The newest open source models like GLM 5.1 and Kimi K2.6
-- Native support for Magnitude GBNF grammar with no setup
-- Generous usage limits that reset every 5 hours
-- Built-in web search support using Exa
-- Very fast models with global infrastructure
-- Zero data retention for all models
-
-Sign up at [app.magnitude.dev](https://app.magnitude.dev). There's a 3 day free trial with no card required.
+We test these constantly. New models drop, the lineup updates.
 
 ## Why we built this
 
-Right now there are two categories of harnesses:
-- Harnesses that optimize for a single model family (Claude Code, Codex)
-- Harnesses that support a wide variety of models (Opencode, Cursor, etc)
+Open models are good enough for serious coding, but using them well is the wild west. Generalist harnesses like OpenCode and Cline support 30+ providers and 100s of models, which means they can't optimize for any specific setup. You end up hacking your own stack that may or may not work reliably, and needs to be redone every time a new model drops.
 
-The problem is, open source models have their own challenges and quirks that need be to addressed in the harness. Without careful attention, you get: broken thinking/tool calls, model behavior failures (doom loops, randomly stopping), and generally subpar performance.
+Magnitude bundles the harness, models, and provider into one stack we continuously test and optimize. By design, we only support the Magnitude Provider. It's how we really lean into model capabilities and keep the quality bar high. And because of open model economics, we can offer this at $20/month with generous rate limits. Sustainably.
 
-For the teams building Claude Code and Codex: they have consistent thinking, tool calling, provider, and model behaviors, which enables them to build a reliable agent experience. Current model-agnostic harnesses need to support a broad range of closed and open models, which means open models don't get the necessary attention.
-
-We're giving them the necessary attention to make their performance equivalent to closed source models at coding tasks. For way cheaper.
+We want to build the coding agent for open models that "just works". One that keeps you at the frontier, without you having to do a thing.
 
 ## Acknowledgments
 

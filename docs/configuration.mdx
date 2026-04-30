@@ -1,0 +1,55 @@
+---
+title: Configuration
+description: "Settings, AGENTS.md, and the .magnitude directory"
+icon: settings
+---
+
+Magnitude is opinionated by design. There isn't much to configure. This page covers the few things you can.
+
+## Settings
+
+Run `/settings` (or `/s`) to open the settings panel. From here you can:
+
+- See your connection state with Magnitude
+- Update your API key
+
+You can also set your API key as an environment variable:
+
+```sh
+export MAGNITUDE_API_KEY=...
+```
+
+## AGENTS.md
+
+Run `/init` to generate an `AGENTS.md` file in your project. This is project context the agents read when working in your repo: conventions, architecture notes, what to do and what to avoid.
+
+Edit `AGENTS.md` like any other file. The agents will pick up your changes on the next session.
+
+## The .magnitude directory
+
+Magnitude creates `~/.magnitude/` automatically to store local state.
+
+| Path | Purpose |
+|---|---|
+| `config.json` | Preferences and global settings |
+| `auth.json` | Stored credentials (file permissions `600`) |
+| `sessions/` | Conversation history |
+| `logs/` | CLI and event logs |
+| `traces/` | Debug trace data when tracing is enabled |
+| `model-catalog/` | Model catalog cache |
+
+Delete `auth.json` to clear saved credentials and re-authenticate.
+
+### config.json
+
+`~/.magnitude/config.json` stores your global preferences. Most of it is managed through `/settings`, but you can edit directly if you need to.
+
+The one toggle worth knowing about:
+
+- `"telemetry": false` opts out of anonymous telemetry. Also controllable via the `MAGNITUDE_TELEMETRY` environment variable.
+
+<Info>Use `/settings` for normal changes. Edit `config.json` manually only when you need direct control.</Info>
+
+### Project files
+
+You can also drop a `.magnitude/` directory inside your project for project-scoped state. Today this is mostly used by skills and notes the agents create during work.
