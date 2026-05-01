@@ -8,6 +8,7 @@ import { join } from 'node:path'
 export function createScoutRole(): RoleDefinition {
   return {
     id: 'scout',
+    description: 'Explores and investigates codebase',
     prompt: definePrompt<'SKILLS_SECTION'>(scoutPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',

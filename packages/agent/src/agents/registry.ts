@@ -6,14 +6,25 @@
 
 import { createRoles, isRoleId, type RoleId, type RoleDefinition } from '@magnitudedev/roles'
 
+import type { Effect, Layer } from 'effect'
 import type { AgentStatusState } from '../projections/agent-status'
 import type { ToolKey } from '../tools/toolkits'
+import type { ObservableConfig, ForkSetupContext } from '../observables/types'
 
 // Agent-package-level role definition.
-// In Phase 1, this is the roles-package RoleDefinition + tool keys.
-// In Phase 3, this will be augmented with lenses, turn policy, etc.
+// Extends the roles-package RoleDefinition with agent-level concerns:
+// tool keys, observables, and fork lifecycle hooks.
 export interface AgentRoleDefinition extends RoleDefinition {
   readonly toolKeys: readonly ToolKey[]
+
+  /** Observable state feeds scoped to this role's fork. */
+  readonly observables?: readonly ObservableConfig<never>[]
+
+  /** Called during fork setup to provide additional layers. */
+  readonly setup?: (ctx: ForkSetupContext) => Effect.Effect<Layer.Layer<unknown>>
+
+  /** Called during fork disposal for cleanup. */
+  readonly teardown?: (ctx: ForkSetupContext) => Effect.Effect<void>
 }
 
 const LEAD_TOOLS: readonly ToolKey[] = [

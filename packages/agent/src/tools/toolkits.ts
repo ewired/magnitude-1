@@ -8,11 +8,13 @@
 
 import { defineToolkit, mergeToolkits, type Toolkit, type ToolkitKeys } from '@magnitudedev/harness'
 import type { RoleId } from '../agents/role-validation'
+import type { ConfigState } from '../ambient/config-ambient'
 
 // --- Tools ---
 import { readTool, writeTool, editTool, treeTool, grepTool, viewTool } from './fs'
 import { shellTool } from './shell'
 import { webSearchTool } from './web-search'
+import { type BrowserToolKey, isBrowserToolKey } from './browser-tools'
 import { webFetchTool } from './web-fetch-tool'
 import { createTaskTool, updateTaskTool, spawnWorkerTool, killWorkerTool } from './task-tools'
 import { skillTool } from './skill-tool'
@@ -115,17 +117,40 @@ const ROLE_TOOLKITS: Record<RoleId, Toolkit> = {
 /** Tools that should not be displayed in the UI */
 export const HIDDEN_TOOLS: ReadonlySet<string> = new Set(['createTask', 'updateTask', 'killWorker', 'messageWorker'])
 
-export type ToolKey = ToolkitKeys<typeof leaderToolkit>
+export type ToolKey = ToolkitKeys<typeof leaderToolkit> | BrowserToolKey
 
 export function isToolKey(value: string): value is ToolKey {
-  return value in leaderToolkit.entries
+  return value in leaderToolkit.entries || isBrowserToolKey(value)
 }
 
 /**
- * Get the toolkit for a given role.
+ * Get the static toolkit for a given role.
  * Returns a Toolkit with entries keyed by the canonical tool keys
  * (fileRead, shell, webSearch, etc.).
  */
 export function getToolkitForRole(roleId: RoleId): Toolkit {
   return ROLE_TOOLKITS[roleId]
+}
+
+/**
+ * Get the effective toolkit for a role, with runtime availability filtering applied.
+ *
+ * Currently filters:
+ * - `webSearch`: removed when the role's provider is not `magnitude` and `EXA_API_KEY` is absent
+ */
+export function getEffectiveToolkit(roleId: RoleId, configState: ConfigState): Toolkit {
+  const toolkit = getToolkitForRole(roleId)
+
+  // webSearch is only available via Magnitude provider or with an EXA API key
+  const hasWebSearch = 'webSearch' in toolkit.entries
+  if (hasWebSearch) {
+    const roleConfig = configState.byRole[roleId]
+    const isMagnitudeProvider = roleConfig.providerId === 'magnitude'
+    const hasExaKey = !!process.env.EXA_API_KEY
+    if (!isMagnitudeProvider && !hasExaKey) {
+      return toolkit.omit('webSearch')
+    }
+  }
+
+  return toolkit
 }

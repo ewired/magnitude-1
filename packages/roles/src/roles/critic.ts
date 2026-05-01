@@ -8,6 +8,7 @@ import { join } from 'node:path'
 export function createCriticRole(): RoleDefinition {
   return {
     id: 'critic',
+    description: 'Reviews code for quality',
     prompt: definePrompt<'SKILLS_SECTION'>(criticPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',

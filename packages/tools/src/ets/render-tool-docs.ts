@@ -277,7 +277,9 @@ function getParams(tool: ToolDefinition): ParamInfo[] {
     const name = String(p.name)
     const optional = p.isOptional
     const type = typeToString(p.type, optional, 1)
-    const description = walkForDescription(p.type) || walkForDescription(p as AST.Annotated) || fromDescriptions.get(name)
+    const desc = walkForDescription(p.type)
+    const propDesc = !desc ? Option.getOrUndefined(AST.getDescriptionAnnotation(p)) : undefined
+    const description = desc || (isNoiseDescription(propDesc) ? undefined : propDesc) || fromDescriptions.get(name)
     const defaultValue = getDefaultValue(p) || transformDefaults.get(name)
 
     return { name, optional, type, description, defaultValue }

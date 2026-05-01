@@ -35,13 +35,15 @@ import { TurnProjection, type ForkTurnState } from '../projections/turn'
 import { SessionContextProjection, type SessionContextState } from '../projections/session-context'
 import { TaskGraphProjection, type TaskGraphState } from '../projections/task-graph'
 
-import type { RoleDefinition, BoundObservable } from '@magnitudedev/roles'
-import { bindObservable } from '@magnitudedev/roles'
+import type { RoleDefinition } from '@magnitudedev/roles'
+import type { BoundObservable } from '../observables/types'
+import { bindObservable } from '../observables/types'
 import { ProjectionReaderTag, type ProjectionReader } from '../observables/projection-reader'
 import { EphemeralSessionContextTag, PolicyContextProviderTag, type EphemeralSessionContext } from '../agents/types'
 import { createPolicyContextProvider } from '../agents/policy-context'
 import { ExecutionManager } from './types'
 import type { ExecutionManagerService } from './types'
+import type { ForkLayer } from './fork-layer'
 import { WorkingDirectoryTag } from './working-directory'
 
 import { ChatPersistence } from '../persistence/chat-persistence-service'
@@ -133,6 +135,11 @@ function makeForkLayers(
     Layer.succeed(PolicyContextProviderTag, policyCtxProvider),
     Layer.succeed(ToolInterceptorTag, providedInterceptor),
     persistenceLayer,
+
+    Layer.succeed(ProjectionReaderTag, {
+      getAgentRouting: () => agentProjection.get,
+      getAgentStatus: () => agentStatusProjection.get,
+    } satisfies ProjectionReader),
   )
 }
 
@@ -142,7 +149,7 @@ function makeForkLayers(
 const makeExecutionManager = Effect.gen(function* () {
   const ephemeralSessionContext = yield* EphemeralSessionContextTag
   // Per-fork cached layers (built during initFork, reused across turns)
-  const forkLayers = new Map<string | null, Layer.Layer<never>>()
+  const forkLayers = new Map<string | null, ForkLayer>()
   const forkCwds = new Map<string | null, string>()
   const forkWorkspacePaths = new Map<string | null, string | undefined>()
 
@@ -226,7 +233,7 @@ const makeExecutionManager = Effect.gen(function* () {
       // Inject role-specific setup layer when the role defines a setup function
       const roleDef = getAgentDefinition(roleId)
       if (roleDef.setup && forkId) {
-        const setupLayer = (yield* roleDef.setup({ forkId, cwd, workspacePath })) as Layer.Layer<never>
+        const setupLayer = yield* roleDef.setup({ forkId, roleId, cwd, workspacePath })
         layers = Layer.merge(layers, setupLayer)
       }
 
@@ -235,7 +242,7 @@ const makeExecutionManager = Effect.gen(function* () {
         const browserService = yield* BrowserService
 
         if (roleDef.teardown) {
-          const teardownEffect = roleDef.teardown({ forkId, cwd, workspacePath }).pipe(
+          const teardownEffect = roleDef.teardown({ forkId, roleId, cwd, workspacePath }).pipe(
             Effect.provideService(BrowserService, browserService)
           ) as Effect.Effect<void>
           forkTeardowns.set(forkId, teardownEffect)
@@ -250,20 +257,13 @@ const makeExecutionManager = Effect.gen(function* () {
         forkRoles.set(forkId, roleId)
       }
 
-      const projectionReader: ProjectionReader = {
-        getAgentRouting: () => agentProjection.get,
-        getAgentStatus: () => agentStatusProjection.get,
-      }
-      const projectionReaderLayer = Layer.succeed(ProjectionReaderTag, projectionReader)
-      layers = Layer.merge(layers, projectionReaderLayer)
-
       // Cache the layers
       forkLayers.set(forkId, layers)
 
       // Bind observables
       const agentDef = getAgentDefinition(roleId)
-      const agentObservables = agentDef.observables.map((obs) =>
-        bindObservable(obs, () => Effect.succeed(layers as Layer.Layer<unknown>))
+      const agentObservables = (agentDef.observables ?? []).map((obs) =>
+        bindObservable(obs, (effect) => Effect.provide(effect, layers))
       )
       boundObservables.set(forkId, agentObservables)
     }) as Effect.Effect<void, never, Projection.ProjectionInstance<SessionContextState> | Projection.ProjectionInstance<AgentRoutingState> | Projection.ProjectionInstance<AgentStatusState> | Projection.ForkedProjectionInstance<ForkTurnState> | Projection.ProjectionInstance<ConversationState> | ChatPersistence | BrowserService | WorkerBusService<AppEvent>>),

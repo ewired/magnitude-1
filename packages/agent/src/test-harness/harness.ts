@@ -1,7 +1,6 @@
 import { Agent, type Projection, makeAmbientServiceLayer } from '@magnitudedev/event-core'
 import { Context, Effect, Layer, SubscriptionRef } from 'effect'
 import { YIELD_USER } from '@magnitudedev/xml-act'
-import type { RoleDefinition } from '@magnitudedev/roles'
 
 import type { AppEvent, SessionContext } from '../events'
 import { textParts, textOf } from '../content'
@@ -112,7 +111,6 @@ export interface HarnessOptions {
   model?: TestModelConfig
 }
 
-type MagnitudeAgentDef = RoleDefinition<import('../catalog').AgentCatalog, RoleId, PolicyContext>
 
 const DEFAULT_TIMEOUT_MS = 10_000
 

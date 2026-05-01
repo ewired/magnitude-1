@@ -157,7 +157,7 @@ export const editTool = defineHarnessTool({
   }),
   stream: {
     initial: { emitted: false },
-    onInput: (input, state, ctx) => Effect.gen(function* () {
+    onInput: (input, state: { emitted: boolean }, ctx) => Effect.gen(function* () {
       if (state.emitted) return state
       const path = input.path
       if (!path || !path.isFinal) return state

@@ -1,5 +1,5 @@
 import { Effect, Stream } from 'effect'
-import type { BoundModel, ModelSpec, ResponseStreamEvent } from '@magnitudedev/ai'
+import type { BoundModel, ModelSpec, ModelStreamResult, ResponseStreamEvent } from '@magnitudedev/ai'
 import type { MagnitudeConnectionError, MagnitudeStreamError } from '@magnitudedev/magnitude-client'
 
 /**
@@ -9,7 +9,7 @@ import type { MagnitudeConnectionError, MagnitudeStreamError } from '@magnituded
  * If no responses are provided, an empty stream is returned.
  */
 export interface TestModelConfig {
-  readonly responses?: readonly (readonly ResponseStreamEvent[])[]
+  readonly responses?: readonly (readonly ResponseStreamEvent<MagnitudeStreamError>[])[]
 }
 
 const testModelSpec: ModelSpec<{}, MagnitudeConnectionError, MagnitudeStreamError> = {
@@ -34,7 +34,11 @@ export function createTestBoundModel(
           ? responses[responses.length - 1]
           : []
       callIndex++
-      return Effect.succeed(Stream.fromIterable(events))
+      const result: ModelStreamResult<MagnitudeStreamError> = {
+        events: Stream.fromIterable(events),
+        parsers: new Map(),
+      }
+      return Effect.succeed(result)
     },
   }
 }

@@ -8,6 +8,7 @@ import { join } from 'node:path'
 export function createScientistRole(): RoleDefinition {
   return {
     id: 'scientist',
+    description: 'Debugs and diagnoses issues',
     prompt: definePrompt<'SKILLS_SECTION'>(scientistPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',

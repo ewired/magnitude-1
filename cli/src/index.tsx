@@ -4,13 +4,10 @@ import fs from 'fs'
 import { createCliRenderer } from '@opentui/core'
 import { createRoot } from '@opentui/react'
 import { Command } from '@commander-js/extra-typings'
-import { createProviderClient } from '@magnitudedev/providers'
 import { createStorageClient } from '@magnitudedev/storage'
-import { MAGNITUDE_SLOTS, type MagnitudeSlot } from '@magnitudedev/agent'
 import { App, type SessionStart } from './app'
 import { initThemeStore, useThemeStateStore } from './hooks/use-theme'
 import { CLI_VERSION } from './version'
-import { ProviderRuntimeProvider } from './providers/provider-runtime'
 import { StorageProvider } from './providers/storage-provider'
 import { isLightBackground } from './utils/theme'
 import { installGracefulShutdownHandlers } from './utils/graceful-shutdown'
@@ -59,7 +56,6 @@ async function main() {
       )
 
       const storage = await createStorageClient({ cwd: process.cwd(), currentVersion: CLI_VERSION })
-      const providerRuntime = await createProviderClient<MagnitudeSlot>({ slots: MAGNITUDE_SLOTS })
       const sessionStart: SessionStart = opts.resume === undefined
         ? { _tag: 'new' }
         : opts.resume === true
@@ -68,18 +64,16 @@ async function main() {
 
       createRoot(renderer).render(
         <StorageProvider client={storage}>
-          <ProviderRuntimeProvider runtime={providerRuntime}>
-            <App
-              sessionStart={sessionStart}
-              debug={opts.debug ?? false}
-              onClientReady={(client) => {
-                clientRef = client
-              }}
-              onSessionId={(id) => {
-                activeSessionId = id
-              }}
-            />
-          </ProviderRuntimeProvider>
+          <App
+            sessionStart={sessionStart}
+            debug={opts.debug ?? false}
+            onClientReady={(client) => {
+              clientRef = client
+            }}
+            onSessionId={(id) => {
+              activeSessionId = id
+            }}
+          />
         </StorageProvider>
       )
     })

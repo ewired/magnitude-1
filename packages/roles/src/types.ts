@@ -2,6 +2,10 @@ import type { ExecuteHookContext, InterceptorDecision } from '@magnitudedev/harn
 import type { Effect } from 'effect'
 import type { PromptTemplate } from './prompt'
 
+// ---------------------------------------------------------------------------
+// Core
+// ---------------------------------------------------------------------------
+
 export type RoleId = 'leader' | 'scout' | 'architect' | 'engineer' | 'critic' | 'scientist' | 'artisan' | 'advisor'
 
 export const ROLE_IDS: readonly RoleId[] = ['leader', 'scout', 'architect', 'engineer', 'critic', 'scientist', 'artisan', 'advisor'] as const
@@ -23,6 +27,9 @@ export type PolicyRule = (ctx: ExecuteHookContext & { policyContext: PolicyConte
 export interface RoleDefinition {
   /** Role identity. */
   readonly id: RoleId
+
+  /** Short human-readable description of this role. */
+  readonly description: string
 
   /** System prompt template. Render with runtime vars (e.g. SKILLS_SECTION) to get final text. */
   readonly prompt: PromptTemplate<'SKILLS_SECTION'>

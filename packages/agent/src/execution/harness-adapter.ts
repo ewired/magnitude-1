@@ -302,7 +302,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
               inputTokens: event.usage.inputTokens ?? null,
               outputTokens: event.usage.outputTokens ?? null,
               cacheReadTokens: event.usage.cacheReadTokens ?? null,
-              cacheWriteTokens: event.usage.cacheWriteTokens ?? null,
+              cacheWriteTokens: null,
             }
           }
 
@@ -339,7 +339,6 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
                   _tag: 'ToolInputDecodeFailure' as const,
                   toolCallId: outcome.toolCallId,
                   toolName: outcome.toolName,
-                  group: '',
                   issue: outcome.issue,
                 },
               }

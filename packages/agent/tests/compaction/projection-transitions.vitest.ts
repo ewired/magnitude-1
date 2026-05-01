@@ -3,8 +3,10 @@ import { Effect } from 'effect'
 import { expect } from 'vitest'
 import { CHARS_PER_TOKEN_LOWER } from '../../src/constants'
 import { getAgentDefinition, ROLE_IDS, type RoleId } from '../../src/agents'
-import { renderSystemPrompt } from '../../src/prompts/system-prompt'
+import { buildSystemPrompt } from '../../src/prompts/system-prompt-builder'
 import { buildResolvedToolSet } from '../../src/tools/resolved-toolset'
+import { getToolkitForRole } from '../../src/tools/toolkits'
+import { renderToolDocs } from '../../src/prompts/render-tool-docs'
 import type { ConfigState } from '../../src/ambient/config-ambient'
 import { TestHarness, TestHarnessLive } from '../../src/test-harness/harness'
 import {
@@ -29,7 +31,13 @@ const mockConfigState: ConfigState = {
 
 const leadDef = getAgentDefinition('leader')
 const leadToolSet = buildResolvedToolSet(leadDef, mockConfigState, 'leader')
-const leadSystemPromptTokens = Math.ceil(renderSystemPrompt(leadDef, new Map(), leadToolSet).length / CHARS_PER_TOKEN_LOWER)
+const leadToolkit = getToolkitForRole('leader')
+const leadToolDefs = [...leadToolSet.availableKeys]
+  .map(key => leadToolkit.entries[key]?.tool)
+  .filter(Boolean)
+  .map(t => t.definition)
+const leadToolDocs = leadToolDefs.length > 0 ? renderToolDocs(leadToolDefs) : ''
+const leadSystemPromptTokens = Math.ceil(buildSystemPrompt({ roleDef: leadDef, skills: new Map(), lenses: [], toolDocs: leadToolDocs }).length / CHARS_PER_TOKEN_LOWER)
 
 describe('compaction/projection-transitions', () => {
   it.effect('initial token estimate includes system prompt tokens', () =>

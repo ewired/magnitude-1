@@ -8,24 +8,21 @@ import { Effect, Context } from 'effect'
 import { Fork } from '@magnitudedev/event-core'
 import { PermissionRejection } from './permission-rejection'
 import type { RoleDefinition } from '@magnitudedev/roles'
-import type { Policy } from '../agents/policy'
+import { evaluatePolicy } from '@magnitudedev/roles'
+import type { ToolCallId } from '@magnitudedev/ai'
+import type { ExecuteHookContext, InterceptorDecision } from '@magnitudedev/harness'
+import type { PolicyContext as RolesPolicyContext } from '@magnitudedev/roles'
 import { PolicyContextProviderTag } from '../agents/types'
-import { evaluate } from '../agents/policy'
 
 const { ForkContext } = Fork
 
 /** Context provided to the interceptor for each tool call. */
 export interface InterceptorContext {
   readonly toolName: string
-  readonly toolCallId: string
+  readonly toolCallId: ToolCallId
   readonly input: unknown
   readonly meta: unknown
 }
-
-/** Decision returned by the interceptor. */
-export type InterceptorDecision =
-  | { readonly _tag: 'Proceed' }
-  | { readonly _tag: 'Reject'; readonly rejection: unknown }
 
 /** Tool interceptor interface — evaluates policy before tool execution. */
 export interface ToolInterceptor {
@@ -48,23 +45,27 @@ export function buildPolicyInterceptor(
       const { forkId } = yield* ForkContext
       const agentDef = resolveAgent(forkId)
       const policyCtx = yield* (yield* PolicyContextProviderTag).get
-      const defKey = getDefKey(ctx.meta)
-      if (defKey === null) {
+      const toolKey = getDefKey(ctx.meta)
+      if (toolKey === null) {
         return reject(PermissionRejection.Forbidden({ reason: 'Invalid tool metadata' }))
       }
 
-      const decision = yield* evaluate(
-        agentDef.policy as Policy<unknown, unknown>,
-        defKey,
-        ctx.input,
-        policyCtx,
-      )
-
-      if (decision.decision === 'allow') {
-        return { _tag: 'Proceed' } satisfies InterceptorDecision
+      const hookCtx: ExecuteHookContext & { policyContext: RolesPolicyContext } = {
+        toolCallId: ctx.toolCallId,
+        toolName: ctx.toolName,
+        toolKey,
+        input: ctx.input,
+        policyContext: {
+          cwd: policyCtx.cwd,
+          workspacePath: policyCtx.workspacePath,
+          disableShellSafeguards: policyCtx.disableShellSafeguards,
+          disableCwdSafeguards: policyCtx.disableCwdSafeguards,
+        },
       }
 
-      return reject(PermissionRejection.Forbidden({ reason: decision.reason }))
+      const decision = yield* evaluatePolicy(agentDef.policy, hookCtx)
+
+      return decision
     })
 }
 

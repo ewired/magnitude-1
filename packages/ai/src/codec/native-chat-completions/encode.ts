@@ -99,8 +99,41 @@ function encodeMessage(message: any): ChatMessage {
   }
 }
 
+/**
+ * Convert an Effect Schema to a clean JSON Schema suitable for tool definitions.
+ *
+ * Effect's JSONSchema.make() adds metadata fields ($id, $schema) that many
+ * providers (e.g. Fireworks) reject. It also produces placeholder objects like
+ * `{"$id": "/schemas/unknown", "title": "unknown"}` for Schema.Unknown, which
+ * should be `{}` (any value) in standard JSON Schema.
+ *
+ * This function recursively cleans the output to produce provider-compatible
+ * JSON Schema.
+ */
+function toToolJsonSchema(node: unknown): unknown {
+  if (node === null || node === undefined) return node
+  if (Array.isArray(node)) return node.map(toToolJsonSchema)
+  if (typeof node !== 'object') return node
+
+  const obj = node as Record<string, unknown>
+
+  // An object with only $id and/or title and no type/properties is an Effect
+  // placeholder for an opaque type (Unknown, Any, etc.) → emit empty schema
+  const keys = Object.keys(obj)
+  const isPlaceholder = keys.every(k => k === '$id' || k === 'title' || k === '$schema')
+  if (isPlaceholder) return {}
+
+  const result: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    // Strip $id and $schema at every level — these are Effect metadata
+    if (k === '$id' || k === '$schema') continue
+    result[k] = typeof v === 'object' ? toToolJsonSchema(v) : v
+  }
+  return result
+}
+
 function schemaToJsonSchema(schema: ToolDefinition["inputSchema"]): Record<string, unknown> {
-  return { ...JSONSchema.make(schema) }
+  return toToolJsonSchema(JSONSchema.make(schema)) as Record<string, unknown>
 }
 
 function encodeTool(tool: ToolDefinition): ChatTool {

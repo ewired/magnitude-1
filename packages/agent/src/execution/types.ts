@@ -19,9 +19,10 @@ import type { ConversationState } from '../projections/conversation'
 import type { ApprovalStateService } from './approval-state'
 import type { BrowserService } from '../services/browser-service'
 import type { ChatPersistence } from '../persistence/chat-persistence-service'
-import type { BoundObservable } from '@magnitudedev/roles'
+import type { BoundObservable } from '../observables/types'
 import type { JsonSchema } from '@magnitudedev/llm-core'
 import type { AppEvent } from '../events'
+import type { ForkLayer } from './fork-layer'
 
 
 // =============================================================================
@@ -111,7 +112,7 @@ export interface ExecutionManagerService {
    * services, ToolInterceptor, etc. Used by Cortex to provide tool-execution
    * context for the native paradigm.
    */
-  readonly getForkLayer: (forkId: string | null) => Layer.Layer<never> | undefined
+  readonly getForkLayer: (forkId: string | null) => ForkLayer | undefined
 
   readonly fork: (params: {
     parentForkId: string | null

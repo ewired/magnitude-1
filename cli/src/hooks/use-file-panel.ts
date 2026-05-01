@@ -141,24 +141,28 @@ export function useFilePanel({
 
     const frozenBase = frozenBaseContent ?? selectedFileContent
 
-    if (state.toolKey === 'fileWrite') {
+    if ('body' in state) {
       return {
-        mode: 'write',
+        mode: 'write' as const,
         status,
         body: state.body,
         baseContent: frozenBase,
       }
     }
 
-    return {
-      mode: 'edit',
-      status,
-      oldText: state.oldText,
-      newText: state.newText,
-      replaceAll: state.replaceAll,
-      streamingTarget: state.streamingTarget,
-      baseContent: frozenBase,
+    if ('oldText' in state) {
+      return {
+        mode: 'edit' as const,
+        status,
+        oldText: state.oldText,
+        newText: state.newText,
+        replaceAll: state.replaceAll,
+        streamingTarget: state.streamingTarget,
+        baseContent: frozenBase,
+      }
     }
+
+    return null
   }, [activeStream, frozenBaseContent, selectedFileContent])
 
   const openFile = useCallback((path: string, section?: string) => {

@@ -1,5 +1,7 @@
 import { Layer } from 'effect'
+import { createId } from '@magnitudedev/generate-id'
 import type { StorageClient } from '@magnitudedev/storage'
+import type { RoleId } from '@magnitudedev/roles'
 import { resolve } from 'path'
 import { stat } from 'fs/promises'
 import {
@@ -12,10 +14,7 @@ import {
   type DisplayState,
   type AgentStatusState,
   type ForkTurnState,
-  type ArtifactState,
-  type MagnitudeSlot,
 } from '@magnitudedev/agent'
-import type { ProviderRuntime } from '@magnitudedev/providers'
 import { JsonChatPersistence } from '../persistence'
 
 type AgentClient = Awaited<ReturnType<typeof createCodingAgentClient>>
@@ -32,7 +31,6 @@ export interface SessionDetail extends SessionInfo {
   display: DisplayState
   forkState: AgentStatusState
   turnState: ForkTurnState
-  artifactState: ArtifactState
 }
 
 interface SessionRecord {
@@ -45,7 +43,6 @@ interface SessionRecord {
   display: DisplayState | null
   forkState: AgentStatusState | null
   turnState: ForkTurnState | null
-  artifactState: ArtifactState | null
   eventSeq: number
   eventBuffer: SseEnvelope[]
   subscribers: Set<(evt: SseEnvelope) => void>
@@ -56,7 +53,7 @@ interface SessionRecord {
 
 interface SseEnvelope {
   id: string
-  event: 'agent_event' | 'display_state' | 'fork_state' | 'turn_state' | 'artifact_state'
+  event: 'agent_event' | 'display_state' | 'fork_state' | 'turn_state'
   data: unknown
 }
 
@@ -72,6 +69,7 @@ const DEFAULT_DISPLAY_STATE: DisplayState = {
   streamingMessageId: null,
   activeThinkBlockId: null,
   showButton: 'send',
+  pendingInboundCommunications: [],
 }
 
 const DEFAULT_FORK_STATE: AgentStatusState = {
@@ -86,10 +84,6 @@ const DEFAULT_TURN_STATE: ForkTurnState = {
   softInterrupted: false,
   parentForkId: null,
   completedTurns: 0,
-}
-
-const DEFAULT_ARTIFACT_STATE: ArtifactState = {
-  artifacts: new Map(),
 }
 
 const DEFAULT_SESSION_TITLE = 'New Chat'
@@ -112,13 +106,11 @@ export class SessionManager {
   private globalBuffer: GlobalSseEnvelope[] = []
   private globalSubscribers = new Set<(evt: GlobalSseEnvelope) => void>()
 
-  private readonly storage: StorageClient
-  private readonly providerRuntime: ProviderRuntime<MagnitudeSlot>
+  private readonly storage: StorageClient<RoleId>
 
-  constructor(opts: { debug: boolean; storage: StorageClient; providerRuntime: ProviderRuntime<MagnitudeSlot> }) {
+  constructor(opts: { debug: boolean; storage: StorageClient<RoleId> }) {
     this.debug = opts.debug
     this.storage = opts.storage
-    this.providerRuntime = opts.providerRuntime
   }
 
   async createSession(opts?: CreateSessionOptions): Promise<SessionInfo> {
@@ -145,7 +137,6 @@ export class SessionManager {
       storage: this.storage,
       debug: this.debug,
       sessionContext,
-      providerRuntime: this.providerRuntime,
       sessionId: id,
     })
     const createdAt = new Date().toISOString()
@@ -160,7 +151,6 @@ export class SessionManager {
       display: null,
       forkState: null,
       turnState: null,
-      artifactState: null,
       eventSeq: 0,
       eventBuffer: [],
       subscribers: new Set(),
@@ -187,11 +177,6 @@ export class SessionManager {
     record.unsubscribers.push(client.state.turn.subscribeFork(null, (state) => {
       record.turnState = state
       this.pushSessionEvent(record, 'turn_state', state)
-    }))
-
-    record.unsubscribers.push(client.state.artifacts.subscribe((state) => {
-      record.artifactState = state
-      this.pushSessionEvent(record, 'artifact_state', state)
     }))
 
     record.unsubscribers.push(client.state.taskGraph.subscribe((state) => {
@@ -243,7 +228,6 @@ export class SessionManager {
       display: record.display ?? DEFAULT_DISPLAY_STATE,
       forkState: record.forkState ?? DEFAULT_FORK_STATE,
       turnState: record.turnState ?? DEFAULT_TURN_STATE,
-      artifactState: record.artifactState ?? DEFAULT_ARTIFACT_STATE,
     }
   }
 
@@ -279,6 +263,8 @@ export class SessionManager {
     }
     await record.client.send({
       type: 'user_message',
+      messageId: createId(),
+      timestamp: Date.now(),
       forkId: null,
       content: textParts(content),
       attachments: [],

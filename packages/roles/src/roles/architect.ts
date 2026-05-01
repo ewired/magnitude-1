@@ -8,6 +8,7 @@ import { join } from 'node:path'
 export function createArchitectRole(): RoleDefinition {
   return {
     id: 'architect',
+    description: 'Plans structure and design',
     prompt: definePrompt<'SKILLS_SECTION'>(architectPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',

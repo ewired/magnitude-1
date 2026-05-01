@@ -141,7 +141,7 @@ export type { EditDiff } from './util/line-edit'
 
 // Execution
 export { ExecutionManager } from './execution/types'
-export type { ExecutionManagerService, ExecuteOptions, ExecuteResult } from './execution/types'
+export type { ExecutionManagerService, ExecuteResult } from './execution/types'
 // ExecutionManagerLive — xml-act paradigm, orphaned. Import directly from the file if needed.
 export { PermissionRejection } from './execution/permission-rejection'
 
@@ -157,7 +157,7 @@ export type { ToolHandle } from './tools/tool-handle'
 export type { ToolState } from './models'
 export type { FileEditState, FileWriteState } from './models'
 export { globalTools } from './tools/globals'
-export { shellTool, SHELL_TOOLS } from './tools/shell'
+export { shellTool } from './tools/shell'
 export { readTool, writeTool, editTool, treeTool, grepTool, fsTools } from './tools/fs'
 // webSearchTool disabled — awaiting Exa reimplementation
 export { webFetchTool } from './tools/web-fetch-tool'
@@ -199,7 +199,9 @@ export {
 export type { SerializedEvent } from './serialization'
 
 // Debug Introspection
-// debug-introspection removed (depends on ReplayProjection — W scheduled rewrite)
+// debug-introspection service removed (depends on ReplayProjection — scheduled rewrite)
+// Types are still exported for CLI debug panel
+export type { DebugSnapshot, ProjectionSnapshot, ContextUsage } from './projections/debug-introspection'
 
 // Ambient config
 export * from './ambient'

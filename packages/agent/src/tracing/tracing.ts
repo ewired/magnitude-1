@@ -5,11 +5,11 @@ import type { TraceInput as TracingTraceInput, TraceData as TracingTraceData } f
  * Agent-local tracing types and services.
  */
 
-/** Transport-level trace input — slot widened to string for agent use */
-export type TraceInput = Omit<TracingTraceInput, 'slot'> & { slot: string }
+/** Transport-level trace input */
+export type TraceInput = TracingTraceInput
 
 /** Full enriched trace data with agent context */
-export type TraceData<M extends Record<string, unknown> = Record<string, unknown>> = Omit<TracingTraceData<M>, 'slot'> & { slot: string }
+export type TraceData<M extends Record<string, unknown> = Record<string, unknown>> = TracingTraceData<M>
 
 /**
  * Driver-facing trace emitter — accepts transport-level trace input.

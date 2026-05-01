@@ -17,6 +17,7 @@ import type { MagnitudeConnectionError, MagnitudeStreamError } from '@magnituded
 import { renderToolDocs } from '../prompts/render-tool-docs'
 
 import type { AppEvent, TurnOutcome } from '../events'
+import type { TurnOutcome as HarnessTurnOutcome } from '@magnitudedev/harness'
 
 import { WindowProjection } from '../projections/window'
 import { SessionContextProjection } from '../projections/session-context'
@@ -33,10 +34,20 @@ import { ExecutionManager } from '../execution/types'
 import { SkillsAmbient } from '../ambient/skills-ambient'
 import { buildInterruptedTurnOutcome } from '../util/interrupt-utils'
 import type { ObservationPart } from '../events'
+import type { ObservablePart } from '../observables/types'
+
+function toObservationPart(part: ObservablePart): ObservationPart {
+  switch (part._tag) {
+    case 'TextPart':
+      return { type: 'text', text: part.text }
+    case 'ImagePart':
+      return { type: 'image', base64: part.data, mediaType: part.mediaType, dimensions: part.dimensions }
+  }
+}
 import { isToolKey, type ToolKey } from '../tools/toolkits'
 import { persistResult } from '../runtime/result-persistence'
 import { PolicyContextProviderTag } from '../agents/types'
-import { handleTaskDirective } from '../tasks/operations'
+import { handleMessageDirective } from '../tasks/operations/message'
 import { Fork } from '@magnitudedev/event-core'
 
 import * as path from 'path'
@@ -86,8 +97,8 @@ function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): TurnOutcome
   }
 }
 
-function mapStreamErrorToOutcome(err: MagnitudeStreamError): TurnOutcome {
-  return { _tag: 'ConnectionFailure', detail: { _tag: 'StreamError' } }
+function mapStreamErrorToOutcome(err: MagnitudeStreamError): HarnessTurnOutcome {
+  return { _tag: 'EngineDefect', message: `Stream error: ${err.message ?? 'unknown'}` }
 }
 
 // =============================================================================
@@ -148,7 +159,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         const boundObs = execManager.getObservables(forkId)
         for (const obs of boundObs) {
           const parts = yield* obs.observe()
-          observations.push(...parts)
+          observations.push(...parts.map(toObservationPart))
         }
         if (observations.length > 0) {
           yield* publish({ type: 'observations_captured', forkId, turnId, parts: observations })
@@ -184,7 +195,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
           model: agentModel.model,
           toolkit,
           mapStreamError: mapStreamErrorToOutcome,
-          layer: forkLayer as Layer.Layer<never>,
+          layer: forkLayer,
           hooks: buildHarnessHooks({
             forkId,
             turnId,
@@ -239,15 +250,12 @@ export const Cortex = Worker.defineForked<AppEvent>()({
           triggeredByUser: chainId === turnId,
           publish,
           handleTaskDirective: (directive) =>
-            handleTaskDirective(directive, {
+            handleMessageDirective(directive, {
               forkId,
               timestamp: Date.now(),
               graph: { tasks: new Map() },
               skills,
-            }).pipe(
-              Effect.provideService(ForkContext, { forkId, roleId }),
-              Effect.provide(forkLayer),
-            ),
+            }),
           identicalResponseTracker: null,
           resolveToolKey: (toolName: string) => toolNameToKey.get(toolName),
         })

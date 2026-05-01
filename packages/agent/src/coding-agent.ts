@@ -218,17 +218,22 @@ export interface CreateClientOptions {
 export async function createCodingAgentClient(options: CreateClientOptions) {
 
   // Construct Magnitude config from options / env vars
-  const apiKey = options.magnitudeApiKey ?? process.env.MAGNITUDE_API_KEY
-  if (!apiKey) throw new Error('MAGNITUDE_API_KEY is required — set it via env var or pass magnitudeApiKey option')
+  const useLocal = !!process.env.MAGNITUDE_USE_LOCAL
+  const apiKey = options.magnitudeApiKey ?? (useLocal ? process.env.MAGNITUDE_LOCAL_API_KEY : undefined) ?? process.env.MAGNITUDE_API_KEY
+  if (!apiKey) throw new Error(
+    useLocal
+      ? 'MAGNITUDE_LOCAL_API_KEY (or MAGNITUDE_API_KEY) is required when MAGNITUDE_USE_LOCAL is set'
+      : 'MAGNITUDE_API_KEY is required — set it via env var or pass magnitudeApiKey option'
+  )
 
-  const magnitudeEndpoint = options.magnitudeEndpoint ?? process.env.MAGNITUDE_ENDPOINT ?? 'https://app.magnitude.dev/api/v1'
+  const magnitudeEndpoint = options.magnitudeEndpoint ?? process.env.MAGNITUDE_ENDPOINT ?? (useLocal ? 'http://localhost:3000/api/v1' : 'https://app.magnitude.dev/api/v1')
 
   const magnitudeConfigLayer = Layer.succeed(MagnitudeConfig, {
     endpoint: magnitudeEndpoint,
     apiKey,
     auth: Auth.bearer(apiKey),
     overrides: options.modelOverrides,
-    defaultProfile: { contextWindow: 200_000, maxOutputTokens: 32_768, capabilities: { vision: true, reasoning: true } },
+    defaultProfile: { contextWindow: 200_000, maxOutputTokens: 32_768, capabilities: { vision: true, grammar: false, reasoning: { type: 'always', effort: ['low', 'medium', 'high'] } } },
   })
 
   const magnitudeClientLayer = Layer.succeed(

@@ -8,6 +8,7 @@ import { join } from 'node:path'
 export function createArtisanRole(): RoleDefinition {
   return {
     id: 'artisan',
+    description: 'Crafts specialized implementations',
     prompt: definePrompt<'SKILLS_SECTION'>(artisanPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',

@@ -8,6 +8,7 @@ import { join } from 'node:path'
 export function createAdvisorRole(): RoleDefinition {
   return {
     id: 'advisor',
+    description: 'Provides strategic guidance',
     prompt: definePrompt<'SKILLS_SECTION'>(advisorPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'peer',

@@ -1,5 +1,5 @@
 import { TextAttributes } from '@opentui/core';
-import type { ToolState } from '@magnitudedev/agent';
+import type { BaseState } from '@magnitudedev/harness';
 import { createToolDisplay } from '../types';
 import { Button } from '../../components/button';
 import { ShimmerText } from '../../components/shimmer-text';
@@ -7,12 +7,11 @@ import { useTheme } from '../../hooks/use-theme';
 
 const SHIMMER_INTERVAL_MS = 160;
 
-export const defaultDisplay = createToolDisplay<ToolState>({
+export const defaultDisplay = createToolDisplay<BaseState>({
   render: ({ state, isExpanded, onToggle }) => {
     const theme = useTheme();
     const isRunning = state.phase === 'streaming' || state.phase === 'executing';
     const isErrorLike = state.phase === 'error' || state.phase === 'rejected' || state.phase === 'interrupted';
-    const label = state.toolKey || 'tool';
 
     return (
       <box style={{ flexDirection: 'column' }}>
@@ -21,7 +20,7 @@ export const defaultDisplay = createToolDisplay<ToolState>({
             <span style={{ fg: isErrorLike ? theme.error : theme.info }}>
               {isErrorLike ? '✗ ' : '• '}
             </span>
-            <span style={{ fg: theme.foreground }}>{label}</span>
+            <span style={{ fg: theme.foreground }}>tool</span>
             {isRunning ? (
               <>
                 <span>{' '}</span>
@@ -43,11 +42,10 @@ export const defaultDisplay = createToolDisplay<ToolState>({
     );
   },
   summary: (state) => {
-    const target = state.toolKey || 'tool';
-    if (state.phase === 'streaming' || state.phase === 'executing') return `Running ${target}`;
-    if (state.phase === 'error') return `${target} error`;
-    if (state.phase === 'rejected') return `${target} rejected`;
-    if (state.phase === 'interrupted') return `${target} interrupted`;
-    return `${target} done`;
+    if (state.phase === 'streaming' || state.phase === 'executing') return 'Running tool';
+    if (state.phase === 'error') return 'Tool error';
+    if (state.phase === 'rejected') return 'Tool rejected';
+    if (state.phase === 'interrupted') return 'Tool interrupted';
+    return 'Tool done';
   },
 });

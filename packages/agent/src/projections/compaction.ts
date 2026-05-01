@@ -24,9 +24,9 @@ import { estimateContentTokens, estimateCompletedTurn, estimateText } from '../u
 import { isRoleId, type RoleId } from '../agents/role-validation'
 import { getAgentDefinition, getForkInfo } from '../agents/registry'
 import { buildSessionContextContent } from '../prompts/session-context'
-import { renderSystemPrompt } from '../prompts/system-prompt'
-import { buildResolvedToolSet } from '../tools/resolved-toolset'
-import { getToolkitForRole } from '../tools/toolkits'
+import { buildSystemPrompt } from '../prompts/system-prompt-builder'
+import { renderToolDocs } from '../prompts/render-tool-docs'
+import { getEffectiveToolkit } from '../tools/toolkits'
 import type { UserPart } from '@magnitudedev/ai'
 import type { CompletedTurn } from '../inbox/types'
 
@@ -66,9 +66,10 @@ function estimateSystemPromptTokens(roleId: RoleId, skills: Map<string, Skill>, 
   if (cached !== undefined) return cached
   
   const agentDef = getAgentDefinition(roleId)
-  const toolSet = buildResolvedToolSet(agentDef, configState, roleId)
-  const toolkit = getToolkitForRole(roleId)
-  const prompt = renderSystemPrompt(agentDef, skills, toolSet, toolkit)
+  const toolkit = getEffectiveToolkit(roleId, configState)
+  const toolDefs = toolkit.keys.map(key => toolkit.entries[key].tool.definition)
+  const toolDocs = toolDefs.length > 0 ? renderToolDocs(toolDefs) : ''
+  const prompt = buildSystemPrompt({ roleDef: agentDef, skills, lenses: [], toolDocs })
   
   const tokens = estimateText(prompt)
   systemPromptTokenCache.set(cacheKey, tokens)

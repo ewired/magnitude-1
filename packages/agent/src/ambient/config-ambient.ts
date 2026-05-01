@@ -39,7 +39,7 @@ export function buildConfigState(config: MagnitudeConfigShape) {
   })
 }
 
-export const ConfigAmbient = Ambient.define<ConfigState, MagnitudeConfigShape>({
+export const ConfigAmbient = Ambient.define<ConfigState, MagnitudeConfig>({
   name: 'Config',
   initial: Effect.gen(function* () {
     const config = yield* MagnitudeConfig

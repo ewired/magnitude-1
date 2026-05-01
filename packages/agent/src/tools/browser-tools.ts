@@ -19,6 +19,21 @@ export class BrowserHarnessTag extends Context.Tag('BrowserHarness')<
   BrowserHarnessAccessor
 >() {}
 
+/** All browser tool key literals */
+export const BROWSER_TOOL_KEYS = [
+  'click', 'doubleClick', 'rightClick', 'type', 'scroll',
+  'drag', 'navigate', 'goBack', 'switchTab', 'newTab',
+  'screenshot', 'evaluate',
+] as const
+
+export type BrowserToolKey = typeof BROWSER_TOOL_KEYS[number]
+
+const _browserToolKeySet: ReadonlySet<string> = new Set(BROWSER_TOOL_KEYS)
+
+export function isBrowserToolKey(value: string): value is BrowserToolKey {
+  return _browserToolKeySet.has(value)
+}
+
 const BrowserError = ToolErrorSchema('BrowserError', {})
 type BrowserError = { readonly _tag: 'BrowserError'; readonly message: string }
 

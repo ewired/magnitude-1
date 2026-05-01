@@ -1,4 +1,4 @@
-import type { ToolState, ToolKey } from '@magnitudedev/agent';
+import type { BrowserActionState } from '@magnitudedev/agent/src/models/browser-action';
 import { getBrowserActionBaseLabel, getBrowserActionIcon } from '@magnitudedev/agent/src/tools/browser-action-visuals';
 import { createToolDisplay } from '../types';
 import { ShimmerText } from '../../components/shimmer-text';
@@ -6,35 +6,18 @@ import { useTheme } from '../../hooks/use-theme';
 
 const SHIMMER_INTERVAL_MS = 160;
 
-type BrowserToolKey =
-  | 'click'
-  | 'doubleClick'
-  | 'rightClick'
-  | 'type'
-  | 'scroll'
-  | 'drag'
-  | 'navigate'
-  | 'goBack'
-  | 'switchTab'
-  | 'newTab'
-  | 'screenshot'
-  | 'evaluate'
-
-type BrowserActionToolState = Extract<ToolState, { toolKey: BrowserToolKey }>
-
-export const browserActionDisplay = createToolDisplay<BrowserActionToolState>({
+export const browserActionDisplay = createToolDisplay<BrowserActionState>({
   render: ({ state }) => {
     const theme = useTheme();
     const isRunning = state.phase === 'streaming' || state.phase === 'executing';
     const isError = state.phase === 'error';
-    const icon = getBrowserActionIcon(state.toolKey);
-    const label = state.label ?? getBrowserActionBaseLabel(state.toolKey);
+    const label = state.label ?? 'Browser action';
 
     if (isRunning) {
       return (
         <box style={{ flexDirection: 'column' }}>
           <text style={{ wrapMode: 'word' }}>
-            <span style={{ fg: theme.info }}>{icon} </span>
+            <span style={{ fg: theme.info }}>🌐 </span>
             <span style={{ fg: theme.foreground }}>{label}</span>
             {state.detail && (
               <span style={{ fg: theme.muted }}>
@@ -51,7 +34,7 @@ export const browserActionDisplay = createToolDisplay<BrowserActionToolState>({
     return (
       <box style={{ flexDirection: 'column' }}>
         <text style={{ wrapMode: 'word' }}>
-          <span style={{ fg: isError ? theme.error : theme.info }}>{isError ? '✗ ' : `${icon} `}</span>
+          <span style={{ fg: isError ? theme.error : theme.info }}>{isError ? '✗ ' : '🌐 '}</span>
           <span style={{ fg: theme.foreground }}>{label}</span>
           {state.detail && (
             <span style={{ fg: theme.muted }}>

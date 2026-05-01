@@ -31,6 +31,7 @@ export interface MagnitudeClientConfig {
 }
 
 const DEFAULT_ENDPOINT = "https://app.magnitude.dev/api/v1"
+const LOCAL_ENDPOINT = "http://localhost:3000/api/v1"
 
 export interface MagnitudeClientShape {
   readonly catalog: ModelCatalog
@@ -50,9 +51,14 @@ export class MagnitudeClient extends Context.Tag("MagnitudeClient")<
 >() {}
 
 export function createMagnitudeClient(config?: MagnitudeClientConfig): MagnitudeClientShape {
-  const apiKey = config?.apiKey ?? process.env.MAGNITUDE_API_KEY
-  if (!apiKey) throw new Error("No API key provided. Pass apiKey in config or set MAGNITUDE_API_KEY environment variable.")
-  const endpoint = config?.endpoint ?? DEFAULT_ENDPOINT
+  const useLocal = !!process.env.MAGNITUDE_USE_LOCAL
+  const apiKey = config?.apiKey ?? (useLocal ? process.env.MAGNITUDE_LOCAL_API_KEY : undefined) ?? process.env.MAGNITUDE_API_KEY
+  if (!apiKey) throw new Error(
+    useLocal
+      ? "No API key provided. Set MAGNITUDE_LOCAL_API_KEY (or MAGNITUDE_API_KEY) environment variable, or pass apiKey in config."
+      : "No API key provided. Pass apiKey in config or set MAGNITUDE_API_KEY environment variable."
+  )
+  const endpoint = config?.endpoint ?? (useLocal ? LOCAL_ENDPOINT : DEFAULT_ENDPOINT)
   const auth = Auth.bearer(apiKey)
   const catalog = createModelCatalog({ endpoint, auth })
 

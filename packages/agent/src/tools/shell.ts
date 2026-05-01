@@ -138,7 +138,7 @@ export const shellTool = defineHarnessTool({
             })
           },
           catch: (e) => ({
-            _tag: 'ShellError',
+            _tag: 'ShellError' as const,
             message: e instanceof Error ? e.message : String(e),
           }),
         }),

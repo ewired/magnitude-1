@@ -8,6 +8,7 @@ import { join } from 'node:path'
 export function createEngineerRole(): RoleDefinition {
   return {
     id: 'engineer',
+    description: 'Implements code changes',
     prompt: definePrompt<'SKILLS_SECTION'>(engineerPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',
