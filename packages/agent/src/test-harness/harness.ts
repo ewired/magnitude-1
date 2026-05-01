@@ -45,8 +45,6 @@ import type { RoleId } from '../agents/role-validation'
 import { registerApprovalBridge } from '../execution/approval-bridge'
 import { makeTestModelResolver } from './test-resolver'
 import type { TestModelConfig } from './test-model'
-import { MagnitudeConfig } from '../model/magnitude-config'
-import { Auth } from '@magnitudedev/ai'
 
 // Testing services
 import { InMemoryChatPersistenceTag, makeInMemoryChatPersistenceLayer } from './in-memory-persistence'
@@ -310,12 +308,6 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
     const defaultWaitTimeoutMs = options.defaults?.waitTimeoutMs ?? DEFAULT_TIMEOUT_MS
     const fakeClock = options.clock === 'fake' ? createFakeClock() : null
 
-    const testMagnitudeConfigLayer = Layer.succeed(MagnitudeConfig, {
-      endpoint: 'http://test',
-      apiKey: 'test-key',
-      auth: Auth.bearer('test-key'),
-      defaultProfile: { contextWindow: 200_000, maxOutputTokens: 32_768, capabilities: { vision: true, reasoning: true } },
-    })
     const testModelResolverLayer = makeTestModelResolver(options.model ?? {})
     const stubBrowserServiceLayer = Layer.succeed(BrowserService, {
       get: () => Effect.die(new Error('BrowserService not available in tests')),
@@ -334,7 +326,6 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
     const runtimeLayer = Layer.mergeAll(
       Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
       stubBrowserServiceLayer,
-      testMagnitudeConfigLayer,
       testModelResolverLayer,
       fsLayer,
       MockTurnScriptLive,

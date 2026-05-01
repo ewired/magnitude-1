@@ -68,8 +68,6 @@ import { collectSessionContext } from './util/collect-session-context'
 import { AgentModelResolverLive } from './model/model-resolver'
 
 // Config & Auth
-import { Auth } from '@magnitudedev/ai'
-import { MagnitudeConfig } from './model/magnitude-config'
 import { MagnitudeClient, createMagnitudeClient } from '@magnitudedev/magnitude-client'
 import type { ModelOverrides } from '@magnitudedev/roles'
 import { makeNoopTracer, makeTracePersister } from './tracing/tracing'
@@ -78,7 +76,7 @@ import { initLogger, logger } from '@magnitudedev/logger'
 import { writeTrace, initTraceSession } from '@magnitudedev/tracing'
 
 import { EphemeralSessionContextTag } from './agents/types'
-import { publishConfigFromMagnitude } from './ambient/config-ambient'
+import { publishConfigFromCatalog } from './ambient/config-ambient'
 import { loadSkills } from '@magnitudedev/skills'
 import { SkillsAmbient, publishSkills } from './ambient/skills-ambient'
 import { publishToolkit } from './ambient/toolkit-ambient'
@@ -229,14 +227,6 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
   const magnitudeEndpoint = options.magnitudeEndpoint ?? process.env.MAGNITUDE_ENDPOINT ?? (useLocal ? 'http://localhost:3000/api/v1' : 'https://app.magnitude.dev/api/v1')
 
-  const magnitudeConfigLayer = Layer.succeed(MagnitudeConfig, {
-    endpoint: magnitudeEndpoint,
-    apiKey,
-    auth: Auth.bearer(apiKey),
-    overrides: options.modelOverrides,
-    defaultProfile: { contextWindow: 200_000, maxOutputTokens: 32_768, capabilities: { vision: true, grammar: false, reasoning: { type: 'always', effort: ['low', 'medium', 'high'] } } },
-  })
-
   const magnitudeClientLayer = Layer.succeed(
     MagnitudeClient,
     createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey }),
@@ -257,8 +247,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
     BrowserServiceLive,
 
-    Layer.provide(AgentModelResolverLive, magnitudeConfigLayer),
-    magnitudeConfigLayer,
+    Layer.provide(AgentModelResolverLive(options.modelOverrides), magnitudeClientLayer),
     magnitudeClientLayer,
 
     FetchHttpClient.layer,
@@ -336,6 +325,9 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
         forkId: null,
         context
       }))
+
+      // Publish config from catalog
+      yield* publishConfigFromCatalog(options.storage, options.modelOverrides)
 
       // Load skills from standard directories
       const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
@@ -429,6 +421,9 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
       // NOTE: AgentStatusProjection is the source of truth for agent identity, metadata, and execution state.
       // AgentRoutingProjection handles message routing only. forkId remains the execution handle used by forked projections/workers.
 
+      // Publish config from catalog
+      yield* publishConfigFromCatalog(options.storage, options.modelOverrides)
+
       // Load skills from standard directories
       const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
       yield* publishSkills(skills)
@@ -482,7 +477,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     await originalDispose()
   }
 
-  const refreshConfig = () => client.runEffect(publishConfigFromMagnitude)
+  const refreshConfig = () => client.runEffect(publishConfigFromCatalog(options.storage, options.modelOverrides))
 
   return {
     ...client,

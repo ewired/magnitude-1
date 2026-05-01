@@ -32,18 +32,25 @@ export function toModelProfile(info: MagnitudeModelInfo): ModelProfile {
 export type MagnitudeStreamError = StreamError
 
 /** All models consumed by the agent must conform to this type. */
-export type MagnitudeModelSpec = ModelSpec<{}, MagnitudeConnectionError, MagnitudeStreamError>
+export type MagnitudeModelSpec = ModelSpec<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>
 
 export interface MagnitudeCompatibleSpecConfig {
   modelId: string
   endpoint: string
 }
 
-export function createMagnitudeCompatibleSpec(config: MagnitudeCompatibleSpecConfig): MagnitudeModelSpec {
+/** Call options supported by Magnitude model specs. */
+export type MagnitudeCallOptions = { maxTokens?: number }
+
+const magnitudeOptions = {
+  maxTokens: NativeChatCompletions.options.maxTokens,
+} as const
+
+export function createMagnitudeCompatibleSpec(config: MagnitudeCompatibleSpecConfig) {
   return NativeChatCompletions.model({
     modelId: config.modelId,
     endpoint: config.endpoint,
-    options: {},
+    options: magnitudeOptions,
     classifyConnectionError: (failure) =>
       classifyMagnitudeConnectionError(failure),
     classifyStreamError: (failure) =>
@@ -55,7 +62,7 @@ export function createRoleSpec(roleId: RoleId, endpoint: string) {
   return NativeChatCompletions.model({
     modelId: `role/${roleId}`,
     endpoint,
-    options: {},
+    options: magnitudeOptions,
     classifyConnectionError: (failure) =>
       classifyMagnitudeConnectionError(failure),
     classifyStreamError: (failure) =>

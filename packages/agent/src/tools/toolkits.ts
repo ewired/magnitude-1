@@ -145,7 +145,7 @@ export function getEffectiveToolkit(roleId: RoleId, configState: ConfigState): T
   const hasWebSearch = 'webSearch' in toolkit.entries
   if (hasWebSearch) {
     const roleConfig = configState.byRole[roleId]
-    const isMagnitudeProvider = roleConfig.providerId === 'magnitude'
+    const isMagnitudeProvider = roleConfig.modelId.startsWith('role/')
     const hasExaKey = !!process.env.EXA_API_KEY
     if (!isMagnitudeProvider && !hasExaKey) {
       return toolkit.omit('webSearch')

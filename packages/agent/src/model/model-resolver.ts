@@ -1,22 +1,21 @@
 import { Context, Effect, Layer } from 'effect'
 import type { BoundModel } from '@magnitudedev/ai'
-import type { MagnitudeConnectionError, MagnitudeStreamError, ModelProfile } from '@magnitudedev/magnitude-client'
-import { resolveModel } from '@magnitudedev/roles'
+import type { MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError, ModelProfile } from '@magnitudedev/magnitude-client'
+import { MagnitudeClient } from '@magnitudedev/magnitude-client'
+import type { ModelOverrides } from '@magnitudedev/roles'
+import { AmbientServiceTag, type AmbientService } from '@magnitudedev/event-core'
 import type { RoleId } from '../agents/role-validation'
-import { MagnitudeConfig } from './magnitude-config'
+import { ConfigAmbient, getRoleConfig } from '../ambient/config-ambient'
 
 export interface AgentBoundModel {
-  /** The ai BoundModel — used by harness in Phase 3. */
-  readonly model: BoundModel<{}, MagnitudeConnectionError, MagnitudeStreamError>
+  readonly model: BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>
   readonly roleId: RoleId
   readonly modelId: string
   readonly profile: ModelProfile
-  /** The endpoint used for this model (needed to construct NativeBoundModel for TurnEngine). */
-  readonly endpoint: string
 }
 
 export interface AgentModelResolverService {
-  readonly resolve: (roleId: RoleId) => Effect.Effect<AgentBoundModel>
+  readonly resolve: (roleId: RoleId) => Effect.Effect<AgentBoundModel, never, AmbientService>
 }
 
 export class AgentModelResolver extends Context.Tag('AgentModelResolver')<
@@ -24,27 +23,32 @@ export class AgentModelResolver extends Context.Tag('AgentModelResolver')<
   AgentModelResolverService
 >() {}
 
-export const AgentModelResolverLive = Layer.effect(
-  AgentModelResolver,
-  Effect.gen(function* () {
-    const config = yield* MagnitudeConfig
+export const AgentModelResolverLive = (overrides?: ModelOverrides) =>
+  Layer.effect(
+    AgentModelResolver,
+    Effect.gen(function* () {
+      const client = yield* MagnitudeClient
 
-    return {
-      resolve: (roleId: RoleId) =>
-        Effect.sync(() => {
-          const bound = resolveModel(roleId, config.endpoint, config.auth, config.overrides)
-          const override = config.overrides?.[roleId]
-          const profile = override?.profile ?? config.defaultProfile
-          const modelId = bound.spec.modelId
+      return {
+        resolve: (roleId: RoleId) =>
+          Effect.gen(function* () {
+            const ambientService = yield* AmbientServiceTag
+            const configState = ambientService.getValue(ConfigAmbient)
+            const roleConfig = getRoleConfig(configState, roleId)
+            const defaults = { maxTokens: roleConfig.profile.maxOutputTokens }
 
-          return {
-            model: bound,
-            roleId,
-            modelId,
-            profile,
-            endpoint: config.endpoint,
-          }
-        }),
-    }
-  }),
-)
+            const override = overrides?.[roleId]
+            const model = override
+              ? override.spec.bind({ auth: override.auth ?? client.auth, defaults })
+              : client.role(roleId, defaults)
+
+            return {
+              model,
+              roleId,
+              modelId: override?.spec.modelId ?? `role/${roleId}`,
+              profile: roleConfig.profile,
+            }
+          }),
+      }
+    }),
+  )

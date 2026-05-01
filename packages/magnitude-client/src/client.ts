@@ -1,10 +1,12 @@
 import { Context, Effect, Duration } from "effect"
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
-import { Auth } from "@magnitudedev/ai"
+import { Auth, type AuthApplicator } from "@magnitudedev/ai"
 import type { RoleId, UsageWindowsResponse } from "./contract"
 import { createModelCatalog, type ModelCatalog } from "./catalog"
-import { createRoleSpec } from "./models"
+import { createRoleSpec, type MagnitudeCallOptions, type MagnitudeStreamError } from "./models"
+import type { MagnitudeConnectionError } from "./errors"
+import type { BoundModel } from "@magnitudedev/ai"
 
 // =============================================================================
 // Web Search Types
@@ -34,11 +36,9 @@ const DEFAULT_ENDPOINT = "https://app.magnitude.dev/api/v1"
 const LOCAL_ENDPOINT = "http://localhost:3000/api/v1"
 
 export interface MagnitudeClientShape {
+  readonly auth: AuthApplicator
   readonly catalog: ModelCatalog
-  readonly role: (id: RoleId) => {
-    stream: ReturnType<ReturnType<ReturnType<typeof createRoleSpec>["bind"]>["stream"]>
-    spec: ReturnType<typeof createRoleSpec>
-  }
+  readonly role: (id: RoleId, defaults?: MagnitudeCallOptions) => BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>
   readonly webSearch: (
     query: string,
     schema?: Record<string, unknown>
@@ -64,17 +64,12 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
   const catalog = createModelCatalog({ endpoint, auth })
 
   return {
-    /** Model catalog — fetch models, look up by role */
+    auth,
     catalog,
 
-    /** Get a bound model for a role — synchronous, no network call needed */
-    role: (id: RoleId) => {
+    role: (id: RoleId, defaults?: MagnitudeCallOptions) => {
       const spec = createRoleSpec(id, endpoint)
-      const bound = spec.bind({ auth })
-      return {
-        stream: bound.stream,
-        spec,
-      }
+      return spec.bind({ auth, defaults })
     },
 
     /** Fetch current usage windows for the authenticated user */

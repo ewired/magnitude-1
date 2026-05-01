@@ -62,16 +62,6 @@ export type Preset = Schema.Schema.Type<typeof PresetSchema>
 
 export const MagnitudeConfigSchema = Schema.Struct({
   // All fields here should be optional or optionalWith so they can have a generated default
-  roles: Schema.optionalWith(
-    Schema.Record({ key: Schema.String, value: RoleConfigSchema }),
-    { default: () => ({}) }
-  ),
-  presets: Schema.optionalWith(Schema.Array(PresetSchema), { default: () => [] }),
-  // used for provider options and local provider options like base URLs, API key etc., not used for oauth atm
-  providers: Schema.optional(
-    Schema.Record({ key: Schema.String, value: ProviderOptionsSchema })
-  ),
-  setupComplete: Schema.optional(Schema.Boolean),
   machineId: Schema.optional(Schema.String),
   telemetry: Schema.optional(Schema.Boolean),
   contextLimits: Schema.optional(ContextLimitPolicySchema),

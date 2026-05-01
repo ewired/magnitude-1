@@ -209,7 +209,6 @@ export type { DebugSnapshot, ProjectionSnapshot, ContextUsage } from './projecti
 export * from './ambient'
 
 // Model resolution
-export { MagnitudeConfig } from './model/magnitude-config'
 export { AgentModelResolver, type AgentBoundModel } from './model/model-resolver'
 
 // Execution usage types

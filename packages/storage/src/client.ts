@@ -29,10 +29,7 @@ import type {
   ContextLimitPolicy,
   MagnitudeConfig,
   MemoryExtractionJobRecord,
-  ModelSelection,
   OAuthAuth,
-  ProviderOptions,
-  RoleConfig,
   StoredLogEntry,
   StoredSessionMeta,
 } from './types'
@@ -48,37 +45,13 @@ export type AllStorageServices =
 
 export interface StorageClient<TSlot extends string = string> {
   config: {
-    getRoleConfigs(): Promise<Record<TSlot, RoleConfig>>
-    getModelSelection(slot: TSlot): Promise<ModelSelection | null>
-    setModelSelection(
-      slot: TSlot,
-      selection: ModelSelection | null
-    ): Promise<void>
-    getPresets(): Promise<Array<{ name: string; models: Record<TSlot, ModelSelection | null> }>>
-    savePreset(
-      name: string,
-      models: Record<TSlot, ModelSelection | null>
-    ): Promise<void>
-    deletePreset(name: string): Promise<void>
-
     getContextLimitPolicy(): Promise<ResolvedContextLimitPolicy>
     setContextLimitPolicy(
       policy: ContextLimitPolicy
     ): Promise<void>
 
-    getSetupComplete(): Promise<boolean>
-    setSetupComplete(value: boolean): Promise<void>
     getTelemetryEnabled(): Promise<boolean>
     setTelemetryEnabled(value: boolean): Promise<void>
-
-    getProviderOptions(providerId: string): Promise<ProviderOptions | undefined>
-    setProviderOptions(
-      providerId: string,
-      optionsOrUpdater:
-        | ProviderOptions
-        | undefined
-        | ((current: ProviderOptions | undefined) => ProviderOptions | undefined)
-    ): Promise<void>
 
     loadFull(): Promise<MagnitudeConfig>
     updateFull(
@@ -183,38 +156,6 @@ export async function createStorageClient<TSlot extends string = string>(options
 
   return {
     config: {
-      async getRoleConfigs() {
-        return (await run(
-          Effect.flatMap(ConfigStorage, (s) => s.getRoleConfigs())
-        )) as Record<TSlot, RoleConfig>
-      },
-
-      getModelSelection(slot) {
-        return run(Effect.flatMap(ConfigStorage, (s) => s.getModelSelection(slot)))
-      },
-
-      setModelSelection(slot, selection) {
-        return run(Effect.flatMap(ConfigStorage, (s) => s.setModelSelection(slot, selection)))
-      },
-
-      async getPresets() {
-        return (await run(
-          Effect.flatMap(ConfigStorage, (s) => s.getPresets())
-        )) as Array<{ name: string; models: Record<TSlot, ModelSelection | null> }>
-      },
-
-      savePreset(name, models) {
-        return run(
-          Effect.flatMap(ConfigStorage, (s) =>
-            s.savePreset(name, models as Record<string, ModelSelection | null>)
-          )
-        )
-      },
-
-      deletePreset(name) {
-        return run(Effect.flatMap(ConfigStorage, (s) => s.deletePreset(name)))
-      },
-
       getContextLimitPolicy() {
         return run(Effect.flatMap(ConfigStorage, (s) => s.getContextLimitPolicy()))
       },
@@ -223,32 +164,12 @@ export async function createStorageClient<TSlot extends string = string>(options
         return run(Effect.flatMap(ConfigStorage, (s) => s.setContextLimitPolicy(policy)))
       },
 
-      getSetupComplete() {
-        return run(Effect.flatMap(ConfigStorage, (s) => s.getSetupComplete()))
-      },
-
-      setSetupComplete(value) {
-        return run(Effect.flatMap(ConfigStorage, (s) => s.setSetupComplete(value)))
-      },
-
       getTelemetryEnabled() {
         return run(Effect.flatMap(ConfigStorage, (s) => s.getTelemetryEnabled()))
       },
 
       setTelemetryEnabled(value) {
         return run(Effect.flatMap(ConfigStorage, (s) => s.setTelemetryEnabled(value)))
-      },
-
-      getProviderOptions(providerId) {
-        return run(Effect.flatMap(ConfigStorage, (s) => s.getProviderOptions(providerId)))
-      },
-
-      setProviderOptions(providerId, optionsOrUpdater) {
-        return run(
-          Effect.flatMap(ConfigStorage, (s) =>
-            s.setProviderOptions(providerId, optionsOrUpdater)
-          )
-        )
       },
 
       loadFull() {

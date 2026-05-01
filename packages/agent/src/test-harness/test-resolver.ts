@@ -21,7 +21,6 @@ export function makeTestModelResolver(config: TestModelConfig = {}): Layer.Layer
         roleId,
         modelId: 'test-model',
         profile: DEFAULT_TEST_PROFILE,
-        endpoint: 'http://test',
       }),
   })
 }

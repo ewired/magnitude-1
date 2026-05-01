@@ -4,7 +4,7 @@ import { resolveContextLimitPolicy } from './defaults'
 import { ConfigStorage, type ConfigStorageShape } from './contracts'
 import { loadConfig, saveConfig, updateConfig } from './storage'
 import { GlobalStorage, type GlobalStorageShape } from '../services'
-import type { ContextLimitPolicy, MagnitudeConfig, ModelSelection, ProviderOptions, RoleConfig } from '../types'
+import type { ContextLimitPolicy, MagnitudeConfig } from '../types'
 
 const makeConfigStorageShape = <TSlot extends string>(
   globalStorage: GlobalStorageShape
@@ -31,20 +31,6 @@ const makeConfigStorageShape = <TSlot extends string>(
       }))
     }),
 
-  getSetupComplete: () =>
-    Effect.promise(async () => {
-      const config = await loadConfig(globalStorage.paths)
-      return config.setupComplete === true
-    }),
-
-  setSetupComplete: (value: boolean) =>
-    Effect.promise(async () => {
-      await updateConfig(globalStorage.paths, (config) => ({
-        ...config,
-        setupComplete: value,
-      }))
-    }),
-
   getTelemetryEnabled: () =>
     Effect.promise(async () => {
       const config = await loadConfig(globalStorage.paths)
@@ -57,117 +43,6 @@ const makeConfigStorageShape = <TSlot extends string>(
         ...config,
         telemetry: value,
       }))
-    }),
-
-  getRoleConfig: (slot: TSlot) =>
-    Effect.map(
-      Effect.promise(() => loadConfig(globalStorage.paths)),
-      (config) => config.roles[slot] ?? null,
-    ),
-
-  getRoleConfigs: () =>
-    Effect.map(
-      Effect.promise(() => loadConfig(globalStorage.paths)),
-      (config) => config.roles as Record<TSlot, RoleConfig>,
-    ),
-
-  getModelSelection: (slot: TSlot) =>
-    Effect.map(
-      Effect.promise(() => loadConfig(globalStorage.paths)),
-      (config) => config.roles[slot]?.model ?? null,
-    ),
-
-  setModelSelection: (slot: TSlot, selection: ModelSelection | null) =>
-    Effect.as(
-      Effect.promise(() =>
-        updateConfig(globalStorage.paths, (config) => ({
-          ...config,
-          roles: {
-            ...config.roles,
-            [slot]: { ...(config.roles[slot] ?? {}), model: selection },
-          },
-        })),
-      ),
-      undefined,
-    ),
-
-  getPresets: () =>
-    Effect.map(
-      Effect.promise(() => loadConfig(globalStorage.paths)),
-      (config) =>
-        config.presets.map((preset) => ({
-          name: preset.name,
-          models: preset.models as Record<TSlot, ModelSelection | null>,
-        })),
-    ),
-
-  savePreset: (name: string, models: Record<TSlot, ModelSelection | null>) =>
-    Effect.promise(async () => {
-      const trimmedName = name.trim()
-      if (!trimmedName) return
-
-      await updateConfig(globalStorage.paths, (config) => {
-        const existingIndex = config.presets.findIndex((preset) => preset.name === trimmedName)
-        const nextPreset = {
-          name: trimmedName,
-          models,
-        }
-
-        if (existingIndex === -1) {
-          return {
-            ...config,
-            presets: [...config.presets, nextPreset],
-          }
-        }
-
-        const nextPresets = [...config.presets]
-        nextPresets[existingIndex] = nextPreset
-        return {
-          ...config,
-          presets: nextPresets,
-        }
-      })
-    }),
-
-  deletePreset: (name: string) =>
-    Effect.promise(async () => {
-      await updateConfig(globalStorage.paths, (config) => ({
-        ...config,
-        presets: config.presets.filter((preset) => preset.name !== name),
-      }))
-    }),
-
-  getProviderOptions: (providerId: string) =>
-    Effect.map(
-      Effect.promise(() => loadConfig(globalStorage.paths)),
-      (config): ProviderOptions | undefined => config.providers?.[providerId],
-    ),
-
-  setProviderOptions: (providerId, optionsOrUpdater) =>
-    Effect.promise(async () => {
-      await updateConfig(globalStorage.paths, (config) => {
-        const current = config.providers?.[providerId]
-        const next =
-          typeof optionsOrUpdater === 'function'
-            ? optionsOrUpdater(current)
-            : optionsOrUpdater
-
-        if (!next) {
-          const { [providerId]: _removed, ...rest } = config.providers ?? {}
-          return {
-            ...config,
-            providers: Object.keys(rest).length > 0 ? rest : undefined,
-          }
-        }
-
-        return {
-          ...config,
-          providers: {
-            ...(config.providers ?? {}),
-            [providerId]: next,
-          },
-        }
-      })
     }),
 })
 

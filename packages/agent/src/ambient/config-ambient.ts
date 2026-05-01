@@ -1,61 +1,91 @@
 import { Ambient, AmbientServiceTag } from '@magnitudedev/event-core'
 import { Effect } from 'effect'
-import { resolveModel } from '@magnitudedev/roles'
+import { FetchHttpClient } from '@effect/platform'
+
+import {
+  MagnitudeClient,
+  toModelProfile,
+  type ModelProfile,
+  type MagnitudeModelInfo,
+} from '@magnitudedev/magnitude-client'
+import {
+  computeContextLimits,
+  DEFAULT_CONTEXT_LIMIT_POLICY,
+  type ResolvedContextLimitPolicy,
+  type StorageClient,
+} from '@magnitudedev/storage'
+import type { ModelOverrides } from '@magnitudedev/roles'
 
 import { ROLE_IDS, type RoleId } from '../agents/role-validation'
-import { MagnitudeConfig, type MagnitudeConfigShape } from '../model/magnitude-config'
 
 export interface RoleConfig {
-  readonly providerId: string | null
-  readonly modelId: string | null
+  readonly modelId: string
+  readonly profile: ModelProfile
   readonly hardCap: number
   readonly softCap: number
 }
 
 export interface ConfigState {
   readonly byRole: Readonly<Record<RoleId, RoleConfig>>
+  readonly catalogLoaded: boolean
+}
+
+const FALLBACK_PROFILE: ModelProfile = {
+  contextWindow: 200_000,
+  maxOutputTokens: 16_384,
+  capabilities: { vision: true, grammar: false, reasoning: { type: 'none' } },
 }
 
 export function getRoleConfig(state: ConfigState, roleId: RoleId): RoleConfig {
   return state.byRole[roleId]
 }
 
-export function buildConfigState(config: MagnitudeConfigShape) {
-  return Effect.sync(() => {
-    const byRole = {} as Record<RoleId, RoleConfig>
-    for (const roleId of ROLE_IDS) {
-      const override = config.overrides?.[roleId]
-      const profile = override?.profile ?? config.defaultProfile
-      const modelId = override ? override.spec.modelId : `role/${roleId}`
-
-      byRole[roleId] = {
-        providerId: 'magnitude',
-        modelId,
-        hardCap: profile.contextWindow,
-        softCap: Math.floor(profile.contextWindow * 0.9),
-      }
-    }
-    return { byRole }
-  })
+export function buildConfigState(
+  catalogModels: readonly MagnitudeModelInfo[] | null,
+  overrides: ModelOverrides | undefined,
+  policy: ResolvedContextLimitPolicy,
+): ConfigState {
+  const byRole = {} as Record<RoleId, RoleConfig>
+  for (const roleId of ROLE_IDS) {
+    const override = overrides?.[roleId]
+    const catalogEntry = catalogModels?.find(m => m.roles.includes(roleId))
+    const profile = override?.profile
+      ?? (catalogEntry ? toModelProfile(catalogEntry) : FALLBACK_PROFILE)
+    const modelId = override ? override.spec.modelId : `role/${roleId}`
+    const hardCap = profile.contextWindow - profile.maxOutputTokens
+    const { softCap } = computeContextLimits(hardCap, policy)
+    byRole[roleId] = { modelId, profile, hardCap, softCap }
+  }
+  return { byRole, catalogLoaded: catalogModels !== null }
 }
 
-export const ConfigAmbient = Ambient.define<ConfigState, MagnitudeConfig>({
+export const ConfigAmbient = Ambient.define<ConfigState, never>({
   name: 'Config',
-  initial: Effect.gen(function* () {
-    const config = yield* MagnitudeConfig
-    return yield* buildConfigState(config)
-  }),
+  initial: Effect.succeed(
+    buildConfigState(null, undefined, DEFAULT_CONTEXT_LIMIT_POLICY),
+  ),
 })
 
-export function publishConfig(config: MagnitudeConfigShape) {
+export function publishConfigFromCatalog(
+  storage: StorageClient,
+  overrides?: ModelOverrides,
+) {
   return Effect.gen(function* () {
+    const client = yield* MagnitudeClient
     const ambientService = yield* AmbientServiceTag
-    const state = yield* buildConfigState(config)
-    yield* ambientService.update(ConfigAmbient, state)
+
+    const models = yield* client.catalog.list.pipe(
+      Effect.provide(FetchHttpClient.layer),
+      Effect.catchAll((err) =>
+        Effect.logWarning(`Failed to fetch model catalog: ${err}`)
+          .pipe(Effect.as(null))
+      ),
+    )
+
+    const policy = yield* Effect.promise(() => storage.config.getContextLimitPolicy())
+    yield* ambientService.update(
+      ConfigAmbient,
+      buildConfigState(models, overrides, policy),
+    )
   })
 }
-
-export const publishConfigFromMagnitude = Effect.gen(function* () {
-  const config = yield* MagnitudeConfig
-  yield* publishConfig(config)
-})

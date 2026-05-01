@@ -13,9 +13,9 @@ const prompt = PromptBuilder.empty()
   .build()
 
 const program = Effect.gen(function* () {
-  const stream = yield* client.role("leader").stream(prompt, [])
+  const result = yield* client.role("leader").stream(prompt, [])
 
-  yield* Stream.runForEach(stream, (event) =>
+  yield* Stream.runForEach(result.events, (event) =>
     Effect.sync(() => {
       if (event._tag === "message_delta") {
         process.stdout.write(event.text)
