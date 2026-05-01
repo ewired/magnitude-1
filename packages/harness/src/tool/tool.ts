@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "@magnitudedev/ai"
 import type { Schema } from "@effect/schema"
 import type { Effect } from "effect"
-import type { StreamingPartial } from "./streaming-partial"
+import type { StreamingPartial } from "@magnitudedev/ai"
 
 // --- ToolContext ---
 

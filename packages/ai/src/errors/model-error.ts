@@ -32,10 +32,6 @@ export class TransportError extends Data.TaggedError("TransportError")<{
   readonly retryable: boolean
 }> {}
 
-export class ParseError extends Data.TaggedError("ParseError")<{
-  readonly message: string
-}> {}
-
 export type ConnectionError =
   | AuthFailed
   | RateLimited
@@ -44,6 +40,4 @@ export type ConnectionError =
   | InvalidRequest
   | TransportError
 
-export type StreamError =
-  | TransportError
-  | ParseError
+export type StreamError = TransportError

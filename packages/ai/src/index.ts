@@ -5,7 +5,7 @@ export { Auth, type AuthApplicator } from "./auth/auth"
 export { Option } from "./options/option"
 
 // Core types
-export type { ModelSpec } from "./model/model-spec"
+export type { ModelSpec, ModelStreamResult } from "./model/model-spec"
 export type { BoundModel } from "./model/bound-model"
 export type { OptionDef, InferCallOptions } from "./options/option"
 
@@ -28,7 +28,7 @@ export type { ToolDefinition } from "./tools/tool-definition"
 export { defineTool } from "./tools/tool-definition"
 
 // Response
-export type { ResponseStreamEvent } from "./response/events"
+export type { ResponseStreamEvent, ValidationIssue, FinishReason, StreamEndReason, StreamEnd } from "./response/events"
 export type { ResponseUsage } from "./response/usage"
 
 // Errors
@@ -39,7 +39,6 @@ export {
   ContextLimitExceeded,
   InvalidRequest,
   TransportError,
-  ParseError,
 } from "./errors/model-error"
 export type { ConnectionError, StreamError } from "./errors/model-error"
 export { defaultClassifyConnectionError, defaultClassifyStreamError } from "./errors/classify"
@@ -52,6 +51,7 @@ export type { ChatCompletionsRequest, ChatCompletionsStreamChunk } from "./wire/
 export type { Codec } from "./codec/codec"
 export { nativeChatCompletionsCodec } from "./codec/native-chat-completions/index"
 
-// Jsonish
-export { createStreamingJsonParser } from "./jsonish/parser"
-export type { StreamingJsonParser, ParsedValue } from "./jsonish/types"
+// Streaming field parser
+export { createStreamingFieldParser } from "./streaming/field-parser"
+export type { StreamingFieldParser } from "./streaming/field-parser"
+export type { FieldEvent, StreamingPartial, StreamingLeaf } from "./streaming/types"

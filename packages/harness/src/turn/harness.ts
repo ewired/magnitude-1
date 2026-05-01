@@ -7,6 +7,7 @@ import type {
   ToolDefinition,
   Prompt,
 } from "@magnitudedev/ai"
+import type { TurnOutcome } from "../events"
 import type { HarnessEvent } from "../events"
 import type { HarnessHooks } from "../hooks"
 import type { Toolkit, ToolkitRequirements } from "../tool/toolkit"
@@ -28,17 +29,20 @@ import {
 export interface HarnessConfig<
   TToolkit extends Toolkit<any> = Toolkit<any>,
   RHooks = never,
+  TInitialError = ConnectionError,
+  TStreamError = StreamError,
 > {
-  readonly model: BoundModel<any, ConnectionError, StreamError>
+  readonly model: BoundModel<any, TInitialError, TStreamError>
   readonly toolkit: TToolkit
   readonly hooks?: HarnessHooks<RHooks>
   readonly layer?: Layer.Layer<ToolkitRequirements<TToolkit> | RHooks>
   readonly initialState?: EngineState
+  readonly mapStreamError: (error: TStreamError) => TurnOutcome
 }
 
 // ── Harness ──────────────────────────────────────────────────────────
 
-export interface Harness {
+export interface Harness<TInitialError = ConnectionError> {
   /** Stream a model response, dispatch tool calls, and produce events.
    *  Returns a LiveTurn whose events stream is driven by the harness —
    *  the consumer reads events, reducers update refs automatically. */
@@ -46,7 +50,7 @@ export interface Harness {
     prompt: Prompt,
   ) => Effect.Effect<
     LiveTurn,
-    ConnectionError | StreamError,
+    TInitialError,
     HttpClient.HttpClient
   >
   /** Create an empty turn for replaying a recorded event sequence.
@@ -89,7 +93,9 @@ export interface ReplayTurn {
 export function createHarness<
   TToolkit extends Toolkit<any>,
   RHooks = never,
->(config: HarnessConfig<TToolkit, RHooks>): Harness {
+  TInitialError = ConnectionError,
+  TStreamError = StreamError,
+>(config: HarnessConfig<TToolkit, RHooks, TInitialError, TStreamError>): Harness<TInitialError> {
   const { toolkit, hooks, model } = config
 
   // Build tool definitions array from toolkit
@@ -169,12 +175,12 @@ export function createHarness<
     prompt: Prompt,
   ): Effect.Effect<
     LiveTurn,
-    ConnectionError | StreamError,
+    TInitialError,
     HttpClient.HttpClient
   > {
     return Effect.gen(function* () {
-      // Get the model stream (may fail with ConnectionError)
-      const modelStream = yield* model.stream(prompt, toolDefs)
+      // Get the model stream + parsers (may fail with ConnectionError)
+      const { events: modelEvents, parsers } = yield* model.stream(prompt, toolDefs)
 
       const refs = yield* makeRefs()
       const eventQueue = yield* Queue.unbounded<HarnessEvent>()
@@ -182,12 +188,14 @@ export function createHarness<
 
       // Build dispatch — delegates all event processing and tool execution
       const processing = dispatch({
-        modelStream,
+        events: modelEvents,
+        parsers,
         toolkit,
         hooks: hooks as HarnessHooks<unknown> | undefined,
         layer: config.layer as Layer.Layer<unknown> | undefined,
         initialEngineState: config.initialState,
         emit: emitEvent,
+        mapStreamError: config.mapStreamError as (error: unknown) => TurnOutcome,
       })
 
       // Fork the dispatch processing and ensure queue shutdown on completion

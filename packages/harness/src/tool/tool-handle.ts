@@ -24,7 +24,6 @@ function isToolLifecycleEvent(event: HarnessEvent): event is ToolLifecycleEvent 
     case 'ToolInputFieldChunk':
     case 'ToolInputFieldComplete':
     case 'ToolInputReady':
-    case 'ToolInputDecodeFailure':
     case 'ToolExecutionStarted':
     case 'ToolExecutionEnded':
     case 'ToolEmission':
@@ -47,17 +46,7 @@ function buildHandle(
     get state() { return state },
     process(event: HarnessEvent): ToolHandle {
       if (!isToolLifecycleEvent(event)) return this
-      // Map ToolInputDecodeFailure → synthetic ToolExecutionEnded(Error)
-      const mapped: ToolLifecycleEvent = event._tag === 'ToolInputDecodeFailure'
-        ? {
-            _tag: 'ToolExecutionEnded',
-            toolCallId: event.toolCallId,
-            toolName: event.toolName,
-            toolKey: event.toolKey,
-            result: { _tag: 'Error', error: typeof event.detail === 'string' ? event.detail : String(event.detail) },
-          } satisfies ToolExecutionEnded
-        : event
-      const reduced = reduce(state, mapped)
+      const reduced = reduce(state, event)
       return buildHandle(toolCallId, toolKey, reduced, reduce)
     },
     interrupt(): ToolHandle {

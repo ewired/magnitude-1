@@ -1,4 +1,4 @@
-import type { ResponseUsage, ToolCallId, ToolResultPart } from "@magnitudedev/ai"
+import type { ResponseUsage, ToolCallId, ToolResultPart, ValidationIssue } from "@magnitudedev/ai"
 
 // ── Tool Result ──────────────────────────────────────────────────────
 
@@ -19,8 +19,8 @@ export type TurnOutcome =
   | { readonly _tag: "OutputTruncated" }
   | { readonly _tag: "ContentFiltered" }
   | { readonly _tag: "SafetyStop"; readonly reason: SafetyStopReason }
-  | { readonly _tag: "ToolInputDecodeFailure"; readonly toolCallId: ToolCallId; readonly toolName: string; readonly detail: unknown }
-  | { readonly _tag: "TurnStructureDecodeFailure"; readonly detail: unknown }
+  | { readonly _tag: "ToolInputDecodeFailure"; readonly toolCallId: ToolCallId; readonly toolName: string; readonly issue: ValidationIssue }
+
   | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
   | { readonly _tag: "Interrupted" }
@@ -50,10 +50,9 @@ export interface ToolInputFieldComplete {
   readonly value: unknown
 }
 
-export interface ToolInputReady<TInput = unknown> {
+export interface ToolInputReady {
   readonly _tag: "ToolInputReady"
   readonly toolCallId: ToolCallId
-  readonly input: TInput
 }
 
 // ── Tool Execution Lifecycle ─────────────────────────────────────────
@@ -122,21 +121,6 @@ export interface MessageEnd {
   readonly _tag: "MessageEnd"
 }
 
-// ── Failures ─────────────────────────────────────────────────────────
-
-export interface ToolInputDecodeFailure {
-  readonly _tag: "ToolInputDecodeFailure"
-  readonly toolCallId: ToolCallId
-  readonly toolName: string
-  readonly toolKey: string
-  readonly detail: unknown
-}
-
-export interface TurnStructureDecodeFailure {
-  readonly _tag: "TurnStructureDecodeFailure"
-  readonly detail: unknown
-}
-
 // ── Turn End ─────────────────────────────────────────────────────────
 
 export interface TurnEnd {
@@ -151,8 +135,7 @@ export type ToolLifecycleEvent<TInput = unknown, TOutput = unknown, TEmission = 
   | ToolInputStarted
   | ToolInputFieldChunk
   | ToolInputFieldComplete
-  | ToolInputReady<TInput>
-  | ToolInputDecodeFailure
+  | ToolInputReady
   | ToolExecutionStarted<TInput>
   | ToolExecutionEnded<TOutput, TError>
   | ToolEmission<TEmission>
@@ -166,5 +149,4 @@ export type HarnessEvent<TInput = unknown, TOutput = unknown, TEmission = unknow
   | MessageDelta
   | MessageEnd
   | ToolLifecycleEvent<TInput, TOutput, TEmission, TError>
-  | TurnStructureDecodeFailure
   | TurnEnd

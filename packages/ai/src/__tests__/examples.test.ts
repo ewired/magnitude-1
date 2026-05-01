@@ -18,6 +18,7 @@ import type {
   HttpConnectionFailure,
   StreamFailure,
   ResponseStreamEvent,
+  ModelStreamResult,
   ToolDefinition,
 } from "../index"
 
@@ -192,7 +193,7 @@ describe("Custom error classification", () => {
 
     type EffectType = typeof effect
     type _AssertConnectionError = EffectType extends Effect.Effect<
-      Stream.Stream<ResponseStreamEvent, StreamError>,
+      ModelStreamResult<StreamError>,
       infer E,
       unknown
     >
@@ -239,10 +240,10 @@ describe("Testing with mock HttpClient", () => {
     const model = spec.bind({ auth: Auth.bearer("test-token") })
 
     const program = Effect.gen(function* () {
-      const responseStream = yield* model.stream(emptyPrompt, noTools, {
+      const result = yield* model.stream(emptyPrompt, noTools, {
         maxTokens: 100,
       })
-      const events = yield* Stream.runCollect(responseStream)
+      const events = yield* Stream.runCollect(result.events)
       return events
     })
 

@@ -1,7 +1,6 @@
-import { Effect, Fiber, Cause, Schema, Layer, Stream } from "effect"
-import type { ResponseStreamEvent, StreamError, ToolCallId } from "@magnitudedev/ai"
-import type { StreamingPartial } from "../tool/streaming-partial"
-import { applyFieldChunk, extractStreamingPartialValues } from "../tool/streaming-partial"
+import { Effect, Fiber, Cause, Layer, Stream } from "effect"
+import type { ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason, ValidationIssue } from "@magnitudedev/ai"
+import type { StreamingPartial } from "@magnitudedev/ai"
 import type { HarnessEvent, ToolResult, TurnOutcome } from "../events"
 import type { HarnessHooks, ExecuteHookContext } from "../hooks"
 import type { Toolkit } from "../tool/toolkit"
@@ -11,14 +10,16 @@ import { formatToolResult } from "./result-formation"
 
 // ── Config ───────────────────────────────────────────────────────────
 
-export interface DispatchConfig {
-  readonly modelStream: Stream.Stream<ResponseStreamEvent, StreamError>
+export interface DispatchConfig<TStreamError = StreamError> {
+  readonly events: Stream.Stream<ResponseStreamEvent<TStreamError>, never>
+  readonly parsers: ReadonlyMap<ToolCallId, StreamingFieldParser>
   readonly toolkit: Toolkit
   readonly hooks?: HarnessHooks<unknown>
   // Erased layer — createHarness enforces type coverage at compile time.
   readonly layer?: Layer.Layer<unknown>
   readonly initialEngineState?: EngineState
   readonly emit: (event: HarnessEvent) => Effect.Effect<void>
+  readonly mapStreamError: (error: TStreamError) => TurnOutcome
 }
 
 // ── Per-tool-call accumulator ────────────────────────────────────────
@@ -27,14 +28,13 @@ interface ToolCallAccumulator {
   readonly toolCallId: ToolCallId
   readonly toolName: string
   readonly toolKey: string
-  readonly streamingPartial: StreamingPartial<unknown>
   readonly streamState: unknown
   readonly streamHook: StreamHook<unknown, unknown, unknown, unknown, unknown> | undefined
 }
 
 // ── Dispatch ─────────────────────────────────────────────────────────
 
-export function dispatch(config: DispatchConfig): Effect.Effect<void> {
+export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStreamError>): Effect.Effect<void> {
   const { toolkit, hooks, emit, initialEngineState } = config
 
   // Build lookup maps from toolkit
@@ -183,7 +183,7 @@ export function dispatch(config: DispatchConfig): Effect.Effect<void> {
 
   // ── Stream event processing ──────────────────────────────────────
 
-  function processEvent(event: ResponseStreamEvent): Effect.Effect<void> {
+  function processEvent(event: ResponseStreamEvent<TStreamError>): Effect.Effect<void> {
     switch (event._tag) {
       case "thought_start":
         return emit({ _tag: "ThoughtStart", level: event.level })
@@ -220,7 +220,6 @@ export function dispatch(config: DispatchConfig): Effect.Effect<void> {
           toolCallId: event.toolCallId,
           toolName: event.toolName,
           toolKey,
-          streamingPartial: {},
           streamState: entry.tool.stream?.initial,
           streamHook: entry.tool.stream,
         }
@@ -242,9 +241,6 @@ export function dispatch(config: DispatchConfig): Effect.Effect<void> {
         if (!acc) return Effect.void
 
         const field = event.path[0] ?? ""
-        const newPartial = applyFieldChunk(acc.streamingPartial, event.path, event.delta)
-        const updatedAcc: ToolCallAccumulator = { ...acc, streamingPartial: newPartial }
-        accumulators.set(event.toolCallId, updatedAcc)
 
         return Effect.gen(function* () {
           yield* emit({
@@ -255,22 +251,25 @@ export function dispatch(config: DispatchConfig): Effect.Effect<void> {
             delta: event.delta,
           })
 
-          // Invoke stream hook onInput if present
-          if (updatedAcc.streamHook) {
-            const toolCtx: ToolContext<unknown> = {
-              emit: makeToolEmit(acc.toolCallId, acc.toolName, acc.toolKey),
-            }
-            const newStreamState = yield* provideLayer(
-              updatedAcc.streamHook.onInput(newPartial, updatedAcc.streamState, toolCtx),
-            ).pipe(
-              Effect.catchAllCause((cause) =>
-                Effect.as(
-                  Effect.logWarning("Stream hook onInput failed", { cause: Cause.squash(cause) }),
-                  updatedAcc.streamState,
+          // Invoke stream hook onInput if present — read partial from parser
+          if (acc.streamHook) {
+            const parser = config.parsers.get(event.toolCallId)
+            if (parser) {
+              const toolCtx: ToolContext<unknown> = {
+                emit: makeToolEmit(acc.toolCallId, acc.toolName, acc.toolKey),
+              }
+              const newStreamState = yield* provideLayer(
+                acc.streamHook.onInput(parser.partial as StreamingPartial<unknown>, acc.streamState, toolCtx),
+              ).pipe(
+                Effect.catchAllCause((cause) =>
+                  Effect.as(
+                    Effect.logWarning("Stream hook onInput failed", { cause: Cause.squash(cause) }),
+                    acc.streamState,
+                  ),
                 ),
-              ),
-            )
-            accumulators.set(event.toolCallId, { ...updatedAcc, streamState: newStreamState })
+              )
+              accumulators.set(event.toolCallId, { ...acc, streamState: newStreamState })
+            }
           }
         })
       }
@@ -290,66 +289,64 @@ export function dispatch(config: DispatchConfig): Effect.Effect<void> {
         })
       }
 
-      case "tool_call_end": {
+      case "tool_call_ready": {
         const acc = accumulators.get(event.toolCallId)
         if (!acc) return Effect.void
 
-        const entry = toolKeyToEntry.get(acc.toolKey)
-        if (!entry) return Effect.void
+        const parser = config.parsers.get(event.toolCallId)
+        if (!parser || parser.decoded === null) {
+          terminalOverride = { _tag: "EngineDefect", message: `No decoded input for ${event.toolCallId}` }
+          return Effect.void
+        }
 
         return Effect.gen(function* () {
-          // Reconstruct input from streaming partial and decode against schema
-          const rawInput = extractStreamingPartialValues(acc.streamingPartial)
-          const decodeResult = yield* provideLayer(
-            Schema.decodeUnknown(entry.tool.definition.inputSchema)(rawInput),
-          ).pipe(
-            Effect.map((input) => ({ _tag: "ok" as const, input })),
-            Effect.catchAll((error) => Effect.succeed({ _tag: "fail" as const, error })),
-          )
-
-          if (decodeResult._tag === "fail") {
-            yield* emit({
-              _tag: "ToolInputDecodeFailure",
-              toolCallId: acc.toolCallId,
-              toolName: acc.toolName,
-              toolKey: acc.toolKey,
-              detail: decodeResult.error,
-            })
-            terminalOverride = {
-              _tag: "ToolInputDecodeFailure",
-              toolCallId: acc.toolCallId,
-              toolName: acc.toolName,
-              detail: decodeResult.error,
-            }
-            return
-          }
-
           yield* emit({
             _tag: "ToolInputReady",
             toolCallId: acc.toolCallId,
-            input: decodeResult.input,
           })
 
           // Fork tool execution concurrently
           const fiber = yield* Effect.fork(
-            executeTool(acc.toolCallId, acc.toolName, acc.toolKey, decodeResult.input),
+            executeTool(acc.toolCallId, acc.toolName, acc.toolKey, parser.decoded),
           )
           toolFibers.set(acc.toolCallId, fiber)
         })
       }
 
-      case "response_done": {
+      case "stream_end": {
         return Effect.gen(function* () {
-          // Join all in-flight tool fibers
-          for (const [, fiber] of toolFibers) {
-            yield* Fiber.join(fiber)
-          }
-          toolFibers.clear()
+          let outcome: TurnOutcome | undefined
 
-          const outcome: TurnOutcome = terminalOverride ?? mapReasonToOutcome(event.reason, toolCallCount)
+          switch (event.reason._tag) {
+            case "completed": {
+              // Join all in-flight tool fibers
+              for (const [, fiber] of toolFibers) {
+                yield* Fiber.join(fiber)
+              }
+              toolFibers.clear()
+              outcome = terminalOverride ?? mapFinishReasonToOutcome(event.reason.finishReason, toolCallCount)
+              break
+            }
+            case "validation_failure": {
+              yield* interruptAllTools()
+              outcome = {
+                _tag: "ToolInputDecodeFailure",
+                toolCallId: event.reason.toolCallId,
+                toolName: event.reason.toolName,
+                issue: event.reason.issue,
+              }
+              break
+            }
+            case "error": {
+              yield* interruptAllTools()
+              outcome = config.mapStreamError(event.reason.error)
+              break
+            }
+          }
+
           yield* emit({
             _tag: "TurnEnd",
-            outcome,
+            outcome: outcome!,
             usage: event.usage ?? null,
           })
         })
@@ -381,7 +378,7 @@ export function dispatch(config: DispatchConfig): Effect.Effect<void> {
     })
   }
 
-  return Stream.runForEach(config.modelStream, processEvent).pipe(
+  return Stream.runForEach(config.events, processEvent).pipe(
     Effect.catchAllCause(() =>
       Effect.gen(function* () {
         yield* interruptAllTools()
@@ -393,17 +390,17 @@ export function dispatch(config: DispatchConfig): Effect.Effect<void> {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function mapReasonToOutcome(reason: string, toolCallCount: number): TurnOutcome {
+function mapFinishReasonToOutcome(reason: FinishReason, toolCallCount: number): TurnOutcome {
   switch (reason) {
     case "stop":
     case "end_turn":
-    case "tool_use":
+    case "tool_calls":
       return { _tag: "Completed", toolCallsCount: toolCallCount }
-    case "max_tokens":
     case "length":
       return { _tag: "OutputTruncated" }
     case "content_filter":
       return { _tag: "ContentFiltered" }
+    case "unknown":
     default:
       return { _tag: "Completed", toolCallsCount: toolCallCount }
   }

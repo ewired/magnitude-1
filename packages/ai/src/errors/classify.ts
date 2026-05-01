@@ -4,7 +4,6 @@ import {
   AuthFailed,
   ContextLimitExceeded,
   InvalidRequest,
-  ParseError,
   RateLimited,
   TransportError,
   UsageLimitExceeded,
@@ -143,8 +142,8 @@ export function defaultClassifyStreamError(
     case "ReadFailure":
       return new TransportError({ status: null, message: String(failure.cause), retryable: true })
     case "SseParseFailure":
-      return new ParseError({ message: `SSE parse failure: ${failure.payload}` })
+      return new TransportError({ status: null, message: `SSE parse failure: ${failure.payload}`, retryable: false })
     case "ChunkDecodeFailure":
-      return new ParseError({ message: `Chunk decode failure: ${String(failure.cause)}` })
+      return new TransportError({ status: null, message: `Chunk decode failure: ${String(failure.cause)}`, retryable: false })
   }
 }

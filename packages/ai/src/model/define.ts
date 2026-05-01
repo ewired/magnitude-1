@@ -1,13 +1,12 @@
-import { Effect, Stream } from "effect"
+import { Effect } from "effect"
 import type * as HttpClient from "@effect/platform/HttpClient"
 import { Prompt } from "../prompt/prompt"
 import type { ToolDefinition } from "../tools/tool-definition"
-import type { ResponseStreamEvent } from "../response/events"
 import type { AuthApplicator } from "../auth/auth"
 import type { Codec } from "../codec/codec"
 import type { HttpConnectionFailure, StreamFailure } from "../errors/failure"
 import { executeHttpStream } from "../transport/stream"
-import type { ModelSpec } from "./model-spec"
+import type { ModelSpec, ModelStreamResult } from "./model-spec"
 import type { BoundModel } from "./bound-model"
 
 // ---------------------------------------------------------------------------
@@ -63,7 +62,7 @@ export function modelDefine<
       tools: readonly ToolDefinition[],
       options: TCallOptions,
     ): Effect.Effect<
-      Stream.Stream<ResponseStreamEvent, TStreamError>,
+      ModelStreamResult<TStreamError>,
       TConnectionError,
       HttpClient.HttpClient
     > => {
@@ -78,9 +77,12 @@ export function modelDefine<
       })
 
       return httpEffect.pipe(
-        Effect.map((wireStream) =>
-          config.codec.decode(wireStream.pipe(Stream.mapError(config.classifyStreamError))),
-        ),
+        Effect.map((wireStream) => {
+          return config.codec.decode(wireStream, {
+            tools,
+            classifyStreamError: config.classifyStreamError,
+          })
+        }),
         Effect.mapError(config.classifyConnectionError),
       )
     },

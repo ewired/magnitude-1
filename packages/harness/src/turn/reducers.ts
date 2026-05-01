@@ -15,7 +15,8 @@ import type {
 import type { Toolkit } from "../tool/toolkit"
 import type { BaseState, StateModel } from "../tool/state-model"
 import { createToolHandle, type ToolHandle } from "../tool/tool-handle"
-import { applyFieldChunk, extractStreamingPartialValues, type StreamingPartial } from "../tool/streaming-partial"
+import type { StreamingPartial } from "@magnitudedev/ai"
+import { applyFieldChunk, extractStreamingPartialValues } from "../tool/streaming-partial"
 
 // ── Reducer Interface ────────────────────────────────────────────────
 
@@ -155,11 +156,13 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
     }
 
     case "ToolInputReady": {
-      // ToolInputReady.input is the decoded tool input (TInput=unknown at erased level).
-      // For canonical turn construction, we need JsonValue for ToolCallPart.input.
-      // The raw JSON from the model stream IS JsonValue by construction.
-      // At the erased event level, input is unknown — we serialize to JsonValue for storage.
-      const inputAsJson: JsonValue = serializeToJsonValue(event.input)
+      // ToolInputReady no longer carries input — the canonical input is assembled
+      // from ToolInputFieldChunk/ToolInputFieldComplete events via toolCallInputChunks.
+      // Extract the accumulated partial as the final input for the tool call.
+      const chunks = state.toolCallInputChunks.get(event.toolCallId)
+      const inputAsJson: JsonValue = chunks && Object.keys(chunks).length > 0
+        ? extractPartialAsJson(chunks)
+        : {}
       const toolCalls = updateToolCall(
         state.assistantMessage.toolCalls ?? [],
         event.toolCallId,
@@ -268,16 +271,18 @@ function engineStateStep(state: EngineState, event: HarnessEvent): EngineState {
       return { ...state, toolOutcomes }
     }
 
-    case "ToolInputDecodeFailure": {
-      const toolOutcomes = new Map(state.toolOutcomes)
-      toolOutcomes.set(event.toolCallId, { _tag: "DecodeFailure" })
-      const deadToolCalls = new Set(state.deadToolCalls)
-      deadToolCalls.add(event.toolCallId)
-      return { ...state, toolOutcomes, deadToolCalls }
+    case "TurnEnd": {
+      let newState = state
+      // Handle ToolInputDecodeFailure via TurnEnd outcome
+      if (event.outcome._tag === "ToolInputDecodeFailure") {
+        const toolOutcomes = new Map(state.toolOutcomes)
+        toolOutcomes.set(event.outcome.toolCallId, { _tag: "DecodeFailure" })
+        const deadToolCalls = new Set(state.deadToolCalls)
+        deadToolCalls.add(event.outcome.toolCallId)
+        newState = { ...state, toolOutcomes, deadToolCalls }
+      }
+      return { ...newState, stopped: true }
     }
-
-    case "TurnEnd":
-      return { ...state, stopped: true }
 
     default:
       return state
@@ -336,7 +341,6 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
       event._tag === "ToolInputFieldChunk" ||
       event._tag === "ToolInputFieldComplete" ||
       event._tag === "ToolInputReady" ||
-      event._tag === "ToolInputDecodeFailure" ||
       event._tag === "ToolExecutionStarted" ||
       event._tag === "ToolExecutionEnded" ||
       event._tag === "ToolEmission" ||

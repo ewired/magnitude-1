@@ -1,3 +1,16 @@
+/**
+ * Types for the streaming field parser module.
+ *
+ * Internal types (ParsedValue, etc.) are not exported from the package.
+ * Public types (FieldEvent, StreamingPartial, StreamingLeaf) are exported via index.ts.
+ */
+
+import type { JsonValue } from "../prompt/parts"
+
+// ---------------------------------------------------------------------------
+// Internal types — used by json-parser and field-parser, not exported publicly
+// ---------------------------------------------------------------------------
+
 export type CompletionState = "complete" | "incomplete"
 
 export type ParsedValue =
@@ -87,10 +100,43 @@ export type Pos =
   | { readonly _tag: "inObjectValue" }
   | { readonly _tag: "inArray" }
 
-export interface StreamingJsonParser {
+// ---------------------------------------------------------------------------
+// Internal parser interface — used by field-parser, not exported publicly
+// ---------------------------------------------------------------------------
+
+export interface IncrementalJsonParser {
   push(chunk: string): void
   end(): void
   readonly partial: ParsedValue | undefined
   readonly done: boolean
   readonly currentPath: readonly string[]
+}
+
+// ---------------------------------------------------------------------------
+// Public types — exported from the package
+// ---------------------------------------------------------------------------
+
+/** Field-level events produced by the streaming field parser on each push/end. */
+export type FieldEvent =
+  | { readonly _tag: "field_start"; readonly path: readonly string[] }
+  | { readonly _tag: "field_delta"; readonly path: readonly string[]; readonly delta: string }
+  | { readonly _tag: "field_end"; readonly path: readonly string[]; readonly value: JsonValue }
+
+/** A streaming leaf value — discriminated on finality. */
+export type StreamingLeaf<T> =
+  | { isFinal: true; value: T }
+  | { isFinal: false; value: string }
+
+/**
+ * Transforms a type into its streaming partial shape.
+ * Fields arrive incrementally — scalars are StreamingLeaf, objects are partial, arrays accumulate.
+ */
+export type StreamingPartial<T> = {
+  [K in keyof T]?: T[K] extends ReadonlyArray<infer E>
+    ? Array<StreamingPartial<E>>
+    : T[K] extends Array<infer E>
+      ? Array<StreamingPartial<E>>
+      : T[K] extends Record<string, unknown>
+        ? StreamingPartial<T[K]>
+        : StreamingLeaf<T[K]>
 }

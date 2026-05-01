@@ -39,8 +39,6 @@ export type {
   MessageStart,
   MessageDelta,
   MessageEnd,
-  ToolInputDecodeFailure,
-  TurnStructureDecodeFailure,
   TurnEnd,
   ToolLifecycleEvent,
   HarnessEvent,

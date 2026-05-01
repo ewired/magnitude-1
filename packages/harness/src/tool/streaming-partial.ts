@@ -1,25 +1,14 @@
 /**
- * Streaming partial types and utilities for incremental tool input accumulation.
+ * Streaming partial utilities for incremental tool input accumulation (replay).
+ *
+ * Type definitions (StreamingPartial, StreamingLeaf) live in @magnitudedev/ai.
+ * These functions stay here for replay — reconstructing partials from persisted events.
  */
 
-/** A streaming leaf value — discriminated on finality. */
-export type StreamingLeaf<T> =
-  | { isFinal: true; value: T }
-  | { isFinal: false; value: string }
+import type { StreamingPartial } from "@magnitudedev/ai"
 
-/**
- * Transforms a tool's TInput into its streaming shape.
- * Fields arrive incrementally — scalars are StreamingLeaf, objects are partial, arrays accumulate.
- */
-export type StreamingPartial<T> = {
-  [K in keyof T]?: T[K] extends ReadonlyArray<infer E>
-    ? Array<StreamingPartial<E>>
-    : T[K] extends Array<infer E>
-      ? Array<StreamingPartial<E>>
-      : T[K] extends Record<string, unknown>
-        ? StreamingPartial<T[K]>
-        : StreamingLeaf<T[K]>
-}
+// Re-export types from AI package for backward compatibility
+export type { StreamingPartial, StreamingLeaf } from "@magnitudedev/ai"
 
 /** All valid deep paths into T as tuple types. */
 export type DeepPaths<T> = T extends object
