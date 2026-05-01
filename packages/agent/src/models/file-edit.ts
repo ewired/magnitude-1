@@ -1,8 +1,8 @@
-import { defineStateModel, type BaseState, type EditDiff } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { editTool } from '../tools/fs'
+import type { EditDiff } from './edit-diff'
 
 export interface FileEditState extends BaseState {
-  toolKey: 'fileEdit'
   path?: string
   oldText: string
   newText: string
@@ -12,7 +12,7 @@ export interface FileEditState extends BaseState {
   diffs: EditDiff[]
 }
 
-const initial: Omit<FileEditState, 'phase' | 'toolKey'> = {
+const initial: Omit<FileEditState, 'phase'> = {
   path: undefined,
   oldText: '',
   newText: '',
@@ -102,7 +102,7 @@ function applyReadyInputUpdate(
   })
 }
 
-export const fileEditModel = defineStateModel('fileEdit', editTool)({
+export const fileEditModel = defineStateModel(editTool)<FileEditState>({
   initial,
   reduce: (state, event): FileEditState => {
     switch (event._tag) {
@@ -111,9 +111,9 @@ export const fileEditModel = defineStateModel('fileEdit', editTool)({
       case 'ToolInputFieldChunk':
         return applyFieldUpdate(state, event.field, event.delta)
       case 'ToolInputReady':
-        return applyReadyInputUpdate(state, event.input)
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return applyReadyInputUpdate({ ...state, phase: 'executing' }, event.input)
       case 'ToolEmission': {
         const v = event.value as { type?: string; path?: string; baseContent?: string }
         return v.type === 'file_edit_base_content'
@@ -135,10 +135,12 @@ export const fileEditModel = defineStateModel('fileEdit', editTool)({
             return { ...state, phase: 'rejected', streamingTarget: null }
           case 'Interrupted':
             return { ...state, phase: 'interrupted', streamingTarget: null }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error', streamingTarget: null }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorMessage: event.message }
       case 'ToolInputFieldComplete':
       default:
         return state

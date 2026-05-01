@@ -5,8 +5,7 @@
  * All tools are in the 'browser' group and access the harness via BrowserHarnessTag.
  */
 
-import { Context, Effect } from 'effect'
-import { Schema } from '@effect/schema'
+import { Context, Effect, Schema } from 'effect'
 import { defineTool, ToolErrorSchema } from '@magnitudedev/tools'
 import type { WebHarness } from '@magnitudedev/browser-harness'
 import { getBrowserActionBaseLabel } from './browser-action-visuals'

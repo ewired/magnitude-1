@@ -1,10 +1,9 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { grepTool } from '../tools/fs'
 
 type SearchMatch = { file: string; match: string }
 
 export interface FileSearchState extends BaseState {
-  toolKey: 'fileSearch'
   pattern?: string
   path?: string
   glob?: string
@@ -15,7 +14,7 @@ export interface FileSearchState extends BaseState {
   errorDetail?: string
 }
 
-const initial: Omit<FileSearchState, 'phase' | 'toolKey'> = {
+const initial: Omit<FileSearchState, 'phase'> = {
   pattern: undefined,
   path: undefined,
   glob: undefined,
@@ -26,7 +25,7 @@ const initial: Omit<FileSearchState, 'phase' | 'toolKey'> = {
   errorDetail: undefined,
 }
 
-export const fileSearchModel = defineStateModel('fileSearch', grepTool)({
+export const fileSearchModel = defineStateModel(grepTool)<FileSearchState>({
   initial,
   reduce: (state, event): FileSearchState => {
     switch (event._tag) {
@@ -38,20 +37,20 @@ export const fileSearchModel = defineStateModel('fileSearch', grepTool)({
         if (event.field === 'glob') return { ...state, phase: 'streaming', glob: (state.glob ?? '') + event.delta }
         return state
       case 'ToolInputReady':
+        return state
+      case 'ToolExecutionStarted':
         return {
           ...state,
-          phase: 'streaming',
-          pattern: event.input.pattern,
-          path: event.input.path,
-          glob: event.input.glob,
-          limit: event.input.limit,
+          phase: 'executing',
+          pattern: event.input.pattern ?? state.pattern,
+          path: event.input.path ?? state.path,
+          glob: event.input.glob ?? state.glob,
+          limit: event.input.limit ?? state.limit,
         }
-      case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success': {
-            const matches = [...(event.result.output as SearchMatch[])]
+            const matches = [...event.result.output]
             return {
               ...state,
               phase: 'completed',
@@ -61,15 +60,17 @@ export const fileSearchModel = defineStateModel('fileSearch', grepTool)({
             }
           }
           case 'Error':
-            return { ...state, phase: 'error', errorDetail: event.result.error }
+            return { ...state, phase: 'error', errorDetail: event.result.error.message }
           case 'Rejected':
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error', errorDetail: event.error }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorDetail: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

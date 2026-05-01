@@ -1,62 +1,47 @@
 import { describe, expect, it } from 'vitest'
 import {
   AuthFailed,
-  ProviderDisconnected,
   UsageLimitExceeded,
-} from '@magnitudedev/providers'
+} from '@magnitudedev/ai'
 import {
-  classifyModelError,
+  SubscriptionRequired,
+  MagnitudeUsageLimitExceeded,
+} from '@magnitudedev/magnitude-client'
+import {
+  classifyConnectionError,
   classifyRetryability,
 } from '../src/workers/cortex-auth'
 
 describe('cortex auth reconnect messaging', () => {
-  it('classifyModelError maps AuthFailed to ProviderNotReady(AuthFailed)', () => {
-    const outcome = classifyModelError(
-      new AuthFailed({ message: 'missing_scope: api.responses.write', providerId: 'test-provider', providerName: 'Test Provider' }),
+  it('classifyConnectionError maps AuthFailed to ProviderNotReady(AuthFailed)', () => {
+    const outcome = classifyConnectionError(
+      new AuthFailed({ status: 401, message: 'missing_scope: api.responses.write' }),
     )
     expect(outcome).toEqual({
       _tag: 'ProviderNotReady',
       detail: {
         _tag: 'AuthFailed',
-        providerId: 'test-provider',
-        providerName: 'Test Provider',
-      },
-    })
-  })
-
-  it('classifyModelError preserves ProviderDisconnected provider identity', () => {
-    const outcome = classifyModelError(
-      new ProviderDisconnected({
-        providerId: 'openai',
-        providerName: 'OpenAI',
-        message: 'OpenAI session expired or became invalid. Please reconnect in /settings.',
-      }),
-    )
-    expect(outcome).toEqual({
-      _tag: 'ProviderNotReady',
-      detail: {
-        _tag: 'ProviderDisconnected',
-        providerId: 'openai',
-        providerName: 'OpenAI',
+        providerId: 'magnitude',
+        providerName: 'Magnitude',
       },
     })
   })
 
   it('classifyRetryability marks AuthFailed cause as auth', () => {
     const reason = classifyRetryability(
-      new AuthFailed({ message: 'token expired', providerId: 'test', providerName: 'Test' }),
+      new AuthFailed({ status: 401, message: 'token expired' }),
     )
     expect(reason).toBe('auth')
   })
 })
 
-describe('classifyModelError', () => {
-  it('maps UsageLimitExceeded to ProviderNotReady(MagnitudeBilling)', () => {
-    const cause = new UsageLimitExceeded({
+describe('classifyConnectionError', () => {
+  it('maps MagnitudeUsageLimitExceeded to ProviderNotReady(MagnitudeBilling)', () => {
+    const cause = new MagnitudeUsageLimitExceeded({
       message: 'Weekly usage limit ($50) exceeded for subscription plan.',
-      code: 'usage_limit_exceeded_weekly',
+      details: { code: 'usage_limit_exceeded_weekly', limit: '$50', period: 'weekly' } as any,
     })
-    const outcome = classifyModelError(cause)
+    const outcome = classifyConnectionError(cause)
     expect(outcome).toEqual({
       _tag: 'ProviderNotReady',
       detail: {
@@ -66,12 +51,12 @@ describe('classifyModelError', () => {
     })
   })
 
-  it('uses model error classification directly', () => {
+  it('maps UsageLimitExceeded to ProviderNotReady(MagnitudeBilling)', () => {
     const cause = new UsageLimitExceeded({
+      status: 429,
       message: 'Clean user message',
-      code: 'usage_limit_exceeded_weekly',
     })
-    const outcome = classifyModelError(cause)
+    const outcome = classifyConnectionError(cause)
     expect(outcome).toEqual({
       _tag: 'ProviderNotReady',
       detail: {

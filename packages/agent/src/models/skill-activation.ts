@@ -1,22 +1,21 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { skillTool } from '../tools/skill-tool'
 
 export interface SkillActivationState extends BaseState {
-  toolKey: 'skill'
   skillName?: string
   skillPath?: string
   contentPreview?: string
   errorDetail?: string
 }
 
-const initial: Omit<SkillActivationState, 'phase' | 'toolKey'> = {
+const initial: Omit<SkillActivationState, 'phase'> = {
   skillName: undefined,
   skillPath: undefined,
   contentPreview: undefined,
   errorDetail: undefined,
 }
 
-export const skillActivationModel = defineStateModel('skill', skillTool)({
+export const skillActivationModel = defineStateModel(skillTool)<SkillActivationState>({
   initial,
   reduce: (state, event): SkillActivationState => {
     switch (event._tag) {
@@ -27,13 +26,13 @@ export const skillActivationModel = defineStateModel('skill', skillTool)({
           ? { ...state, phase: 'streaming', skillName: (state.skillName ?? '') + event.delta }
           : state
       case 'ToolInputReady':
-        return { ...state, phase: 'streaming', skillName: event.input.name as string | undefined }
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return { ...state, phase: 'executing', skillName: event.input.name ?? state.skillName }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success': {
-            const output = event.result.output as { content: string; skillPath?: string }
+            const output = event.result.output
             const content = output.content
             return {
               ...state,
@@ -43,15 +42,17 @@ export const skillActivationModel = defineStateModel('skill', skillTool)({
             }
           }
           case 'Error':
-            return { ...state, phase: 'error', errorDetail: event.result.error }
+            return { ...state, phase: 'error', errorDetail: event.result.error.message }
           case 'Rejected':
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error', errorDetail: event.error }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorDetail: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

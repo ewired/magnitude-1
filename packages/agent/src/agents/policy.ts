@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
-import type { ToolCatalog } from '@magnitudedev/tools'
-import type { Schema } from '@effect/schema'
+
+import type { Schema } from 'effect'
 
 // Policy types — local definitions until harness integration (Phase 3)
 export type Decision = { decision: 'allow' } | { decision: 'deny'; reason: string }
@@ -28,7 +28,7 @@ const deny = (reason: string): Decision => ({ decision: 'deny', reason })
 const allow: Decision = { decision: 'allow' }
 
 export function evaluate(
-  policy: Policy<ToolCatalog, unknown>,
+  policy: Policy<unknown, unknown>,
   tool: string,
   input: unknown,
   ctx: unknown,

@@ -1,5 +1,4 @@
-import type { Schema } from '@effect/schema';
-import type { Effect } from 'effect';
+import type { Schema, Effect } from 'effect'
 import type { ToolContext } from './tool-context';
 
 export interface StreamHook<TInput, TEmission, TStreamState, E = never, R = never> {

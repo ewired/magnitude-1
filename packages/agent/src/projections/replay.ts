@@ -11,22 +11,22 @@
  */
 
 import { Projection } from '@magnitudedev/event-core'
-import { initialEngineState, foldEngineState } from '@magnitudedev/turn-engine'
-import type { EngineState } from '@magnitudedev/turn-engine'
+import { EngineStateReducer } from '@magnitudedev/harness'
+import type { EngineState } from '@magnitudedev/harness'
 import type { AppEvent } from '../events'
 
 export const ReplayProjection = Projection.defineForked<AppEvent, EngineState>()({
   name: 'Replay',
 
-  initialFork: initialEngineState(),
+  initialFork: EngineStateReducer.initial,
 
   eventHandlers: {
-    tool_event: ({ fork, event }) => foldEngineState(fork, event.event),
+    tool_event: ({ fork, event }) => EngineStateReducer.step(fork, event.event),
 
     // Keep state through turn_started so crash recovery can read it.
     turn_started: ({ fork }) => fork,
 
     // Reset on turn_outcome — terminal turns don't need replay.
-    turn_outcome: () => initialEngineState(),
+    turn_outcome: () => EngineStateReducer.initial,
   },
 })

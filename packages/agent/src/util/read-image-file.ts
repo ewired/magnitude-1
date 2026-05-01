@@ -1,5 +1,5 @@
 import { Image, format } from '@magnitudedev/image'
-import type { ImageMediaType } from '@magnitudedev/tools'
+import type { ImageMediaType } from '../content'
 
 export interface ReadImageFileOptions {
   readonly maxLongEdge?: number

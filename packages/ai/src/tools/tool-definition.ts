@@ -16,13 +16,11 @@ export interface ToolDefinitionErased {
 export interface ToolDefinitionConcrete<
   TInput,
   TOutput,
-  TInputEncoded = TInput,
-  TOutputEncoded = TOutput,
 > {
   readonly name: string
   readonly description: string
-  readonly inputSchema: Schema.Schema<TInput, TInputEncoded, never>
-  readonly outputSchema: Schema.Schema<TOutput, TOutputEncoded, never>
+  readonly inputSchema: Schema.Schema<TInput, TInput, never>
+  readonly outputSchema: Schema.Schema<TOutput, TOutput, never>
 }
 
 /**
@@ -32,19 +30,15 @@ export interface ToolDefinitionConcrete<
 export type ToolDefinition<
   TInput = never,
   TOutput = never,
-  TInputEncoded = TInput,
-  TOutputEncoded = TOutput,
 > = [TInput] extends [never]
   ? ToolDefinitionErased
-  : ToolDefinitionConcrete<TInput, TOutput, TInputEncoded, TOutputEncoded>
+  : ToolDefinitionConcrete<TInput, TOutput>
 
 export function defineTool<
   TInput,
   TOutput,
-  TInputEncoded = TInput,
-  TOutputEncoded = TOutput,
 >(
-  definition: ToolDefinitionConcrete<TInput, TOutput, TInputEncoded, TOutputEncoded>,
-): ToolDefinitionConcrete<TInput, TOutput, TInputEncoded, TOutputEncoded> {
+  definition: ToolDefinitionConcrete<TInput, TOutput>,
+): ToolDefinitionConcrete<TInput, TOutput> {
   return definition
 }

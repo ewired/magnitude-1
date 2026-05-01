@@ -8,7 +8,7 @@
  */
 
 import { Effect, Either } from "effect"
-import { Schema } from "@effect/schema"
+import { Schema } from "effect"
 import type { ToolContext } from '@magnitudedev/tools'
 import type {
   RegisteredTool,

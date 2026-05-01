@@ -205,17 +205,10 @@ describe('ToolInputDecodeFailure → tool_event', () => {
       toolCallId: 'tc-1',
       toolName: 'shell',
       group: 'g1',
-      detail: { msg: 'bad json' },
+      issue: { path: [], message: 'bad json' },
     })
     expect(events).toHaveLength(1)
     expect(events[0]).toMatchObject({ type: 'tool_event', toolKey: 'shell' })
-  })
-})
-
-describe('TurnStructureDecodeFailure', () => {
-  it('drops — surfaces via turn_outcome ParseFailure, not tool_event', () => {
-    const events = lift({ _tag: 'TurnStructureDecodeFailure', detail: 'unexpected token' })
-    expect(events).toHaveLength(0)
   })
 })
 

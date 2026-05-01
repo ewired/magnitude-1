@@ -29,7 +29,6 @@ import type { Codec, EncodeOptions, ResponseStreamEvent, ToolDef } from '@magnit
 import type { Driver, DriverError } from '@magnitudedev/drivers'
 import { CodecEncodeError, CodecDecodeError } from '@magnitudedev/codecs'
 import type { AuthInfo } from '@magnitudedev/storage'
-import type { ProviderModel } from '@magnitudedev/providers'
 
 // =============================================================================
 // Wire config
@@ -92,7 +91,6 @@ export const makeNativeTransport = <W, C>(
 // =============================================================================
 
 export interface NativeBoundModel {
-  readonly model:      ProviderModel
   readonly auth:       AuthInfo
   readonly transport:  NativeTransport
   readonly wireConfig: NativeWireConfig

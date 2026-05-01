@@ -1,15 +1,13 @@
 /**
  * Shell Tool
- *
- * Execute shell commands in a subprocess.
  */
 
-import { Effect } from 'effect'
-import { Schema } from '@effect/schema'
-import { defineTool, ToolErrorSchema } from '@magnitudedev/tools'
+import { Effect, Schema } from 'effect'
+import { defineHarnessTool } from '@magnitudedev/harness'
 import { spawn } from 'child_process'
 import { WorkingDirectoryTag } from '../execution/working-directory'
 import { agentEnv } from '../util/agent-env'
+import { ToolErrorSchema } from './errors'
 
 const DEFAULT_TIMEOUT_S = 120
 const MAX_TIMEOUT_S = 600
@@ -33,23 +31,18 @@ const ShellErrorSchema = ToolErrorSchema('ShellError', {})
 // Shell Tool
 // =============================================================================
 
-const shortenCommandPreview = (command: string, maxLength = 80): string => {
-  const normalized = command.replace(/\s+/g, ' ').trim()
-  if (normalized.length <= maxLength) return normalized
-  return `${normalized.slice(0, Math.max(0, maxLength - 3))}...`
-}
-
-export const shellTool = defineTool({
-  name: 'shell',
-  group: 'default',
-  description: 'Execute a shell command. Do not use this for operations covered by built-in tools like read, grep, tree, write, edit, and web_fetch.',
-  inputSchema: Schema.Struct({
-    command: Schema.String.annotations({ description: 'Shell command to execute' }),
-    timeout: Schema.optional(
-      Schema.Number.annotations({ description: 'Timeout in seconds (default: 120, max: 600).' })
-    ),
-  }),
-  outputSchema: ShellOutput,
+export const shellTool = defineHarnessTool({
+  definition: {
+    name: 'shell',
+    description: 'Execute a shell command. Do not use this for operations covered by built-in tools like read, grep, tree, write, edit, and web_fetch.',
+    inputSchema: Schema.Struct({
+      command: Schema.String.annotations({ description: 'Shell command to execute' }),
+      timeout: Schema.optional(
+        Schema.Number.annotations({ description: 'Timeout in seconds (default: 120, max: 600).' })
+      ),
+    }),
+    outputSchema: ShellOutput,
+  },
   errorSchema: ShellErrorSchema,
   execute: ({ command, timeout }, _ctx) =>
     Effect.gen(function* () {
@@ -159,8 +152,4 @@ export const shellTool = defineTool({
           })
       )
     }),
-  label: (input) => (input.command ? `$ ${shortenCommandPreview(input.command)}` : 'Running command…'),
 })
-
-// Tool slugs
-export const SHELL_TOOLS = ['default.shell'] as const

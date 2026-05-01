@@ -152,12 +152,8 @@ export { PermissionRejection } from './execution/permission-rejection'
 // TODO: Re-add protocol export when implemented
 // export { getProtocol } from './prompts/protocol'
 
-// Tool types (re-exported from xml-act and tools packages)
-
-export type { ToolDefinition } from '@magnitudedev/tools'
-
 // Tools
-export { catalog, isToolKey, type ToolKey } from './catalog'
+export { isToolKey, type ToolKey } from './tools/toolkits'
 export type { ToolHandle } from './tools/tool-handle'
 export type { ToolState } from './models'
 export type { FileEditState, FileWriteState } from './models'
@@ -209,52 +205,12 @@ export type { SerializedEvent } from './serialization'
 // Ambient config
 export * from './ambient'
 
-// Providers (re-exported from @magnitudedev/providers)
-export {
-  PROVIDERS,
-  getProvider,
-  getProviderIds,
+// Model resolution
+export { MagnitudeConfig } from './model/magnitude-config'
+export { AgentModelResolver, type AgentBoundModel } from './model/model-resolver'
 
-  detectDefaultProvider,
-  buildClientRegistry,
-  startAnthropicOAuth,
-  exchangeAnthropicCode,
-  refreshAnthropicToken,
-  ANTHROPIC_OAUTH_BETA_HEADERS,
-  startOpenAIBrowserOAuth,
-  startOpenAIDeviceOAuth,
-  refreshOpenAIToken,
-
-  isBrowserCompatible,
-  getBrowserCompatibleModels,
-  BROWSER_COMPATIBLE_MODELS,
-} from '@magnitudedev/providers'
-
-export type {
-  BamlProviderType,
-  AuthFlowType,
-  AuthMethodDef,
-  ProviderDefinition,
-  AuthInfo,
-  ApiKeyAuth,
-  OAuthAuth,
-  AwsAuth,
-  GcpAuth,
-  ModelSelection,
-  MagnitudeConfig,
-  ProviderOptions,
-  DetectedProvider,
-  DetectedAuthMethod,
-  ProviderAuthMethodStatus,
-  AnthropicOAuthStart,
-  OpenAIBrowserOAuthStart,
-  OpenAIDeviceOAuthStart,
-
-  ChatStream,
-  CallUsage,
-  SlotUsage,
-  getModelCost,
-} from '@magnitudedev/providers'
+// Execution usage types
+export { type AgentCallUsage, fromResponseUsage } from './execution/types'
 
 // Tracing
 export { initTraceSession, writeTrace, getTraceSessionId } from '@magnitudedev/tracing'

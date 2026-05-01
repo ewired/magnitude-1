@@ -1,9 +1,9 @@
 import { Ambient, AmbientServiceTag } from '@magnitudedev/event-core'
 import { Effect } from 'effect'
-import { ProviderState } from '@magnitudedev/providers'
-import type { ProviderStateShape } from '@magnitudedev/providers/src/runtime/contracts'
+import { resolveModel } from '@magnitudedev/roles'
 
 import { ROLE_IDS, type RoleId } from '../agents/role-validation'
+import { MagnitudeConfig, type MagnitudeConfigShape } from '../model/magnitude-config'
 
 export interface RoleConfig {
   readonly providerId: string | null
@@ -20,64 +20,42 @@ export function getRoleConfig(state: ConfigState, roleId: RoleId): RoleConfig {
   return state.byRole[roleId]
 }
 
-export function buildConfigState(opts: {
-  providerState: ProviderStateShape<RoleId>
-}) {
-  const { providerState } = opts
-
-  return Effect.gen(function* () {
-    const entries = yield* Effect.forEach(
-      ROLE_IDS,
-      (roleId) =>
-        Effect.gen(function* () {
-          const peek = yield* providerState.peek(roleId)
-          const { hardCap, softCap } = yield* providerState.contextLimits(roleId)
-
-          const config: RoleConfig = {
-            providerId: peek?.model.providerId ?? null,
-            modelId: peek?.model.id ?? null,
-            hardCap,
-            softCap,
-          }
-
-          return [roleId, config] as const
-        }),
-    )
-
+export function buildConfigState(config: MagnitudeConfigShape) {
+  return Effect.sync(() => {
     const byRole = {} as Record<RoleId, RoleConfig>
-    for (const [roleId, config] of entries) {
-      byRole[roleId] = config
-    }
+    for (const roleId of ROLE_IDS) {
+      const override = config.overrides?.[roleId]
+      const profile = override?.profile ?? config.defaultProfile
+      const modelId = override ? override.spec.modelId : `role/${roleId}`
 
-    return {
-      byRole,
+      byRole[roleId] = {
+        providerId: 'magnitude',
+        modelId,
+        hardCap: profile.contextWindow,
+        softCap: Math.floor(profile.contextWindow * 0.9),
+      }
     }
+    return { byRole }
   })
 }
 
-export const ConfigAmbient = Ambient.define<ConfigState, ProviderStateShape<RoleId>>({
+export const ConfigAmbient = Ambient.define<ConfigState, MagnitudeConfigShape>({
   name: 'Config',
   initial: Effect.gen(function* () {
-    const providerState = yield* ProviderState
-    return yield* buildConfigState({
-      providerState: providerState as ProviderStateShape<RoleId>,
-    })
+    const config = yield* MagnitudeConfig
+    return yield* buildConfigState(config)
   }),
 })
 
-export function publishConfig(opts: {
-  providerState: ProviderStateShape<RoleId>
-}) {
+export function publishConfig(config: MagnitudeConfigShape) {
   return Effect.gen(function* () {
     const ambientService = yield* AmbientServiceTag
-    const state = yield* buildConfigState(opts)
+    const state = yield* buildConfigState(config)
     yield* ambientService.update(ConfigAmbient, state)
   })
 }
 
-export const publishConfigFromProviders = Effect.gen(function* () {
-  const providerState = yield* ProviderState
-  yield* publishConfig({
-    providerState: providerState as ProviderStateShape<RoleId>,
-  })
+export const publishConfigFromMagnitude = Effect.gen(function* () {
+  const config = yield* MagnitudeConfig
+  yield* publishConfig(config)
 })

@@ -1,13 +1,14 @@
-export type { Phase, BaseState, EditDiff } from '@magnitudedev/tools'
+export type { Phase, BaseState } from '@magnitudedev/harness'
+export type { EditDiff } from './edit-diff'
 
-import { catalog } from '../catalog'
+import type { Toolkit, ToolkitKeys } from '@magnitudedev/harness'
+import { leaderToolkit } from '../tools/toolkits'
 
-export type ToolState = {
-  [K in keyof typeof catalog.entries]:
-    (typeof catalog.entries)[K] extends { state: { initial: infer S } }
-      ? S
-      : never
-}[keyof typeof catalog.entries]
+type ToolStateFromToolkit<T extends Toolkit> = {
+  [K in ToolkitKeys<T>]: T['entries'][K] extends { state: { initial: infer S } } ? S : never
+}[ToolkitKeys<T>]
+
+export type ToolState = ToolStateFromToolkit<typeof leaderToolkit>
 
 export { fileReadModel, type FileReadState } from './file-read'
 export { fileWriteModel, type FileWriteState } from './file-write'
@@ -41,7 +42,7 @@ export {
   screenshotModel,
   evaluateModel,
 } from './browser-action'
-export { catalog, isToolKey, type ToolKey } from '../catalog'
+export { isToolKey, type ToolKey } from '../tools/toolkits'
 
 // Aliases for display compatibility
 export { fileWriteModel as contentModel, type FileWriteState as ContentState } from './file-write'

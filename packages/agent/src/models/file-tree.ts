@@ -1,10 +1,9 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { treeTool } from '../tools/fs'
 
 type TreeEntry = { path: string; name: string; type: 'file' | 'dir'; depth: number }
 
 export interface FileTreeState extends BaseState {
-  toolKey: 'fileTree'
   path?: string
   entries: TreeEntry[]
   fileCount: number
@@ -12,7 +11,7 @@ export interface FileTreeState extends BaseState {
   errorDetail?: string
 }
 
-const initial: Omit<FileTreeState, 'phase' | 'toolKey'> = {
+const initial: Omit<FileTreeState, 'phase'> = {
   path: undefined,
   entries: [],
   fileCount: 0,
@@ -20,7 +19,7 @@ const initial: Omit<FileTreeState, 'phase' | 'toolKey'> = {
   errorDetail: undefined,
 }
 
-export const fileTreeModel = defineStateModel('fileTree', treeTool)({
+export const fileTreeModel = defineStateModel(treeTool)<FileTreeState>({
   initial,
   reduce: (state, event): FileTreeState => {
     switch (event._tag) {
@@ -31,13 +30,13 @@ export const fileTreeModel = defineStateModel('fileTree', treeTool)({
           ? { ...state, phase: 'streaming', path: (state.path ?? '') + event.delta }
           : state
       case 'ToolInputReady':
-        return { ...state, phase: 'streaming', path: event.input.path }
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return { ...state, phase: 'executing', path: event.input.path ?? state.path }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success': {
-            const entries = event.result.output as TreeEntry[]
+            const entries = event.result.output
             return {
               ...state,
               phase: 'completed',
@@ -47,15 +46,17 @@ export const fileTreeModel = defineStateModel('fileTree', treeTool)({
             }
           }
           case 'Error':
-            return { ...state, phase: 'error', errorDetail: event.result.error }
+            return { ...state, phase: 'error', errorDetail: event.result.error.message }
           case 'Rejected':
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error', errorDetail: event.error }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorDetail: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

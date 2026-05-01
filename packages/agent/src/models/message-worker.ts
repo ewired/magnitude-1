@@ -1,7 +1,7 @@
-import { defineStateModel } from '@magnitudedev/tools'
+import { defineStateModel } from '@magnitudedev/harness'
 import { messageWorkerTool } from '../tools/agent-communication'
 
-export const messageWorkerModel = defineStateModel('messageWorker', messageWorkerTool)({
+export const messageWorkerModel = defineStateModel(messageWorkerTool)({
   initial: {},
   reduce: (state, event) => {
     switch (event._tag) {
@@ -9,6 +9,8 @@ export const messageWorkerModel = defineStateModel('messageWorker', messageWorke
       case 'ToolExecutionStarted': return { ...state, phase: 'executing' as const }
       case 'ToolExecutionEnded':
         return { ...state, phase: event.result._tag === 'Success' ? 'completed' as const : 'error' as const }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error' as const, errorMessage: event.message }
       default: return state
     }
   },

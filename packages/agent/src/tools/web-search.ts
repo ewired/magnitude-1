@@ -1,107 +1,44 @@
 /**
  * Web Search Tool
  *
- * Searches the web using either the Magnitude provider API or EXA API.
- * - If Magnitude provider is active: calls https://app.magnitude.dev/api/v1/web-search
- * - If EXA_API_KEY env var is set: calls EXA API via @effect/platform HttpClient
- * - Otherwise: fails with clear error
+ * Searches the web via MagnitudeClient.
  */
 
-import { Effect } from 'effect'
-import { Schema } from '@effect/schema'
-import { defineTool, ToolErrorSchema } from '@magnitudedev/tools'
-import { AmbientServiceTag, Fork } from '@magnitudedev/event-core'
-import { ProviderState } from '@magnitudedev/providers'
-import { ConfigAmbient } from '../ambient/config-ambient'
-import { WebSearchService } from '../services/web-search-service'
-import { isRoleId, type RoleId } from '../agents/role-validation'
-
-const { ForkContext } = Fork
+import { Effect, Schema } from 'effect'
+import { defineHarnessTool } from '@magnitudedev/harness'
+import { MagnitudeClient } from '@magnitudedev/magnitude-client'
+import { ToolErrorSchema } from './errors'
 
 const WebSearchErrorSchema = ToolErrorSchema('WebSearchError', {})
 
-// =============================================================================
-// Tool Definition
-// =============================================================================
-
-export const webSearchTool = defineTool({
-  name: 'web_search',
-  group: 'default',
-  description: 'Search the web and optionally extract structured data',
-
-  inputSchema: Schema.Struct({
-    query: Schema.String.annotations({ description: 'Search query string' }),
-    schema: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown }).annotations({ description: 'Optional schema for structured data extraction' }))
-  }),
-
-  outputSchema: Schema.Struct({
-    text: Schema.String,
-    sources: Schema.Array(Schema.Struct({ title: Schema.String, url: Schema.String })),
-    data: Schema.optional(Schema.Unknown),
-  }),
+export const webSearchTool = defineHarnessTool({
+  definition: {
+    name: 'web_search',
+    description: 'Search the web and optionally extract structured data',
+    inputSchema: Schema.Struct({
+      query: Schema.String.annotations({ description: 'Search query string' }),
+      schema: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown }).annotations({ description: 'Optional schema for structured data extraction' }))
+    }),
+    outputSchema: Schema.Struct({
+      text: Schema.String,
+      sources: Schema.Array(Schema.Struct({ title: Schema.String, url: Schema.String })),
+      data: Schema.optional(Schema.Unknown),
+    }),
+  },
   errorSchema: WebSearchErrorSchema,
-
   execute: ({ query, schema }, _ctx) =>
     Effect.gen(function* () {
-      const ambientService = yield* AmbientServiceTag
-      const providerState = yield* ProviderState
-      const webSearchService = yield* WebSearchService
-      const configState = ambientService.getValue(ConfigAmbient)
-
-      // Get current role from fork context
-      const forkCtx = yield* ForkContext
-      if (!isRoleId(forkCtx.roleId)) {
-        return yield* Effect.fail({
+      const client = yield* MagnitudeClient
+      const result = yield* client.webSearch(query, schema).pipe(
+        Effect.mapError((err) => ({
           _tag: 'WebSearchError' as const,
-          message: `Unknown role: ${forkCtx.roleId}`,
-        })
+          message: err.message,
+        }))
+      )
+      return {
+        text: result.text,
+        sources: [...result.sources],
+        data: result.data,
       }
-      const roleId: RoleId = forkCtx.roleId
-      
-      const roleConfig = configState.byRole[roleId]
-      const isMagnitudeProvider = roleConfig.providerId === 'magnitude'
-
-      if (isMagnitudeProvider) {
-        // Get Magnitude API key from ProviderState for THIS role
-        const peekResult = yield* providerState.peek(roleId)
-        if (!peekResult || !peekResult.auth) {
-          return yield* Effect.fail({
-            _tag: 'WebSearchError' as const,
-            message: 'Magnitude provider is selected but no authentication is configured.',
-          })
-        }
-
-        const auth = peekResult.auth
-        let apiKey: string | undefined
-
-        if (auth.type === 'api') {
-          apiKey = auth.key
-        } else if (auth.type === 'oauth') {
-          apiKey = auth.accessToken
-        }
-
-        if (!apiKey) {
-          return yield* Effect.fail({
-            _tag: 'WebSearchError' as const,
-            message: 'Magnitude provider authentication is missing an API key or access token.',
-          })
-        }
-
-        return yield* webSearchService.searchMagnitude(apiKey, query, schema)
-      }
-
-      // Check for EXA_API_KEY env var
-      const exaApiKey = process.env.EXA_API_KEY
-      if (exaApiKey) {
-        return yield* webSearchService.searchExa(exaApiKey, query, schema)
-      }
-
-      // Neither Magnitude nor EXA is available
-      return yield* Effect.fail({
-        _tag: 'WebSearchError' as const,
-        message: 'Web search is not available. Use the Magnitude provider or set the EXA_API_KEY environment variable.',
-      })
     }),
-
-  label: (input) => input.query ? `Searching: ${input.query.slice(0, 50)}` : 'Searching…',
 })

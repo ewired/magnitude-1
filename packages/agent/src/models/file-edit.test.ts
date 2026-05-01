@@ -135,22 +135,31 @@ describe('fileEditModel provisional diffs', () => {
 
     const withInputReady = fileEditModel.reduce(state, {
       _tag: 'ToolInputReady',
+      toolCallId: 'tc1',
+    })
+
+    const withExecStarted = fileEditModel.reduce(withInputReady, {
+      _tag: 'ToolExecutionStarted',
+      toolCallId: 'tc1',
+      toolName: 'edit',
+      toolKey: 'fileEdit',
       input: {
         path: 'f.ts',
         old: 'old',
         new: 'new',
         replaceAll: false,
       },
+      cached: false,
     })
 
-    expect(withInputReady.phase).toBe('streaming')
-    expect(withInputReady.path).toBe('f.ts')
-    expect(withInputReady.oldText).toBe('old')
-    expect(withInputReady.newText).toBe('new')
-    expect(withInputReady.replaceAll).toBe(false)
-    expect(withInputReady.diffs).toEqual([])
+    expect(withExecStarted.phase).toBe('executing')
+    expect(withExecStarted.path).toBe('f.ts')
+    expect(withExecStarted.oldText).toBe('old')
+    expect(withExecStarted.newText).toBe('new')
+    expect(withExecStarted.replaceAll).toBe(false)
+    expect(withExecStarted.diffs).toEqual([])
 
-    const withBase = fileEditModel.reduce(withInputReady, {
+    const withBase = fileEditModel.reduce(withExecStarted, {
       _tag: 'ToolEmission',
       value: {
         type: 'file_edit_base_content',

@@ -7,7 +7,7 @@
 import { createRoles, isRoleId, type RoleId, type RoleDefinition } from '@magnitudedev/roles'
 
 import type { AgentStatusState } from '../projections/agent-status'
-import type { ToolKey } from '../catalog'
+import type { ToolKey } from '../tools/toolkits'
 
 // Agent-package-level role definition.
 // In Phase 1, this is the roles-package RoleDefinition + tool keys.

@@ -11,15 +11,9 @@ function typedKeys<T extends Record<string, unknown>>(obj: T): (keyof T & string
 
 // --- ToolkitEntry ---
 
-// Base entry shape used as constraint — accepts both erased and concrete tools.
-interface ToolkitEntryBase {
-  readonly tool: { readonly definition: { readonly name: string } }
-  readonly state?: StateModel | undefined
-}
-
 export interface ToolkitEntry<
   TTool = HarnessTool,
-  TStateModel extends StateModel | undefined = StateModel | undefined,
+  TStateModel = StateModel | undefined,
 > {
   readonly tool: TTool
   readonly state?: TStateModel
@@ -27,11 +21,11 @@ export interface ToolkitEntry<
 
 // --- Toolkit ---
 
-export interface Toolkit<T extends Record<string, ToolkitEntryBase> = Record<string, ToolkitEntryBase>> {
+export interface Toolkit<T extends Record<string, ToolkitEntry> = Record<string, ToolkitEntry>> {
   readonly entries: T
-  readonly keys: readonly (keyof T & string)[]
-  pick<K extends (keyof T & string)[]>(...keys: K): Toolkit<Pick<T, K[number]>>
-  omit<K extends (keyof T & string)[]>(...keys: K): Toolkit<Omit<T, K[number]>>
+  readonly keys: T extends infer U extends Record<string, ToolkitEntry> ? readonly (keyof U & string)[] : never
+  pick<K extends string[]>(...keys: K): Toolkit<Pick<T, K[number] & keyof T>>
+  omit<K extends string[]>(...keys: K): Toolkit<Omit<T, K[number] & keyof T>>
 }
 
 // --- Type helpers ---
@@ -54,45 +48,41 @@ export type ToolkitRequirements<T extends Toolkit> = {
 
 // --- Implementation ---
 
-class ToolkitImpl<T extends Record<string, ToolkitEntryBase>> implements Toolkit<T> {
+class ToolkitImpl<T extends Record<string, ToolkitEntry>> implements Toolkit<T> {
   readonly entries: T
-  readonly keys: readonly (keyof T & string)[]
+  readonly keys: T extends infer U extends Record<string, ToolkitEntry> ? readonly (keyof U & string)[] : never
 
   constructor(entries: T) {
     this.entries = Object.freeze({ ...entries }) as T
-    this.keys = typedKeys(entries)
+    this.keys = typedKeys(entries) as any
   }
 
-  pick<K extends (keyof T & string)[]>(...keys: K): Toolkit<Pick<T, K[number]>> {
-    const picked: Record<string, ToolkitEntryBase> = {}
+  pick<K extends string[]>(...keys: K): Toolkit<Pick<T, K[number] & keyof T>> {
+    const picked: Record<string, ToolkitEntry> = {}
     for (const key of keys) {
       if (!(key in this.entries)) {
-        throw new Error(`Toolkit.pick: key "${key}" not found. Available: ${this.keys.join(", ")}`)
+        throw new Error(`Toolkit.pick: key "${key}" not found. Available: ${(this.keys as readonly string[]).join(", ")}`)
       }
-      picked[key] = this.entries[key]
+      picked[key] = this.entries[key as keyof T] as ToolkitEntry
     }
-    // TS can't narrow a dynamically-built record to Pick.
-    return new ToolkitImpl(picked as Pick<T, K[number]>)
+    return new ToolkitImpl(picked) as any
   }
 
-  omit<K extends (keyof T & string)[]>(...keys: K): Toolkit<Omit<T, K[number]>> {
+  omit<K extends string[]>(...keys: K): Toolkit<Omit<T, K[number] & keyof T>> {
     const omitSet = new Set<string>(keys)
-    const remaining: Record<string, ToolkitEntryBase> = {}
-    for (const key of this.keys) {
+    const remaining: Record<string, ToolkitEntry> = {}
+    for (const key of (this.keys as readonly string[])) {
       if (!omitSet.has(key)) {
-        remaining[key] = this.entries[key]
+        remaining[key] = this.entries[key as keyof T] as ToolkitEntry
       }
     }
-    // TS can't narrow a dynamically-built record to Omit.
-    return new ToolkitImpl(remaining as Omit<T, K[number]>)
+    return new ToolkitImpl(remaining) as any
   }
 }
 
 // --- defineToolkit ---
 
-// Constraint uses a structural minimum to accept both erased and concrete tools.
-// The `const T` inference captures the full concrete types.
-export function defineToolkit<const T extends Record<string, { readonly tool: { readonly definition: { readonly name: string } }; readonly state?: StateModel }>>(entries: T): Toolkit<T> {
+export function defineToolkit<const T extends Record<string, ToolkitEntry>>(entries: T): Toolkit<T> {
   return new ToolkitImpl(entries)
 }
 

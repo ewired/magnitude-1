@@ -3,7 +3,7 @@
  *
  * A minimal coding agent that:
  * - Uses event-core architecture (projections, workers, signals)
- * - Uses js-act for sandbox execution with tool calling
+ * - Uses native tool calling via TurnEngine
  * - Has a shell command tool for executing commands
  * - Supports session persistence and hydration
  */
@@ -53,7 +53,7 @@ import { FsLive } from './services/fs'
 import { ExecutionManager } from './execution/types'
 import { ExecutionManagerLive } from './execution/execution-manager'
 import { BrowserServiceLive } from './services/browser-service'
-import { WebSearchServiceLive } from './services/web-search-service'
+
 import { FetchHttpClient } from '@effect/platform'
 import { registerApprovalBridge } from './execution/approval-bridge'
 
@@ -64,18 +64,21 @@ import { ChatPersistence } from './persistence/chat-persistence-service'
 import { collectSessionContext } from './util/collect-session-context'
 
 // Engine layers
-import { TurnEngineLive } from './engine/turn-engine'
-import { NativeModelResolverLive } from './engine/native-model-resolver-live'
 
-// Providers
-import { bootstrapProviderRuntime, makeModelResolver, makeNoopTracer, makeProviderRuntimeLive, makeTracePersister, type ProviderRuntime } from '@magnitudedev/providers'
-import { ROLE_IDS } from './agents/role-validation'
+import { AgentModelResolverLive } from './model/model-resolver'
+
+// Config & Auth
+import { Auth } from '@magnitudedev/ai'
+import { MagnitudeConfig } from './model/magnitude-config'
+import { MagnitudeClient, createMagnitudeClient } from '@magnitudedev/magnitude-client'
+import type { ModelOverrides } from '@magnitudedev/roles'
+import { makeNoopTracer, makeTracePersister } from './tracing/tracing'
 import type { StorageClient } from '@magnitudedev/storage'
 import { initLogger, logger } from '@magnitudedev/logger'
 import { writeTrace, initTraceSession } from '@magnitudedev/tracing'
 
 import { EphemeralSessionContextTag } from './agents/types'
-import { publishConfigFromProviders } from './ambient/config-ambient'
+import { publishConfigFromMagnitude } from './ambient/config-ambient'
 import { loadSkills } from '@magnitudedev/skills'
 import { SkillsAmbient, publishSkills } from './ambient/skills-ambient'
 
@@ -173,11 +176,20 @@ export interface CreateClientOptions {
   sessionContext?: Omit<SessionContext, 'workspacePath'>
 
   /**
-   * Optional pre-configured provider runtime.
-   * When provided, provider bootstrap is skipped and the caller is responsible
-   * for initializing model selections/auth inside the runtime.
+   * Magnitude API key. Falls back to MAGNITUDE_API_KEY env var.
    */
-  providerRuntime?: ProviderRuntime<RoleId>
+  magnitudeApiKey?: string
+
+  /**
+   * Magnitude API endpoint. Falls back to MAGNITUDE_ENDPOINT env var,
+   * then to 'https://app.magnitude.dev/api/v1'.
+   */
+  magnitudeEndpoint?: string
+
+  /**
+   * Optional model overrides for development/testing.
+   */
+  modelOverrides?: ModelOverrides
 
   /**
    * Disable shell command classification safeguards for this runtime only.
@@ -200,17 +212,29 @@ export interface CreateClientOptions {
  * Create a CodingAgent client with persistence.
  *
  * Loads events from persistence on startup:
- * - If events exist: hydrates projections and sandbox from persisted state
+ * - If events exist: hydrates projections from persisted state
  * - If no events: initializes a new session
  */
 export async function createCodingAgentClient(options: CreateClientOptions) {
 
-  // Bootstrap provider runtime from stored config / env vars unless the caller
-  // supplied a pre-configured runtime.
-  const providerRuntime = options.providerRuntime ?? makeProviderRuntimeLive<RoleId>()
-  if (!options.providerRuntime) {
-    await Effect.runPromise(bootstrapProviderRuntime<RoleId>({ slots: ROLE_IDS }).pipe(Effect.provide(providerRuntime)))
-  }
+  // Construct Magnitude config from options / env vars
+  const apiKey = options.magnitudeApiKey ?? process.env.MAGNITUDE_API_KEY
+  if (!apiKey) throw new Error('MAGNITUDE_API_KEY is required — set it via env var or pass magnitudeApiKey option')
+
+  const magnitudeEndpoint = options.magnitudeEndpoint ?? process.env.MAGNITUDE_ENDPOINT ?? 'https://app.magnitude.dev/api/v1'
+
+  const magnitudeConfigLayer = Layer.succeed(MagnitudeConfig, {
+    endpoint: magnitudeEndpoint,
+    apiKey,
+    auth: Auth.bearer(apiKey),
+    overrides: options.modelOverrides,
+    defaultProfile: { contextWindow: 200_000, maxOutputTokens: 32_768, capabilities: { vision: true, reasoning: true } },
+  })
+
+  const magnitudeClientLayer = Layer.succeed(
+    MagnitudeClient,
+    createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey }),
+  )
 
   // Enable tracing in debug mode
   if (options.debug) {
@@ -225,13 +249,13 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
   })
   const layer = Layer.mergeAll(
     Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
-    Layer.provide(BrowserServiceLive, providerRuntime),
-    Layer.provide(WebSearchServiceLive, FetchHttpClient.layer),
-    Layer.provide(makeModelResolver<RoleId>(), providerRuntime),
-    Layer.provide(NativeModelResolverLive, providerRuntime),
-    TurnEngineLive,
+    BrowserServiceLive,
+
+    Layer.provide(AgentModelResolverLive, magnitudeConfigLayer),
+    magnitudeConfigLayer,
+    magnitudeClientLayer,
+
     FetchHttpClient.layer,
-    providerRuntime,
     FsLive,
     tracerLayer,
     options.persistence,
@@ -450,7 +474,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     await originalDispose()
   }
 
-  const refreshConfig = () => client.runEffect(publishConfigFromProviders)
+  const refreshConfig = () => client.runEffect(publishConfigFromMagnitude)
 
   return {
     ...client,

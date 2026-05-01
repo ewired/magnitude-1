@@ -1,4 +1,9 @@
-import type { ThinkingLens } from '@magnitudedev/roles'
+/** Thinking lens definition for protocol prompt construction. */
+export interface ThinkingLens {
+  readonly name: string
+  readonly trigger: string
+  readonly description: string
+}
 
 // Protocol constants — inlined from xml-act to eliminate the live dependency.
 const P = 'magnitude:'

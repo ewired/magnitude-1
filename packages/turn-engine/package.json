@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@effect/schema": "^0.75.5",
     "@magnitudedev/codecs": "workspace:*",
     "@magnitudedev/tools": "workspace:*",
     "effect": "^3.19.6"

@@ -16,6 +16,7 @@ import { UserMessageResolutionProjection } from './user-message-resolution'
 import { CanonicalTurnProjection } from './canonical-turn'
 import { ConfigAmbient, getRoleConfig, type RoleConfig, type ConfigState } from '../ambient/config-ambient'
 import { SkillsAmbient } from '../ambient/skills-ambient'
+import { ToolkitAmbient } from '../ambient/toolkit-ambient'
 import type { Skill } from '@magnitudedev/skills'
 
 import { CHARS_PER_TOKEN_XML } from '../constants'
@@ -25,6 +26,7 @@ import { getAgentDefinition, getForkInfo } from '../agents/registry'
 import { buildSessionContextContent } from '../prompts/session-context'
 import { renderSystemPrompt } from '../prompts/system-prompt'
 import { buildResolvedToolSet } from '../tools/resolved-toolset'
+import { getToolkitForRole } from '../tools/toolkits'
 import { ContentPart } from '../content'
 
 // =============================================================================
@@ -82,7 +84,8 @@ function estimateSystemPromptTokens(roleId: RoleId, skills: Map<string, Skill>, 
   
   const agentDef = getAgentDefinition(roleId)
   const toolSet = buildResolvedToolSet(agentDef, configState, roleId)
-  const prompt = renderSystemPrompt(agentDef, skills, toolSet)
+  const toolkit = getToolkitForRole(roleId)
+  const prompt = renderSystemPrompt(agentDef, skills, toolSet, toolkit)
   
   // Use XML format constant for system prompt token estimation
   const tokens = Math.ceil(prompt.length / CHARS_PER_TOKEN_XML)
@@ -249,7 +252,7 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
   name: 'Compaction',
 
   reads: [AgentRoutingProjection, AgentStatusProjection, UserMessageResolutionProjection, CanonicalTurnProjection] as const,
-  ambients: [ConfigAmbient, SkillsAmbient] as const,
+  ambients: [ConfigAmbient, SkillsAmbient, ToolkitAmbient] as const,
 
   signals: {
     shouldCompactChanged: Signal.create<{ forkId: string | null; shouldCompact: boolean }>('Compaction/shouldCompactChanged'),
@@ -302,11 +305,9 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
       }
 
       const canonical = read(CanonicalTurnProjection)
-      // Use canonical XML serialization for compaction
-      const completedText = canonical.lastCompleted?.turnId === event.turnId
-        ? canonical.lastCompleted.canonicalXml
-        : ''
-      const addedTokens = estimateContentTokens(completedText)
+      const addedTokens = canonical.lastCompleted?.turnId === event.turnId
+        ? canonical.lastCompleted.estimatedTokens
+        : 0
       const tokenEstimate = event.inputTokens !== null
         ? event.inputTokens + addedTokens
         : fork.tokenEstimate + addedTokens

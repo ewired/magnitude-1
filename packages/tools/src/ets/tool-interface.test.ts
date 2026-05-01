@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { Schema } from '@effect/schema'
+import { Schema } from 'effect'
 import { defineTool } from '../tool-definition'
 import { generateToolInterface, generateToolGroupInterface } from './tool-interface'
 

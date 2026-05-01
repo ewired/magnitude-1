@@ -15,7 +15,7 @@
 import { Effect, SubscriptionRef } from 'effect'
 import { ExecutionManager } from './types'
 import { DisplayProjection, type ApprovalRequestMessage } from '../projections/display'
-import { isToolKey } from '../catalog'
+import { isToolKey } from '../tools/toolkits'
 
 /**
  * Register approval state handlers that bridge into projection state.

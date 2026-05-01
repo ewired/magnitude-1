@@ -1,6 +1,8 @@
-import type { ContentPart, ImageMediaType } from '@magnitudedev/tools'
+export type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
 
-export type { ContentPart, ImageMediaType }
+export type ContentPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly base64: string; readonly mediaType: ImageMediaType; readonly width: number; readonly height: number }
 
 export class ContentPartBuilder {
   private parts: ContentPart[] = []

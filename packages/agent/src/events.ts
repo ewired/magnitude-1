@@ -9,12 +9,9 @@
 
 import type { ContentPart } from './content'
 import type { ImageMediaType } from './content'
-import type {
-  TurnEngineEvent,
-  TurnStructureDecodeFailure,
-  ToolInputDecodeFailure,
-} from '@magnitudedev/turn-engine'
-import type { ToolKey } from './catalog'
+import type { ToolLifecycleEvent } from '@magnitudedev/harness'
+import type { ValidationIssue } from '@magnitudedev/ai'
+import type { ToolKey } from './tools/toolkits'
 import type { ObservationPart } from '@magnitudedev/roles'
 import type { Skill } from '@magnitudedev/skills'
 import type { RoleId } from '@magnitudedev/roles'
@@ -203,7 +200,12 @@ export type TurnFeedback =
   | { readonly _tag: 'OneshotLivenessRetriggered' }
   | { readonly _tag: 'YieldWorkerRetriggered' }
 
-export type ParseFailureEvent = TurnStructureDecodeFailure | ToolInputDecodeFailure
+export interface ParseFailureEvent {
+  readonly _tag: 'ToolInputDecodeFailure'
+  readonly toolCallId: string
+  readonly toolName: string
+  readonly issue: ValidationIssue
+}
 
 export type MagnitudeBillingReason =
   | { readonly _tag: 'SubscriptionRequired'; readonly message: string }
@@ -346,7 +348,7 @@ export interface ToolEvent {
   readonly turnId: string
   readonly toolCallId: string
   readonly toolKey: ToolKey
-  readonly event: TurnEngineEvent
+  readonly event: ToolLifecycleEvent
 }
 
 export type ToolDisplay =

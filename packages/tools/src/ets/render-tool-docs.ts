@@ -5,8 +5,7 @@
  * Walks Effect Schema AST directly — no TypeScript package dependency.
  */
 
-import { Schema, AST } from '@effect/schema'
-import { Option } from 'effect'
+import { Schema, SchemaAST as AST, Option } from 'effect'
 import type { ToolDefinition } from '../tool-definition'
 
 // =============================================================================

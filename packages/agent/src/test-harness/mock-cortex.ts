@@ -1,53 +1,10 @@
-import { Cause, Duration, Effect, Stream } from 'effect'
+// TODO: rewrite mock-cortex for harness paradigm
+// This file previously used createTurnStream, drainTurnEventStream, and ExecutionManager.execute()
+// which have all been removed. Needs full rewrite to use createHarness + runTurn.
+
+import { Effect, Stream } from 'effect'
 import { Worker } from '@magnitudedev/event-core'
 import type { AppEvent } from '../events'
-import { TransportError } from '@magnitudedev/providers'
-import { ExecutionManager } from '../execution/types'
-import { createTurnStream } from '../execution/turn-stream'
-import { drainTurnEventStream } from '../workers/turn-event-drain'
-import { MockTurnScriptTag, type MockTurnResponse } from './turn-script'
-import { YIELD_USER } from '@magnitudedev/xml-act'
-import { buildResolvedToolSet, type ResolvedToolSet } from '../tools/resolved-toolset'
-import { getAgentDefinition } from '../agents/registry'
-import type { ConfigState } from '../ambient/config-ambient'
-import { ROLE_IDS, type RoleId } from '../agents/role-validation'
-
-// Mock config state for testing — provides a default config for every role
-const defaultRoleConfig = { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 }
-const mockConfigState: ConfigState = {
-  byRole: Object.fromEntries(ROLE_IDS.map(s => [s, defaultRoleConfig])) as Record<RoleId, typeof defaultRoleConfig>,
-}
-
-function createMockToolSet(roleId: RoleId): ResolvedToolSet {
-  const agentDef = getAgentDefinition(roleId)
-  return buildResolvedToolSet(agentDef, mockConfigState, roleId)
-}
-
-function frameToChunks(frame: MockTurnResponse): readonly string[] {
-  if (frame.xmlChunks && frame.xmlChunks.length > 0) return frame.xmlChunks
-  if (frame.xml !== undefined) return [frame.xml]
-  return [`<magnitude:message>ok</magnitude:message>${YIELD_USER}`]
-}
-
-function buildStream(frame: MockTurnResponse): Stream.Stream<string, import('@magnitudedev/providers').ModelError> {
-  const chunks = frameToChunks(frame)
-  const effective = frame.terminateStreamEarly ? chunks.slice(0, Math.max(0, chunks.length - 1)) : chunks
-
-  return Stream.fromIterable(effective).pipe(
-    Stream.zipWithIndex,
-    Stream.mapEffect(([chunk, idx]) => Effect.gen(function* () {
-      const chunkNum = idx + 1
-      if (frame.failAfterChunk !== undefined && chunkNum > frame.failAfterChunk) {
-        return yield* Effect.fail(new TransportError({ message: `MockTurnScript failAfterChunk=${frame.failAfterChunk}`, status: null }))
-      }
-      const delayMs = frame.delayMsBetweenChunks ?? 0
-      if (delayMs > 0 && chunkNum > 1) {
-        yield* Effect.sleep(Duration.millis(delayMs))
-      }
-      return chunk
-    }))
-  )
-}
 
 export const MockCortex = Worker.defineForked<AppEvent>()({
   name: 'MockCortex',
@@ -57,105 +14,8 @@ export const MockCortex = Worker.defineForked<AppEvent>()({
   },
 
   eventHandlers: {
-    turn_started: (event, publish) => {
-      const { forkId, turnId, chainId } = event
-
-      return Effect.gen(function* () {
-        const script = yield* MockTurnScriptTag
-        const execManager = yield* ExecutionManager
-        const frame = yield* script.dequeue({ forkId, turnId })
-
-        const turnStream = createTurnStream((sink) => Effect.gen(function* () {
-          const xmlStream = buildStream(frame).pipe(
-            Stream.tap((chunk) => sink.emit({ _tag: 'RawResponseChunk', text: chunk }))
-          )
-
-          const variant: RoleId = forkId === null ? 'leader' : 'engineer'
-          const executeResult = yield* execManager.execute(
-            xmlStream,
-            {
-              forkId,
-              turnId,
-              chainId,
-              defaultProseDest: forkId === null ? 'user' : 'parent',
-              triggeredByUser: false,
-              toolSet: createMockToolSet(variant),
-            },
-            sink,
-          )
-
-          const usage = {
-            inputTokens: frame.usage?.inputTokens ?? null,
-            outputTokens: frame.usage?.outputTokens ?? null,
-            cacheReadTokens: frame.usage?.cacheReadTokens ?? null,
-            cacheWriteTokens: frame.usage?.cacheWriteTokens ?? null,
-            inputCost: null,
-            outputCost: null,
-            totalCost: null,
-          }
-
-          yield* sink.emit({ _tag: 'TurnResult', value: { executeResult, usage } })
-        }))
-
-        const drained = yield* drainTurnEventStream(turnStream, forkId, turnId, publish)
-        const { executeResult, usage } = drained.finalResult
-
-        yield* publish({
-          type: 'turn_outcome',
-          forkId,
-          turnId,
-          chainId,
-          strategyId: 'native',
-          outcome: executeResult.result,
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          cacheReadTokens: usage.cacheReadTokens,
-          cacheWriteTokens: usage.cacheWriteTokens,
-          providerId: null,
-          modelId: null,
-        })
-      }).pipe(
-        Effect.onInterrupt(() => {
-          return publish({
-            type: 'turn_outcome',
-            forkId,
-            turnId,
-            chainId,
-            strategyId: 'native',
-            outcome: { _tag: 'Cancelled', reason: { _tag: 'UserInterrupt' } },
-            inputTokens: null,
-            outputTokens: null,
-            cacheReadTokens: null,
-            cacheWriteTokens: null,
-            providerId: null,
-            modelId: null,
-          })
-        }),
-        Effect.catchAllCause((cause) => {
-          const failure = Cause.failureOption(cause)
-          const defect = Cause.dieOption(cause)
-          const message = failure?._tag === 'Some'
-            ? (failure.value instanceof Error ? failure.value.message : String(failure.value))
-            : defect?._tag === 'Some'
-              ? (defect.value instanceof Error ? defect.value.message : String(defect.value))
-              : Cause.pretty(cause)
-
-          return publish({
-            type: 'turn_outcome',
-            forkId,
-            turnId,
-            chainId,
-            strategyId: 'native',
-            outcome: { _tag: 'UnexpectedError', message: `MockCortex turn failed: ${message}` },
-            inputTokens: null,
-            outputTokens: null,
-            cacheReadTokens: null,
-            cacheWriteTokens: null,
-            providerId: null,
-            modelId: null,
-          })
-        })
-      )
+    turn_started: (_event, _publish) => {
+      return Effect.die(new Error('MockCortex not yet rewritten for harness paradigm'))
     }
   }
 })

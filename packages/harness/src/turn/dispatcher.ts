@@ -328,6 +328,14 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
               break
             }
             case "validation_failure": {
+              const acc = accumulators.get(event.reason.toolCallId)!
+              yield* emit({
+                _tag: "ToolInputDecodeFailed",
+                toolCallId: event.reason.toolCallId,
+                toolName: acc.toolName,
+                toolKey: acc.toolKey,
+                message: event.reason.issue.message,
+              })
               yield* interruptAllTools()
               outcome = {
                 _tag: "ToolInputDecodeFailure",
@@ -365,12 +373,12 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
     return Effect.gen(function* () {
       for (const [toolCallId, fiber] of toolFibers) {
         yield* Fiber.interrupt(fiber)
-        const acc = accumulators.get(toolCallId)
+        const acc = accumulators.get(toolCallId)!
         yield* emit({
           _tag: "ToolExecutionEnded",
           toolCallId,
-          toolName: acc?.toolName ?? "",
-          toolKey: acc?.toolKey ?? "",
+          toolName: acc.toolName,
+          toolKey: acc.toolKey,
           result: { _tag: "Interrupted" },
         })
       }

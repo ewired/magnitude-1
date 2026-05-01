@@ -9,7 +9,7 @@ export type { Phase, BaseState, StateModel } from "./tool/state-model"
 export { defineStateModel } from "./tool/state-model"
 
 // Tool
-export type { HarnessTool, HarnessToolErased, HarnessToolConcrete, ToolContext, StreamHook } from "./tool/tool"
+export type { HarnessTool, ToolContext, StreamHook } from "./tool/tool"
 export { defineHarnessTool } from "./tool/tool"
 
 // Toolkit
@@ -29,6 +29,7 @@ export type {
   ToolInputFieldChunk,
   ToolInputFieldComplete,
   ToolInputReady,
+  ToolInputDecodeFailed,
   ToolExecutionStarted,
   ToolExecutionEnded,
   ToolEmission,

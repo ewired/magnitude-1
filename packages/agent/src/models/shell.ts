@@ -1,8 +1,7 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { shellTool } from '../tools/shell'
 
 export interface ShellState extends BaseState {
-  toolKey: 'shell'
   command: string
   done: 'completed' | null
   exitCode?: number
@@ -11,7 +10,7 @@ export interface ShellState extends BaseState {
   errorMessage?: string
 }
 
-const initial: Omit<ShellState, 'phase' | 'toolKey'> = {
+const initial: Omit<ShellState, 'phase'> = {
   command: '',
   done: null,
   exitCode: undefined,
@@ -20,7 +19,7 @@ const initial: Omit<ShellState, 'phase' | 'toolKey'> = {
   errorMessage: undefined,
 }
 
-export const shellModel = defineStateModel('shell', shellTool)({
+export const shellModel = defineStateModel(shellTool)<ShellState>({
   initial,
   reduce: (state, event): ShellState => {
     switch (event._tag) {
@@ -31,9 +30,9 @@ export const shellModel = defineStateModel('shell', shellTool)({
           ? { ...state, command: state.command + event.delta }
           : state
       case 'ToolInputReady':
-        return { ...state, command: event.input.command, phase: 'streaming' }
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return { ...state, phase: 'executing', command: event.input.command ?? state.command }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':
@@ -47,15 +46,17 @@ export const shellModel = defineStateModel('shell', shellTool)({
               errorMessage: undefined,
             }
           case 'Error':
-            return { ...state, phase: 'error', errorMessage: event.result.error }
+            return { ...state, phase: 'error', errorMessage: event.result.error.message }
           case 'Rejected':
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error', errorMessage: event.error }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorMessage: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

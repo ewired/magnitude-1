@@ -9,7 +9,7 @@ import { Projection } from '@magnitudedev/event-core'
 import type { ObservationPart } from '@magnitudedev/roles'
 import type { AppEvent, StrategyId, ImageAttachment, ProviderNotReadyDetail, ConnectionFailureDetail, SafetyStopReason } from '../events'
 import type { TurnPart, ThoughtPart, MessagePart, ToolCallPart } from '@magnitudedev/codecs'
-import { renderToolOutput } from '@magnitudedev/turn-engine'
+import { renderToolOutput } from '../util/render-tool-output'
 import { getAgentByForkId, AgentStatusProjection } from './agent-status'
 import { SubagentActivityProjection } from './subagent-activity'
 import { OutboundMessagesProjection } from './outbound-messages'
@@ -531,6 +531,10 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
         }
 
         case 'ToolInputReady': {
+          return fork
+        }
+
+        case 'ToolExecutionStarted': {
           const toolName = fork.workingToolCallNames.get(event.toolCallId) ?? 'unknown'
           const part: ToolCallPart = {
             type: 'tool_call',
@@ -570,7 +574,7 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
                   toToolErrorResult({
                     toolName,
                     status: 'error',
-                    message: result.error,
+                    message: typeof result.error === 'string' ? result.error : String(result.error),
                   }),
                 ],
               }

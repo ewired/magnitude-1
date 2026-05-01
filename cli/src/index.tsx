@@ -15,8 +15,6 @@ import { StorageProvider } from './providers/storage-provider'
 import { isLightBackground } from './utils/theme'
 import { installGracefulShutdownHandlers } from './utils/graceful-shutdown'
 
-import { runOneshot } from './oneshot'
-
 async function main() {
   // Initialize theme store before rendering (defaults to dark)
   initThemeStore()
@@ -27,29 +25,8 @@ async function main() {
     .option('--resume [id]', 'Resume the most recent chat session or a specific session by ID')
     .option('--debug', 'Enable debug mode with debug panel')
 
-    .option('--oneshot [prompt]', 'Run autonomous oneshot task and exit on completion')
-    .option('--provider <id>', 'Provider ID for oneshot mode (e.g. anthropic, openai)')
-    .option('--model <id>', 'Model ID for oneshot mode')
-    .option('--disable-shell-safeguards', 'Disable shell command classification safeguards for this oneshot run')
-    .option('--disable-cwd-safeguards', 'Disable working-directory boundary safeguards for this oneshot run')
     .argument('[prompt]')
     .action(async (promptArg, opts) => {
-      if (opts.oneshot !== undefined) {
-        if (opts.resume !== undefined) {
-          console.error('--resume and --oneshot cannot be used together')
-          process.exit(1)
-        }
-        const prompt = typeof opts.oneshot === 'string' ? opts.oneshot : promptArg
-        await runOneshot({
-          prompt,
-          providerId: opts.provider,
-          modelId: opts.model,
-          debug: opts.debug ?? false,
-          disableShellSafeguards: opts.disableShellSafeguards ?? false,
-          disableCwdSafeguards: opts.disableCwdSafeguards ?? false,
-        })
-        return
-      }
 
       const renderer = await createCliRenderer({
         exitOnCtrlC: false, // We handle Ctrl+C manually for two-tap exit

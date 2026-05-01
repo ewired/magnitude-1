@@ -32,8 +32,8 @@ import { textOf } from '../content'
 import { createId } from '../util/id'
 
 import { finalizeOpenToolStepsAsInterruptedInSteps } from './display-interrupt'
-import { catalog, type ToolKey } from '../catalog'
-import type { ToolState } from '../tools/tool-handle'
+import { type ToolKey, HIDDEN_TOOLS } from '../tools/toolkits'
+import type { ToolState } from '../models/index'
 import { ToolStateProjection } from './tool-state'
 
 // =============================================================================
@@ -663,6 +663,8 @@ export function upsertStreamingCommunicationStep(
 export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>()({
   name: 'Display',
 
+  ambients: [],
+
   reads: [AgentRoutingProjection, AgentStatusProjection, UserMessageResolutionProjection, TurnProjection, ToolStateProjection] as const,
 
   initialFork: {
@@ -856,7 +858,6 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
     tool_event: ({ event, fork, read, emit }) => {
       const inner = event.event
       const toolStateFork = read(ToolStateProjection) ?? { toolHandles: {} }
-
       switch (inner._tag) {
         case 'ToolInputStarted': {
           // Emit signal for parent fork activity tracking (before any early returns)
@@ -867,10 +868,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             return fork
           }
 
-          // Consult agent definition's display policy
-          void read(AgentStatusProjection)
-          const entry = catalog.entries[event.toolKey]
-          if ('display' in entry && entry.display === false) {
+          // Skip hidden tools
+          if (HIDDEN_TOOLS.has(event.toolKey)) {
             return fork
           }
 
@@ -914,10 +913,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             return fork
           }
 
-          // Consult agent definition's display policy
-          void read(AgentStatusProjection)
-          const entry = catalog.entries[event.toolKey]
-          if ('display' in entry && entry.display === false) {
+          // Skip hidden tools
+          if (HIDDEN_TOOLS.has(event.toolKey)) {
             return fork
           }
 

@@ -1,16 +1,15 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { viewTool } from '../tools/fs'
 
 export interface FileViewState extends BaseState {
-  toolKey: 'fileView'
   path?: string
 }
 
-const initial: Omit<FileViewState, 'phase' | 'toolKey'> = {
+const initial: Omit<FileViewState, 'phase'> = {
   path: undefined,
 }
 
-export const fileViewModel = defineStateModel('fileView', viewTool)({
+export const fileViewModel = defineStateModel(viewTool)<FileViewState>({
   initial,
   reduce: (state, event): FileViewState => {
     switch (event._tag) {
@@ -21,9 +20,9 @@ export const fileViewModel = defineStateModel('fileView', viewTool)({
           ? { ...state, phase: 'streaming', path: (state.path ?? '') + event.delta }
           : state
       case 'ToolInputReady':
-        return { ...state, phase: 'streaming', path: event.input.path }
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return { ...state, phase: 'executing', path: event.input.path ?? state.path }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':
@@ -34,10 +33,12 @@ export const fileViewModel = defineStateModel('fileView', viewTool)({
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error' }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorMessage: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

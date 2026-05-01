@@ -131,11 +131,20 @@ export interface TurnEnd {
 
 // ── Union Types ──────────────────────────────────────────────────────
 
+export interface ToolInputDecodeFailed {
+  readonly _tag: "ToolInputDecodeFailed"
+  readonly toolCallId: ToolCallId
+  readonly toolName: string
+  readonly toolKey: string
+  readonly message: string
+}
+
 export type ToolLifecycleEvent<TInput = unknown, TOutput = unknown, TEmission = unknown, TError = unknown> =
   | ToolInputStarted
   | ToolInputFieldChunk
   | ToolInputFieldComplete
   | ToolInputReady
+  | ToolInputDecodeFailed
   | ToolExecutionStarted<TInput>
   | ToolExecutionEnded<TOutput, TError>
   | ToolEmission<TEmission>

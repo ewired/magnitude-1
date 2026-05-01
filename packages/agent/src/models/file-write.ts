@@ -1,22 +1,21 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { writeTool } from '../tools/fs'
 
 export interface FileWriteState extends BaseState {
-  toolKey: 'fileWrite'
   path?: string
   body: string
   charCount: number
   lineCount: number
 }
 
-const initial: Omit<FileWriteState, 'phase' | 'toolKey'> = {
+const initial: Omit<FileWriteState, 'phase'> = {
   path: undefined,
   body: '',
   charCount: 0,
   lineCount: 0,
 }
 
-export const fileWriteModel = defineStateModel('fileWrite', writeTool)({
+export const fileWriteModel = defineStateModel(writeTool)<FileWriteState>({
   initial,
   reduce: (state, event): FileWriteState => {
     switch (event._tag) {
@@ -36,19 +35,19 @@ export const fileWriteModel = defineStateModel('fileWrite', writeTool)({
         }
         return state
       }
-      case 'ToolInputReady': {
-        const content = event.input.content
+      case 'ToolInputReady':
+        return state
+      case 'ToolExecutionStarted': {
+        const content = event.input.content ?? state.body
         return {
           ...state,
-          phase: 'streaming',
+          phase: 'executing',
           path: event.input.path ?? state.path,
           body: content,
           charCount: content.length,
           lineCount: content.length > 0 ? content.split('\n').length : 0,
         }
       }
-      case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
       case 'ToolEmission': {
         const v = event.value as { type?: string; path?: string; linesWritten?: number }
         return v.type === 'write_stats'
@@ -65,10 +64,12 @@ export const fileWriteModel = defineStateModel('fileWrite', writeTool)({
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error' }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorMessage: event.message }
       case 'ToolInputFieldComplete':
       default:
         return state

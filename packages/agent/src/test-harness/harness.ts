@@ -1,9 +1,8 @@
 import { Agent, type Projection, makeAmbientServiceLayer } from '@magnitudedev/event-core'
-import { defineCatalog } from '@magnitudedev/tools'
 import { Context, Effect, Layer, SubscriptionRef } from 'effect'
 import { YIELD_USER } from '@magnitudedev/xml-act'
 import type { RoleDefinition } from '@magnitudedev/roles'
-import type { AgentCatalogEntry } from '../catalog'
+
 import type { AppEvent, SessionContext } from '../events'
 import { textParts } from '../content'
 import { createId } from '../util/id'
@@ -42,10 +41,13 @@ import { SessionTitleWorker } from '../workers/session-title-worker'
 
 // Runtime/services
 import { ExecutionManagerLive } from '../execution/execution-manager'
-import { BrowserServiceLive } from '../services/browser-service'
-import { ModelCatalog, makeProviderRuntimeLive, makeTestResolver, type TestModelConfig } from '@magnitudedev/providers'
+import { BrowserService } from '../services/browser-service'
 import type { RoleId } from '../agents/role-validation'
 import { registerApprovalBridge } from '../execution/approval-bridge'
+import { makeTestModelResolver } from './test-resolver'
+import type { TestModelConfig } from './test-model'
+import { MagnitudeConfig } from '../model/magnitude-config'
+import { Auth } from '@magnitudedev/ai'
 
 // Testing services
 import { InMemoryChatPersistenceTag, makeInMemoryChatPersistenceLayer } from './in-memory-persistence'
@@ -310,11 +312,17 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
     const defaultWaitTimeoutMs = options.defaults?.waitTimeoutMs ?? DEFAULT_TIMEOUT_MS
     const fakeClock = options.clock === 'fake' ? createFakeClock() : null
 
-    const testModelCatalogLayer = Layer.succeed(ModelCatalog, {
-      refresh: () => Effect.void,
-      getModels: () => Effect.succeed([]),
+    const testMagnitudeConfigLayer = Layer.succeed(MagnitudeConfig, {
+      endpoint: 'http://test',
+      apiKey: 'test-key',
+      auth: Auth.bearer('test-key'),
+      defaultProfile: { contextWindow: 200_000, maxOutputTokens: 32_768, capabilities: { vision: true, reasoning: true } },
     })
-    const providerRuntime = makeProviderRuntimeLive<RoleId>(testModelCatalogLayer)
+    const testModelResolverLayer = makeTestModelResolver(options.model ?? {})
+    const stubBrowserServiceLayer = Layer.succeed(BrowserService, {
+      get: () => Effect.die(new Error('BrowserService not available in tests')),
+      release: () => Effect.die(new Error('BrowserService not available in tests')),
+    })
     const ephemeralSessionContextLayer = Layer.succeed(EphemeralSessionContextTag, {
       disableShellSafeguards: false,
       disableCwdSafeguards: false,
@@ -327,12 +335,10 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
 
     const runtimeLayer = Layer.mergeAll(
       Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
-      Layer.provide(BrowserServiceLive, providerRuntime),
-      providerRuntime,
+      stubBrowserServiceLayer,
+      testMagnitudeConfigLayer,
+      testModelResolverLayer,
       fsLayer,
-      ...(options.model
-        ? [makeTestResolver(options.model as TestModelConfig)]
-        : [makeTestResolver()]),
       MockTurnScriptLive,
       basePersistenceLayer,
       faultWrappedPersistenceLayer,

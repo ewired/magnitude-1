@@ -8,7 +8,8 @@ import subagentBaseRaw from '../agents/prompts/subagent-base.txt' with { type: '
 import { renderSkillReferenceTable } from './tasks/index'
 import fewShotNoteRaw from './protocol/few-shot-note.txt' with { type: 'text' }
 import type { ResolvedToolSet } from '../tools/resolved-toolset'
-import { renderToolDocs } from '@magnitudedev/tools'
+import type { Toolkit } from '@magnitudedev/harness'
+import { renderToolDocs } from './render-tool-docs'
 
 export function compilePromptTemplate(raw: string): string {
   return raw
@@ -26,11 +27,12 @@ export function renderSystemPrompt(
   roleDef: RoleDefinition,
   skills: Map<string, Skill>,
   toolSet: ResolvedToolSet,
+  toolkit: Toolkit,
   options?: { implicitTools?: readonly string[] },
 ): string {
   // Render tool docs from the resolved tool set
   const availableTools = [...toolSet.availableKeys]
-    .map(key => toolSet.agentDef.tools.entries[key]?.tool)
+    .map(key => toolkit.entries[key]?.tool)
     .filter(Boolean)
   const toolDocs = availableTools.length > 0
     ? renderToolDocs(availableTools)

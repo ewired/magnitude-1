@@ -1,1 +1,1 @@
-export type { EditDiff } from '@magnitudedev/tools'
+export type { EditDiff } from './edit-diff'

@@ -1,20 +1,19 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { webSearchTool } from '../tools/web-search'
 
 export interface WebSearchState extends BaseState {
-  toolKey: 'webSearch'
   query?: string
   sources?: readonly { title: string; url: string }[]
   errorDetail?: string
 }
 
-const initial: Omit<WebSearchState, 'phase' | 'toolKey'> = {
+const initial: Omit<WebSearchState, 'phase'> = {
   query: undefined,
   sources: undefined,
   errorDetail: undefined,
 }
 
-export const webSearchModel = defineStateModel('webSearch', webSearchTool)({
+export const webSearchModel = defineStateModel(webSearchTool)<WebSearchState>({
   initial,
   reduce: (state, event): WebSearchState => {
     switch (event._tag) {
@@ -25,23 +24,25 @@ export const webSearchModel = defineStateModel('webSearch', webSearchTool)({
           ? { ...state, phase: 'streaming', query: (state.query ?? '') + event.delta }
           : state
       case 'ToolInputReady':
-        return { ...state, phase: 'streaming', query: event.input.query }
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return { ...state, phase: 'executing', query: event.input.query ?? state.query }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':
-            return { ...state, phase: 'completed', sources: (event.result.output as { sources?: readonly { title: string; url: string }[] }).sources ?? [] }
+            return { ...state, phase: 'completed', sources: event.result.output.sources ?? [] }
           case 'Error':
-            return { ...state, phase: 'error', errorDetail: event.result.error }
+            return { ...state, phase: 'error', errorDetail: event.result.error.message }
           case 'Rejected':
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error', errorDetail: event.error }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorDetail: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:
