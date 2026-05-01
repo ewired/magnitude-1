@@ -25,7 +25,7 @@ export const browserObservable = createObservable({
     const tabText = `Current page: ${tabState.tabs[tabState.activeTab]?.url ?? 'unknown'}\nViewport: ${width}x${height}\nTabs:\n${tabLines.join('\n')}`
     return [
       { type: 'text' as const, text: tabText },
-      { type: 'image' as const, base64, mediaType: `image/${format}` },
+      { type: 'image' as const, base64, mediaType: `image/${format}`, dimensions: { width: imgWidth, height: imgHeight } },
     ] satisfies ObservationPart[]
   })
 })

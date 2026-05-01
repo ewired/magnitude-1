@@ -13,7 +13,7 @@ import type { UserPart, ImageMediaType } from '@magnitudedev/ai'
 // No outer wrapper — the chat template or codec provides the boundary.
 // =============================================================================
 
-function isImageOutput(output: unknown): output is { _tag: 'ImagePart'; data: string; mediaType: ImageMediaType } {
+function isImageOutput(output: unknown): output is { _tag: 'ImagePart'; data: string; mediaType: ImageMediaType; dimensions?: { width: number; height: number } } {
   return (
     typeof output === 'object' &&
     output !== null &&
@@ -74,7 +74,12 @@ export function renderToolOutput(result: ToolResult): readonly UserPart[] {
       }
 
       if (isImageOutput(output)) {
-        return [{ _tag: 'ImagePart', data: output.data, mediaType: output.mediaType }]
+        return [{
+          _tag: 'ImagePart' as const,
+          data: output.data,
+          mediaType: output.mediaType,
+          ...(output.dimensions ? { dimensions: output.dimensions } : {}),
+        }]
       }
 
       if (isScalar(output)) {

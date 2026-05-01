@@ -45,7 +45,7 @@ describe('renderTimeline', () => {
             truncated: true,
             originalBytes: 42,
           },
-          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', width: 100, height: 100 } },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } } },
         ],
       },
     ]
@@ -55,7 +55,7 @@ describe('renderTimeline', () => {
         _tag: 'TextPart',
         text: '--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n<mention path="src/a.ts" type="text" truncated="true" original_bytes="42">export const a = 1</mention>',
       },
-      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', width: 100, height: 100 },
+      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } },
     ])
   })
 
@@ -101,7 +101,7 @@ describe('renderTimeline', () => {
             content: 'const x = 1', truncated: true, originalBytes: 123,
           },
           { kind: 'mention', path: 'c.ts', contentType: 'text', error: 'not found' },
-          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', width: 100, height: 100 } },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } } },
         ],
       },
       { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
@@ -114,7 +114,7 @@ describe('renderTimeline', () => {
         text:
           '--- 2024-03-28 16:00 ---\n<magnitude:message from="user">see this</magnitude:message>\n<mention path="b.ts" type="text" truncated="true" original_bytes="123">const x = 1</mention>\n<mention path="c.ts" type="text" error="not found"/>',
       },
-      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', width: 100, height: 100 },
+      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } },
     ])
   })
 
@@ -422,7 +422,7 @@ describe('renderTimeline', () => {
         timestamp: TS0,
         text: 'look at this',
         attachments: [
-          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', width: 100, height: 100 }, filename: 'screenshot.png' },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } }, filename: 'screenshot.png' },
         ],
       },
     ]
@@ -444,7 +444,7 @@ describe('renderTimeline', () => {
         timestamp: TS0,
         text: 'look at this',
         attachments: [
-          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', width: 100, height: 100 }, filename: 'screenshot.png' },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } }, filename: 'screenshot.png' },
         ],
       },
     ]
@@ -456,7 +456,7 @@ describe('renderTimeline', () => {
         text: `--- 2024-03-28 16:00 ---
 <magnitude\u003amessage from="user">look at this</magnitude\u003amessage>`,
       },
-      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', width: 100, height: 100 },
+      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } },
     ])
   })
 

@@ -1,6 +1,6 @@
 import { access } from 'fs/promises'
 import { join } from 'path'
-import { CHARS_PER_TOKEN } from '../constants'
+import { CHARS_PER_TOKEN_UPPER } from '../constants'
 import { createDefaultIgnore } from './gitignore'
 import { runGitCommand } from './git-command'
 import { walk, type Entry } from './walk'
@@ -92,13 +92,13 @@ async function collectGitRawScores(cwd: string, currentDays: number): Promise<Ma
 function lineCost(depth: number, name: string, isDir: boolean): number {
   // +1 for newline character
   const chars = depth * 2 + name.length + (isDir ? 2 : 1) + 1
-  return Math.max(1, Math.ceil(chars / CHARS_PER_TOKEN))
+  return Math.max(1, Math.ceil(chars / CHARS_PER_TOKEN_UPPER))
 }
 
 function remainderLineCost(depth: number, childCount: number): number {
   // "  ".repeat(depth+1) + "... (N more)\n"
   const chars = (depth + 1) * 2 + 9 + String(childCount).length + 1
-  return Math.ceil(chars / CHARS_PER_TOKEN)
+  return Math.ceil(chars / CHARS_PER_TOKEN_UPPER)
 }
 
 function buildNodeTree(entries: Entry[]): BuildNode[] {

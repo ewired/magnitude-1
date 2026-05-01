@@ -19,7 +19,7 @@ import { SkillsAmbient } from '../ambient/skills-ambient'
 import { ToolkitAmbient } from '../ambient/toolkit-ambient'
 import type { Skill } from '@magnitudedev/skills'
 
-import { CHARS_PER_TOKEN_XML } from '../constants'
+import { estimateContentTokens, estimateCompletedTurn, estimateText } from '../util/token-estimation'
 
 import { isRoleId, type RoleId } from '../agents/role-validation'
 import { getAgentDefinition, getForkInfo } from '../agents/registry'
@@ -28,6 +28,8 @@ import { renderSystemPrompt } from '../prompts/system-prompt'
 import { buildResolvedToolSet } from '../tools/resolved-toolset'
 import { getToolkitForRole } from '../tools/toolkits'
 import type { UserPart } from '@magnitudedev/ai'
+import type { CompletedTurn } from '../inbox/types'
+
 
 // =============================================================================
 // Context Limit Helpers
@@ -54,27 +56,7 @@ function computeContextLimitBlocked(
   return isCompactionBlocking(tag) && tokenEstimate >= limits.hardCap
 }
 
-/** Estimate tokens for content string or content parts using XML format constant */
-function estimateContentTokens(content: string): number
-function estimateContentTokens(content: UserPart[], modelId?: string | null, providerId?: string | null): number
-function estimateContentTokens(content: string | UserPart[], modelId?: string | null, providerId?: string | null): number {
-  if (typeof content === 'string') {
-    return Math.ceil(content.length / CHARS_PER_TOKEN_XML)
-  }
-  let tokens = 0
-  for (const part of content) {
-    switch (part._tag) {
-      case 'TextPart':
-        tokens += Math.ceil(part.text.length / CHARS_PER_TOKEN_XML)
-        break
-      case 'ImagePart':
-        // Image dimensions not available on UserPart; use conservative estimate
-        tokens += getImageTokenEstimator(modelId ?? null, providerId ?? null)(1024, 1024)
-        break
-    }
-  }
-  return tokens
-}
+
 
 const systemPromptTokenCache = new Map<string, number>()
 
@@ -88,60 +70,9 @@ function estimateSystemPromptTokens(roleId: RoleId, skills: Map<string, Skill>, 
   const toolkit = getToolkitForRole(roleId)
   const prompt = renderSystemPrompt(agentDef, skills, toolSet, toolkit)
   
-  // Use XML format constant for system prompt token estimation
-  const tokens = Math.ceil(prompt.length / CHARS_PER_TOKEN_XML)
+  const tokens = estimateText(prompt)
   systemPromptTokenCache.set(cacheKey, tokens)
   return tokens
-}
-
-type ImageTokenEstimator = (width: number, height: number) => number
-
-const estimators: Record<string, ImageTokenEstimator> = {
-  anthropic: (w, h) => {
-    const longEdge = Math.max(w, h)
-    if (longEdge > 1568) {
-      const scale = 1568 / longEdge
-      w = Math.round(w * scale)
-      h = Math.round(h * scale)
-    }
-    return Math.ceil((w * h) / 750)
-  },
-
-  openai: (w, h) => {
-    const maxDim = Math.max(w, h)
-    if (maxDim > 2048) {
-      const scale = 2048 / maxDim
-      w = Math.round(w * scale)
-      h = Math.round(h * scale)
-    }
-    const minDim = Math.min(w, h)
-    if (minDim > 768) {
-      const scale = 768 / minDim
-      w = Math.round(w * scale)
-      h = Math.round(h * scale)
-    }
-    const tilesW = Math.ceil(w / 512)
-    const tilesH = Math.ceil(h / 512)
-    return (tilesW * tilesH * 170) + 85
-  },
-
-  google: () => 560,
-  'google-ai': () => 560,
-  'vertex-ai': () => 560,
-}
-
-function getImageTokenEstimator(modelId: string | null, providerId: string | null): ImageTokenEstimator {
-  if (modelId) {
-    if (/claude/i.test(modelId)) return estimators.anthropic
-    if (/gpt|o[1-9]-/i.test(modelId)) return estimators.openai
-    if (/gemini/i.test(modelId)) return estimators.google
-  }
-
-  if (providerId === 'anthropic' || providerId === 'aws-bedrock') return estimators.anthropic
-  if (providerId === 'openai') return estimators.openai
-  if (providerId === 'google' || providerId === 'google-ai' || providerId === 'vertex-ai') return estimators.google
-
-  return estimators.anthropic
 }
 
 function toRoleId(role: string): RoleId | null {
@@ -305,13 +236,19 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
         return nextState
       }
 
-      const canonical = read(CanonicalTurnProjection)
-      const addedTokens = canonical.lastCompleted?.turnId === event.turnId
-        ? canonical.lastCompleted.estimatedTokens
-        : 0
-      const tokenEstimate = event.inputTokens !== null
-        ? event.inputTokens + addedTokens
-        : fork.tokenEstimate + addedTokens
+      let tokenEstimate: number
+
+      if (event.inputTokens !== null) {
+        // Tier 1: actual API usage — this IS the total prompt size, no additive correction
+        tokenEstimate = event.inputTokens
+      } else {
+        // Tier 3: heuristic fallback — add estimated turn cost to running total
+        const canonical = read(CanonicalTurnProjection)
+        const turnCost = canonical.lastCompleted?.turnId === event.turnId
+          ? estimateCompletedTurn(canonical.lastCompleted)
+          : 0
+        tokenEstimate = fork.tokenEstimate + turnCost
+      }
 
       const nextState = recomputeOperationalFields(fork, limits, {
         tokenEstimate,
@@ -469,7 +406,7 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
       const fork = state.forks.get(value.forkId)
       if (!fork) return state
 
-      const addedTokens = estimateContentTokens([...value.content], fork.modelId, fork.providerId)
+      const addedTokens = estimateContentTokens([...value.content])
       const tokenEstimate = fork.tokenEstimate + addedTokens
       const configState = ambient.get(ConfigAmbient)
       const agentStatus = read(AgentStatusProjection)

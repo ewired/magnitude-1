@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { join } from 'path'
-import { CHARS_PER_TOKEN } from '../../constants'
+import { CHARS_PER_TOKEN_UPPER } from '../../constants'
 import { knapsackFolderTree } from '../folder-tree-knapsack'
 
 const REPO_ROOT = join(import.meta.dir, '../../../../../')
@@ -9,7 +9,7 @@ test('budget obeyed on real workspace', async () => {
   const budget = 2500
   const out = await knapsackFolderTree(REPO_ROOT, budget)
   expect(out.length).toBeGreaterThan(0)
-  expect(Math.ceil(out.length / CHARS_PER_TOKEN)).toBeLessThanOrEqual(budget)
+  expect(Math.ceil(out.length / CHARS_PER_TOKEN_UPPER)).toBeLessThanOrEqual(budget)
 })
 
 test('files appear in output on real workspace', async () => {

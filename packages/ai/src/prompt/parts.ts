@@ -29,6 +29,7 @@ export interface ImagePart {
   readonly _tag: "ImagePart"
   readonly data: string
   readonly mediaType: ImageMediaType
+  readonly dimensions?: { readonly width: number; readonly height: number }
 }
 
 export interface ToolCallPart {

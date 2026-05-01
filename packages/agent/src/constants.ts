@@ -5,17 +5,17 @@
 /** Default chat name before title generation */
 export const DEFAULT_CHAT_NAME = 'New Chat'
 
-/** Characters per token estimate (conservative) - for legacy XML format */
-export const CHARS_PER_TOKEN = 3
+/** Characters per token upper bound (for truncation budgets — higher = fewer tokens per char = more conservative truncation) */
+export const CHARS_PER_TOKEN_UPPER = 4
 
-/** Characters per token estimate for XML format */
-export const CHARS_PER_TOKEN_XML = 3.2
+/** Characters per token lower bound (for compaction estimation — lower = more tokens estimated = safer) */
+export const CHARS_PER_TOKEN_LOWER = 3
 
 /** Max tokens for a resolved ref in an inspect block */
 export const INSPECT_TOKEN_LIMIT = 25_000
 
 /** Character equivalent of INSPECT_TOKEN_LIMIT */
-export const INSPECT_CHAR_LIMIT = INSPECT_TOKEN_LIMIT * CHARS_PER_TOKEN
+export const INSPECT_CHAR_LIMIT = INSPECT_TOKEN_LIMIT * CHARS_PER_TOKEN_UPPER
 
 
 // =============================================================================

@@ -1,5 +1,4 @@
-import type { UserPart, AssistantMessage, ToolResultMessage } from '@magnitudedev/ai'
-import type { RichImagePart } from '../content'
+import type { UserPart, AssistantMessage, ToolResultMessage, ImagePart } from '@magnitudedev/ai'
 import type {
   ResolvedMention,
 } from '../events'
@@ -62,7 +61,7 @@ export type AgentAtom =
 // ---------------------------------------------------------------------------
 
 export type TimelineAttachment =
-  | { readonly kind: 'image'; readonly image: RichImagePart; readonly filename?: string }
+  | { readonly kind: 'image'; readonly image: ImagePart; readonly filename?: string }
   | ({ readonly kind: 'mention' } & ResolvedMention)
 
 // ---------------------------------------------------------------------------
@@ -138,7 +137,6 @@ export interface CompletedTurn {
   readonly assistant: AssistantMessage
   readonly toolResults: readonly ToolResultMessage[]
   readonly feedback: readonly TurnFeedback[]
-  readonly estimatedTokens: number
   readonly clean: boolean
 }
 

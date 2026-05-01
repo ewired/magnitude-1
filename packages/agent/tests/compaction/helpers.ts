@@ -3,7 +3,7 @@ import { Effect } from 'effect'
 import { createId } from '../../src/util/id'
 import type { AppEvent, SessionContext } from '../../src/events'
 import type { RoleId } from '../../src/agents/role-validation'
-import { CHARS_PER_TOKEN_XML } from '../../src/constants'
+import { CHARS_PER_TOKEN_LOWER } from '../../src/constants'
 import { CompactionProjection } from '../../src/projections/compaction'
 import { WindowProjection } from '../../src/projections/window'
 import { TurnProjection } from '../../src/projections/turn'
@@ -31,7 +31,7 @@ export const baseContext = (overrides: Partial<SessionContext> = {}): SessionCon
   ...overrides,
 })
 
-export const estimateTokens = (text: string) => Math.ceil(text.length / CHARS_PER_TOKEN_XML)
+export const estimateTokens = (text: string) => Math.ceil(text.length / CHARS_PER_TOKEN_LOWER)
 
 export const mkUserMessage = (options: {
   forkId?: string | null

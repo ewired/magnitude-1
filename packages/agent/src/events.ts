@@ -14,7 +14,7 @@ import type { ValidationIssue } from '@magnitudedev/ai'
 import type { ToolKey } from './tools/toolkits'
 export type ObservationPart =
   | { readonly type: 'text'; readonly text: string }
-  | { readonly type: 'image'; readonly base64: string; readonly mediaType: string }
+  | { readonly type: 'image'; readonly base64: string; readonly mediaType: string; readonly dimensions?: { readonly width: number; readonly height: number } }
 import type { Skill } from '@magnitudedev/skills'
 import type { RoleId } from '@magnitudedev/roles'
 import type { TaskAssignee } from './tasks/types'

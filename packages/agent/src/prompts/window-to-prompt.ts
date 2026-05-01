@@ -15,34 +15,16 @@ import type { WindowEntry, ForkWindowState } from '../projections/window'
 import type { UserPart } from '@magnitudedev/ai'
 import type { TurnFeedback } from '../inbox/types'
 import { renderTimeline } from '../inbox/render'
+import { renderFeedbackText } from './feedback-text'
 
 // ---------------------------------------------------------------------------
 // TurnFeedback → UserMessage parts
 // ---------------------------------------------------------------------------
 
 function renderFeedback(feedback: readonly TurnFeedback[]): UserPart[] {
-  const lines: string[] = []
-  for (const fb of feedback) {
-    switch (fb.kind) {
-      case 'message_ack':
-        lines.push(`<message-sent to="${fb.destination}" chars="${fb.chars}"/>`)
-        break
-      case 'no_tools_or_messages':
-        lines.push('You did not use any tools or send any messages. Please take action.')
-        break
-      case 'error':
-        lines.push(`<error>${fb.message}</error>`)
-        break
-      case 'interrupted':
-        lines.push('Turn was interrupted.')
-        break
-      case 'yield_worker_retrigger':
-        lines.push('Error: yield was re-triggered. Use <end-turn> with <idle/> to properly yield.')
-        break
-    }
-  }
-  if (lines.length === 0) return []
-  return [{ _tag: 'TextPart', text: lines.join('\n') }]
+  const text = renderFeedbackText(feedback)
+  if (!text) return []
+  return [{ _tag: 'TextPart', text }]
 }
 
 // ---------------------------------------------------------------------------

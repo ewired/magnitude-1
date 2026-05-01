@@ -102,8 +102,8 @@ function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_mess
         builder.pushText(imagePlaceholder({
           filename: attachment.filename,
           mediaType: attachment.image.mediaType,
-          width: attachment.image.width,
-          height: attachment.image.height,
+          width: attachment.image.dimensions?.width,
+          height: attachment.image.dimensions?.height,
         }))
       }
       continue

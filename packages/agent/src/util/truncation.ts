@@ -14,7 +14,7 @@
 // Local type definition (matches common package)
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
-import { CHARS_PER_TOKEN } from '../constants'
+import { CHARS_PER_TOKEN_UPPER } from '../constants'
 
 // Token costs for common structural elements
 const TOKEN_COSTS = {
@@ -30,7 +30,7 @@ const TOKEN_COSTS = {
 
 /** Convert chars to tokens */
 export function charsToTokens(chars: number): number {
-  return Math.ceil(chars / CHARS_PER_TOKEN)
+  return Math.ceil(chars / CHARS_PER_TOKEN_UPPER)
 }
 
 /** Result of measuring a value */
@@ -61,7 +61,7 @@ function jsonEscapedCharLen(code: number): number {
  * "too big" - not exactly how big. This makes measurement O(min(size, cap)).
  */
 export function measureBounded(value: JsonValue, capTokens: number): Measurement {
-  const capChars = capTokens * CHARS_PER_TOKEN
+  const capChars = capTokens * CHARS_PER_TOKEN_UPPER
   let count = 0
 
   function measure(v: unknown): boolean {
@@ -302,7 +302,7 @@ function truncateString(s: string, budgetTokens: number): string {
   if (budgetTokens < 3) return '...'
 
   // Output format: "content..." → 1 (open quote) + escapedLen + 4 (suffix ...")
-  const maxOutputChars = Math.floor(budgetTokens * CHARS_PER_TOKEN)
+  const maxOutputChars = Math.floor(budgetTokens * CHARS_PER_TOKEN_UPPER)
   const availableForContent = maxOutputChars - 5
 
   if (availableForContent <= 0) return '...'

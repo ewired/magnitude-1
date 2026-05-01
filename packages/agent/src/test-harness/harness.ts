@@ -546,7 +546,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
                   content: [
                     ...(msg.turn.assistant.reasoning ? [`[thought] ${msg.turn.assistant.reasoning}`] : []),
                     ...(msg.turn.assistant.text ? [msg.turn.assistant.text] : []),
-                    ...(msg.turn.assistant.toolCalls ?? []).map((tc) => `[tool_call] ${tc.toolName}`),
+                    ...(msg.turn.assistant.toolCalls ?? []).map((tc) => `[tool_call] ${tc.name}`),
                   ].join('\n'),
                 }
               case 'context':

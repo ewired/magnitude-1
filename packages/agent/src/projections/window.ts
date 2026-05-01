@@ -210,6 +210,7 @@ function toUserPartFromObservation(part: ObservationPart): UserPart {
     _tag: 'ImagePart',
     data: part.base64,
     mediaType: part.mediaType as ImageMediaType,
+    ...(part.dimensions ? { dimensions: part.dimensions } : {}),
   }
 }
 
@@ -489,7 +490,6 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
           assistant: { _tag: 'AssistantMessage' as const },
           toolResults: [],
           feedback,
-          estimatedTokens: 0,
           clean: false,
         }
         newMessages.push({
@@ -712,7 +712,7 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
       const text = extractText(value.content)
       const imageAttachments: TimelineAttachment[] = (value.attachments ?? [])
         .filter((a): a is ImageAttachment => a.type === 'image')
-        .map(a => ({ kind: 'image' as const, image: { _tag: 'ImagePart' as const, data: a.base64, mediaType: a.mediaType, width: a.width, height: a.height }, filename: a.filename }))
+        .map(a => ({ kind: 'image' as const, image: { _tag: 'ImagePart' as const, data: a.base64, mediaType: a.mediaType, dimensions: { width: a.width, height: a.height } }, filename: a.filename }))
       const mentionAttachments: TimelineAttachment[] = value.resolvedMentions.map(m => ({
         kind: 'mention' as const,
         ...m,

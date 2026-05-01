@@ -3,12 +3,6 @@ import type { TextPart, ImagePart, ImageMediaType } from '@magnitudedev/ai'
 // Re-export ai types for convenience
 export type { TextPart, ImagePart, ImageMediaType } from '@magnitudedev/ai'
 
-/** ImagePart extended with dimensions — for agent-internal use where dimensions are known */
-export interface RichImagePart extends ImagePart {
-  readonly width: number
-  readonly height: number
-}
-
 /** The content part union — re-exported from ai */
 export type { UserPart } from '@magnitudedev/ai'
 
