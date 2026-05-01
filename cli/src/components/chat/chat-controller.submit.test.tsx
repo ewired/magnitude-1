@@ -3,6 +3,8 @@ import React, { type ReactNode } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import type { InputValue } from '../../types/store'
 import type { ChatControllerProps } from './types'
+import { chatThemes } from '../../utils/theme'
+import type { BashResult } from '../../utils/bash-executor'
 
 let latestMultilineProps: {
   onChange: (value: InputValue) => void
@@ -73,29 +75,26 @@ function makeProps(overrides: Partial<ChatControllerProps> = {}): ChatController
       tokenUsage: null,
       contextHardCap: null,
       isCompacting: false,
-      theme: {
-        inputBg: '#111111',
-        muted: '#888888',
-        foreground: '#ffffff',
-        primary: '#55aaff',
-        secondary: '#ffaa00',
-        border: '#444444',
-        surface: '#222222',
-        error: '#ff3333',
-        inputFocusedFg: '#ffffff',
-        inputFg: '#cccccc',
-        info: '#00aaff',
-      },
+      theme: chatThemes.dark,
       modeColor: '#00aaff',
       attachmentsMaxWidth: 80,
       composerCanFocus: false,
       widgetNavActive: false,
       isSubagentView: false,
+      supportsVision: true,
     },
     services: {
       submitUserMessageToFork: mock(() => {}),
       runSlashCommand: mock(() => false),
-      executeBash: mock(() => ({ command: '', output: '', exitCode: 0 })),
+      executeBash: mock((command: string): BashResult => ({
+        id: 'test',
+        command,
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        cwd: '/tmp',
+        timestamp: 0,
+      })),
       appendBashOutput: mock(() => {}),
       recordBashCommand: mock(() => {}),
       clearSystemBanners: mock(() => {}),
@@ -107,6 +106,7 @@ function makeProps(overrides: Partial<ChatControllerProps> = {}): ChatController
       exitBashMode: mock(() => {}),
       requestIdleSubagentClose: mock(() => {}),
       requestActiveSubagentKill: mock(() => {}),
+      showToast: mock(() => {}),
     },
     displayMessages: [],
     tasks: [],

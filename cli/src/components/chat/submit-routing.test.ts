@@ -13,7 +13,7 @@ describe('buildSubmitDispatchEvents', () => {
     expect(events).toEqual([
       { type: 'user_message', forkId: 'fork-123' },
     ])
-    expect(events.some(event => event.type === 'interrupt')).toBe(false)
+    expect(events.some(event => (event.type as string) === 'interrupt')).toBe(false)
   })
 })
 

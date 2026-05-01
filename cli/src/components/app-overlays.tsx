@@ -4,6 +4,7 @@ import { ForkDetailOverlay } from './fork-detail-overlay'
 import { SettingsOverlay } from './settings-overlay'
 import type { AgentStatusState } from '@magnitudedev/agent'
 import type { RecentChat } from '../data/recent-chats'
+import type { MagnitudeAuthState } from '../hooks/use-magnitude-auth'
 import { createCodingAgentClient } from '@magnitudedev/agent'
 import { useTheme } from '../hooks/use-theme'
 import { BOX_CHARS } from '../utils/ui-constants'
@@ -16,10 +17,7 @@ export type AppOverlaysProps = {
 
   settingsVisible: boolean
   onSettingsClose: () => void
-  connectionStatus: {
-    connected: boolean
-    mode: 'cloud' | 'local' | 'none'
-  }
+  auth: MagnitudeAuthState
   roles: ReadonlyArray<{
     id: string
     description: string
@@ -50,7 +48,7 @@ export function AppOverlays({
   setShowBrowserSetup,
   settingsVisible,
   onSettingsClose,
-  connectionStatus,
+  auth,
   roles,
   showRecentChatsOverlay,
   recentChats,
@@ -147,7 +145,7 @@ export function AppOverlays({
         <SettingsOverlay
           isVisible={settingsVisible}
           onClose={onSettingsClose}
-          connectionStatus={connectionStatus}
+          auth={auth}
           roles={roles}
         />
       </box>

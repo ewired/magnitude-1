@@ -3,7 +3,6 @@ import type { TaskListItem } from './task-list/index'
 import type { BashResult } from '../../utils/bash-executor'
 import type { KeyEvent } from '@opentui/core'
 import type { ChatTheme } from '../../types/theme-system'
-import type { SettingsTab } from '../../hooks/use-settings-navigation'
 
 export type ChatControllerEnv = {
   status: DisplayState['status']
@@ -39,7 +38,7 @@ export type ChatControllerServices = {
   clearSystemBanners: () => void
   interruptFork: (forkId: string | null) => void
   interruptAll: () => void
-  openSettings: (tab: SettingsTab) => void
+  openSettings: () => void
   handleWidgetKeyEvent: (key: KeyEvent) => boolean
   enterBashMode: () => void
   exitBashMode: () => void

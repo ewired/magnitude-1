@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from 'bun:test'
 import React, { useEffect } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+import type { KeyEvent } from '@opentui/core'
 import { useSlashCommands } from './use-slash-commands'
 
 type HookSnapshot = ReturnType<typeof useSlashCommands>
@@ -58,7 +59,7 @@ describe('useSlashCommands', () => {
         meta: false,
         option: false,
         shift: false,
-      })
+      } as unknown as KeyEvent)
     })
 
     expect(onExecute).toHaveBeenCalledWith('/new')
@@ -67,7 +68,7 @@ describe('useSlashCommands', () => {
 
   test('Tab confirms currently selected slash command', () => {
     const onExecute = mock(() => {})
-    const hook = renderHook('/mo', onExecute)
+    const hook = renderHook('/in', onExecute)
 
     act(() => {
       hook.getSnapshot().handleKeyIntercept({
@@ -77,10 +78,10 @@ describe('useSlashCommands', () => {
         meta: false,
         option: false,
         shift: false,
-      })
+      } as unknown as KeyEvent)
     })
 
-    expect(onExecute).toHaveBeenCalledWith('/model')
+    expect(onExecute).toHaveBeenCalledWith('/init')
     hook.cleanup()
   })
 

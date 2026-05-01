@@ -3,14 +3,14 @@
 </p>
 
 <p align="center">
-  <a href="https://docs.magnitude.dev" target="_blank"><img src="https://img.shields.io/badge/📕-Docs-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="Documentation" /></a> <a href="https://app.magnitude.dev" target="_blank"><img src="https://img.shields.io/badge/%F0%9F%96%A5-Provider-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="Provider" /></a> <img src="https://img.shields.io/badge/License-Apache%202.0-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="License" /> <a href="https://discord.gg/VcdpMh9tTy" target="_blank"><img src="https://img.shields.io/discord/1305570963206836295?style=flat-square&logo=discord&logoColor=white&label=Discord&labelColor=5865F2&color=gray" alt="Discord" /></a> <a href="https://x.com/usemagnitude" target="_blank"><img src="https://img.shields.io/badge/-Follow%20Magnitude-000000?style=flat-square&labelColor=000000&color=gray&logo=x&logoColor=white" alt="Follow Magnitude" /></a>
+  <a href="https://docs.magnitude.dev" target="_blank"><img src="https://img.shields.io/badge/📕-Docs-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="Documentation" /></a> <a href="https://app.magnitude.dev" target="_blank"><img src="https://img.shields.io/badge/%F0%9F%96%A5-Console-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="Console" /></a> <img src="https://img.shields.io/badge/License-Apache%202.0-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="License" /> <a href="https://discord.gg/VcdpMh9tTy" target="_blank"><img src="https://img.shields.io/discord/1305570963206836295?style=flat-square&logo=discord&logoColor=white&label=Discord&labelColor=5865F2&color=gray" alt="Discord" /></a> <a href="https://x.com/usemagnitude" target="_blank"><img src="https://img.shields.io/badge/-Follow%20Magnitude-000000?style=flat-square&labelColor=000000&color=gray&logo=x&logoColor=white" alt="Follow Magnitude" /></a>
 </p>
 
 <p align="center">
   <strong>Opinionated coding agent for open models</strong>
 </p>
 
-Magnitude gets the most out of open models for coding. We continuously test and tweak our setup so you don't have to. 
+Magnitude gets the most out of open models for coding. We continuously test our setup so you don't have to. 
 
 - **Multi-model** - GLM 5.1, Kimi K2.6, DeepSeek V4, all used for the right job
 - **Verified providers** - Only the ones serving the models correctly and fast
@@ -23,9 +23,9 @@ Magnitude gets the most out of open models for coding. We continuously test and 
 
 ## Get started
 
-1. Sign up at [app.magnitude.dev](https://app.magnitude.dev) to get your free API key
-2. Run `npm i -g @magnitudedev/cli` then `magnitude`
-3. Paste in your API key and click enter
+1. Run `npm i -g @magnitudedev/cli` in the terminal
+2. Run `magnitude` which will ask for an API key
+3. Sign up at [app.magnitude.dev](https://app.magnitude.dev) to get your free API key
 
 3 day free trial, no card required. Add a card to continue at $20/month.
 

@@ -64,6 +64,8 @@ import { createId } from '@magnitudedev/generate-id'
 import { useStorage } from './providers/storage-provider'
 import { useFilePanel } from './hooks/use-file-panel'
 import { useLazyClient } from './hooks/use-lazy-client'
+import { useMagnitudeAuth } from './hooks/use-magnitude-auth'
+import { MagnitudeLoginScreen } from './components/magnitude-login-screen'
 import { createRoles, ROLE_IDS } from '@magnitudedev/roles'
 
 export const getSelectedForkContentVersion = (
@@ -137,6 +139,7 @@ function AppInner({
 }) {
   const renderer = useRenderer()
   const storage = useStorage()
+  const auth = useMagnitudeAuth()
   const { client, workspacePath, send: clientSend, ensureReady: ensureClientReady, setFactory: setClientFactory, setClient: setLazyClient } = useLazyClient()
 
   const [display, setDisplay] = useState<DisplayState | null>(null)
@@ -249,6 +252,9 @@ function AppInner({
   }, [showRecentChatsOverlay, refreshRecentChats])
 
   useEffect(() => {
+    if (!auth.loaded || !auth.key) {
+      return
+    }
     let mounted = true
     let c: AgentClient | null = null
 
@@ -305,6 +311,7 @@ function AppInner({
         storage,
         debug: debugMode,
         sessionId: activeSessionId,
+        magnitudeApiKey: auth.key ?? undefined,
       })
     }
 
@@ -433,7 +440,7 @@ function AppInner({
       onClientReady?.(null)
       c?.dispose()
     }
-  }, [debugMode, onClientReady, onSessionId, renderer, sessionSelection, setClientFactory, setLazyClient, storage])
+  }, [debugMode, onClientReady, onSessionId, renderer, sessionSelection, setClientFactory, setLazyClient, storage, auth.loaded, auth.key])
 
   // Subscribe to display state for selected fork
   useEffect(() => {
@@ -757,7 +764,7 @@ function AppInner({
     logger.info('Init project activated')
   }, [clientSend])
 
-  const openSettings = useCallback((_tab?: string) => {
+  const openSettings = useCallback(() => {
     setSettingsOpen(true)
   }, [])
 
@@ -807,7 +814,6 @@ function AppInner({
     activateSkill,
     initProject,
     openSettings,
-    openSetup: openSettings,
     openBrowserSetup,
   }), [resetConversation, showEphemeral, theme.error, exitApp, openRecentChats, enterBashMode, activateSkill, initProject, openSettings, openBrowserSetup])
 
@@ -1016,6 +1022,15 @@ function AppInner({
     })
   }, [clientSend])
 
+  if (auth.loaded && !auth.key) {
+    return (
+      <MagnitudeLoginScreen
+        onSubmit={auth.save}
+        onExit={exitApp}
+      />
+    )
+  }
+
   if (!display) {
     return (
       <SessionLoadingView
@@ -1031,7 +1046,7 @@ function AppInner({
       setShowBrowserSetup={setShowBrowserSetup}
       settingsVisible={settingsOpen}
       onSettingsClose={onSettingsClose}
-      connectionStatus={{ connected: !!client, mode: 'cloud' }}
+      auth={auth}
       roles={rolesData}
       showRecentChatsOverlay={showRecentChatsOverlay}
       recentChats={recentChats}
@@ -1095,7 +1110,7 @@ function AppInner({
         <text style={{ fg: theme.foreground }} attributes={TextAttributes.BOLD}>Tip: </text>
         <text style={{ fg: theme.muted }}>Use </text>
         <text style={{ fg: theme.foreground }}>/settings</text>
-        <text style={{ fg: theme.muted }}> to configure providers and models!</text>
+        <text style={{ fg: theme.muted }}> to view your connection and roles.</text>
       </box>
 
       {!hasActivity && (

@@ -594,17 +594,17 @@ export function ChatController(props: ChatControllerProps) {
                   <text style={{ fg: orange[400] }} attributes={TextAttributes.BOLD}>Bash Mode</text>
                 ) : env.isSubagentView ? (
                   <>
-                    <text style={{ fg: env.theme.muted }}>{env.modelSummary?.provider ?? '—'}</text>
+                    <text style={{ fg: env.theme.muted }}>{env.modelSummary?.provider ?? '-'}</text>
                     <text style={{ fg: env.theme.muted }}> {'\u00b7'} </text>
-                    <text style={{ fg: env.theme.foreground }}>{env.modelSummary?.model ?? '—'}</text>
+                    <text style={{ fg: env.theme.foreground }}>{env.modelSummary?.model ?? '-'}</text>
                   </>
                 ) : (
                   <>
-                    <Button onClick={() => services.openSettings('provider')} onMouseOver={() => setIsProviderHovered(true)} onMouseOut={() => setIsProviderHovered(false)}>
+                    <Button onClick={() => services.openSettings()} onMouseOver={() => setIsProviderHovered(true)} onMouseOut={() => setIsProviderHovered(false)}>
                       <text style={{ fg: isProviderHovered ? env.theme.primary : env.theme.muted }}>{env.modelSummary?.provider ?? 'No provider'}</text>
                     </Button>
                     <text style={{ fg: env.theme.muted }}> {'\u00b7'} </text>
-                    <Button onClick={() => services.openSettings('model')} onMouseOver={() => setIsModelHovered(true)} onMouseOut={() => setIsModelHovered(false)}>
+                    <Button onClick={() => services.openSettings()} onMouseOver={() => setIsModelHovered(true)} onMouseOut={() => setIsModelHovered(false)}>
                       <text style={{ fg: isModelHovered ? env.theme.primary : env.theme.foreground }}>{env.modelSummary?.model ?? 'No model'}</text>
                     </Button>
                   </>

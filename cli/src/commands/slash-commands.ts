@@ -13,10 +13,7 @@ export const SLASH_COMMANDS: SlashCommandDefinition[] = [
   { id: 'exit',     label: 'exit',     description: 'Exit Magnitude', aliases: ['quit', 'q'] },
   { id: 'bash',     label: 'bash',     description: 'Enter bash mode' },
   { id: 'init',     label: 'init',     description: 'Generate AGENTS.md for this project' },
-  { id: 'setup',    label: 'setup',    description: 'Run the setup wizard' },
   { id: 'settings',      label: 'settings',      description: 'Open settings', aliases: ['s'] },
-  { id: 'model',         label: 'model',         description: 'Select or switch model', aliases: ['m'] },
-  { id: 'provider',      label: 'provider',      description: 'Manage providers' },
   { id: 'browser-setup', label: 'browser-setup', description: 'Set up the browser agent' },
 ]
 
