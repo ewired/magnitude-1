@@ -81,6 +81,8 @@ import { EphemeralSessionContextTag } from './agents/types'
 import { publishConfigFromMagnitude } from './ambient/config-ambient'
 import { loadSkills } from '@magnitudedev/skills'
 import { SkillsAmbient, publishSkills } from './ambient/skills-ambient'
+import { publishToolkit } from './ambient/toolkit-ambient'
+import { leaderToolkit } from './tools/toolkits'
 
 // =============================================================================
 // Agent
@@ -338,6 +340,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
       // Load skills from standard directories
       const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
       yield* publishSkills(skills)
+      yield* publishToolkit(leaderToolkit)
 
       // Persist the initial event immediately
       const pending = yield* eventSink.drainPending()
@@ -429,6 +432,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
       // Load skills from standard directories
       const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
       yield* publishSkills(skills)
+      yield* publishToolkit(leaderToolkit)
 
       // Persist all recovery events immediately so reopening the same session
       // again won't re-run recovery for already-terminated forks.
