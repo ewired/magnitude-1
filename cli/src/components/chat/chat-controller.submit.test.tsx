@@ -112,6 +112,8 @@ function makeProps(overrides: Partial<ChatControllerProps> = {}): ChatController
     tasks: [],
     selectedForkId: null,
     pushForkOverlay: () => {},
+    roleProfiles: null,
+    subscribeForkCompaction: () => () => {},
     isBlockingOverlayActive: false,
     selectedFileOpen: false,
     onCloseFilePanel: () => {},

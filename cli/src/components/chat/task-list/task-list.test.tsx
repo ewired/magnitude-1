@@ -34,6 +34,7 @@ vi.mock('../../button', () => ({
 const { TaskList, getVisibleTasks, scheduleInitialTaskListSnap } = await import('./task-list')
 
 const noop = () => {}
+const subscribeForkCompactionStub = () => () => {}
 const theme = () => useThemeStateStore.getState().theme
 
 const htmlToText = (html: string): string =>
@@ -59,7 +60,7 @@ const makeTask = (overrides: Partial<TaskRow> = {}): TaskRow => ({
 
 test('returns null when there are no tasks', () => {
   measuredWidth = null
-  const html = render(<TaskList tasks={[]} pushForkOverlay={noop} />)
+  const html = render(<TaskList tasks={[]} pushForkOverlay={noop} roleProfiles={null} subscribeForkCompaction={subscribeForkCompactionStub} />)
   expect(html).toBe('')
 })
 
@@ -71,6 +72,8 @@ test('renders task header summary from completed vs not completed statuses', () 
         makeTask({ taskId: 't-2', status: 'pending' }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -87,6 +90,8 @@ test('renders task status glyphs as only completed and not completed', () => {
         makeTask({ taskId: 't-pending', status: 'pending' }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
   const text = htmlToText(html)
@@ -102,6 +107,8 @@ test('renders no tree connectors in task rows', () => {
         makeTask({ taskId: 'child', title: 'Child', depth: 1, parentId: 'root' }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
   const text = htmlToText(html)
@@ -115,7 +122,7 @@ test('collapsed mode renders only the latest six tasks', () => {
     makeTask({ taskId: `t${index + 1}`, title: `Task ${index + 1}` }),
   )
 
-  const html = render(<TaskList tasks={tasks} pushForkOverlay={noop} />)
+  const html = render(<TaskList tasks={tasks} pushForkOverlay={noop} roleProfiles={null} subscribeForkCompaction={subscribeForkCompactionStub} />)
   const text = htmlToText(html)
 
   expect(text).not.toContain('Task 1')
@@ -150,6 +157,8 @@ test('expanded mode helper preserves all tasks for scrollable rendering', () => 
     <TaskList
       tasks={visible}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
   expect(htmlToText(html)).toContain('Task 30')
@@ -205,6 +214,8 @@ test('default header shows Task (X completed, Y active) using not-completed acti
         makeTask({ taskId: 'child-working', title: 'Working', depth: 1, parentId: 'root', status: 'working' }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -224,6 +235,7 @@ test('renders worker assignee with worker status prefix and timer segment', () =
             kind: 'worker',
             variant: 'idle',
             label: '[builder] builder-abc123',
+            role: 'builder',
             icon: '●',
             tone: 'muted',
             interactiveForkId: 'fork-abc123',
@@ -241,6 +253,8 @@ test('renders worker assignee with worker status prefix and timer segment', () =
         }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -262,6 +276,7 @@ test('keeps assignee column and expand/collapse controls visible', () => {
             kind: 'worker',
             variant: 'idle',
             label: '[builder] builder-abc123',
+            role: 'builder',
             icon: '●',
             tone: 'muted',
             interactiveForkId: 'fork-abc123',
@@ -279,7 +294,8 @@ test('keeps assignee column and expand/collapse controls visible', () => {
         }),
       ]}
       pushForkOverlay={noop}
-
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -300,7 +316,8 @@ test('uses measured width to truncate task names earlier', () => {
         }),
       ]}
       pushForkOverlay={noop}
-
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -323,6 +340,8 @@ test('sticky root header shows correct subtree progress counts', () => {
         makeTask({ taskId: 'root-b', title: 'Root B', depth: 0, status: 'pending' }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -340,6 +359,7 @@ test('renders resumed worker layout with glyph only', () => {
             kind: 'worker',
             variant: 'working',
             label: '[planner] planner-1',
+            role: 'planner',
             icon: '●',
             tone: 'active',
             interactiveForkId: 'fork-planner-1',
@@ -357,6 +377,8 @@ test('renders resumed worker layout with glyph only', () => {
         }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -378,6 +400,7 @@ test('completed task keeps idle worker rendering', () => {
             kind: 'worker',
             variant: 'idle',
             label: '[builder] builder-idle',
+            role: 'builder',
             icon: '●',
             tone: 'muted',
             interactiveForkId: 'fork-builder-idle',
@@ -395,6 +418,8 @@ test('completed task keeps idle worker rendering', () => {
         }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -414,6 +439,8 @@ test('completed task text remains muted gray while checkmark stays green', () =>
         }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -442,6 +469,8 @@ test('renders killed worker with red kill icon glyph', () => {
         }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -460,6 +489,8 @@ test('renders blank in assigned to column for composite tasks with no worker', (
         }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 
@@ -479,6 +510,8 @@ test('keeps assigned to column blank for non-composite unassigned tasks', () => 
         }),
       ]}
       pushForkOverlay={noop}
+      roleProfiles={null}
+      subscribeForkCompaction={subscribeForkCompactionStub}
     />,
   )
 

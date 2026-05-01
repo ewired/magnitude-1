@@ -21,6 +21,7 @@ import { useTheme } from './hooks/use-theme'
 import { SelectedFileProvider } from './hooks/use-file-viewer'
 
 import { BOX_CHARS } from './utils/ui-constants'
+import { formatTokensCompact } from './utils/format-tokens'
 import { hasConversationActivity } from './utils/start-state'
 
 import { AnimatedLogo } from './components/animated-logo'
@@ -181,13 +182,7 @@ function AppInner({
   const turnStartTimeRef = useRef<number | null>(null)
   const hasAnimatedRef = useRef(skipAnimation)
 
-  const formatFooterTokens = (n: number) => {
-    if (n >= 1000) {
-      const v = (n / 1000).toFixed(1)
-      return (v.endsWith('.0') ? v.slice(0, -2) : v) + 'k'
-    }
-    return `${n}`
-  }
+  const formatFooterTokens = formatTokensCompact
   const tokenUsage = lastActualInputTokens ?? (hasCompletedTurn ? tokenEstimate : null)
   const contextPercent = (tokenUsage != null && contextHardCap) ? Math.round((tokenUsage / contextHardCap) * 100) : null
   const contextDisplayText = tokenUsage == null
@@ -509,6 +504,11 @@ function AppInner({
     })
 
     return unsubscribe
+  }, [client])
+
+  const subscribeForkCompaction = useCallback((forkId: string, cb: (state: CompactionState) => void) => {
+    if (!client) return () => {}
+    return client.state.compaction.subscribeFork(forkId, cb)
   }, [client])
 
   // Subscribe to tool state for file panel streaming support
@@ -1350,6 +1350,8 @@ function AppInner({
             tasks={tasks}
             selectedForkId={selectedForkId}
             pushForkOverlay={pushForkOverlay}
+            roleProfiles={roleProfiles}
+            subscribeForkCompaction={subscribeForkCompaction}
             selectedFileOpen={isFilePanelOpen}
             onCloseFilePanel={closeFilePanel}
             onApprove={handleApprove}

@@ -22,6 +22,7 @@ export type TaskAssigneeSlot =
       kind: 'worker'
       variant: 'working'
       label: string
+      role: string | null
       icon: '●'
       tone: 'active'
       interactiveForkId: string
@@ -34,6 +35,7 @@ export type TaskAssigneeSlot =
       kind: 'worker'
       variant: 'idle'
       label: string
+      role: string | null
       icon: '●'
       tone: 'muted'
       interactiveForkId: string

@@ -6,6 +6,7 @@ import { useLocalWidth } from '../../../hooks/use-local-width'
 import { Button } from '../../button'
 import { computeWorkerElapsedMs, formatWorkerTimer, isWorkerResumed } from '../../../utils/task-list-worker-timer'
 import { BOX_CHARS } from '../../../utils/ui-constants'
+import { formatTokensCompact } from '../../../utils/format-tokens'
 import {
   computeInheritedVisualStatusMap,
   type VisualStatus,
@@ -20,6 +21,10 @@ import type {
   TaskAssigneeSlot,
   WorkerSlotDisplay,
 } from './types'
+import type { SubscribeForkCompaction } from '../types'
+import type { RoleProfile } from '@magnitudedev/agent'
+import type { RoleId } from '@magnitudedev/roles'
+import { isRoleId } from '@magnitudedev/roles'
 
 const COLLAPSED_ROWS = 6
 const EXPANDED_ROWS = 25
@@ -46,6 +51,8 @@ const PULSE_BLUE_SHADES = [
 type Props = {
   tasks: readonly TaskListItem[]
   pushForkOverlay: (forkId: string) => void
+  roleProfiles: Partial<Record<RoleId, RoleProfile>> | null
+  subscribeForkCompaction: SubscribeForkCompaction
   scrollRefOverride?: { current: { scrollTo: (offset: number) => void } | null }
 }
 
@@ -60,6 +67,8 @@ type TaskRowProps = {
   taskNameWidth: number
   columnGap: number
   agentIdWidth: number
+  roleProfiles: Partial<Record<RoleId, RoleProfile>> | null
+  subscribeForkCompaction: SubscribeForkCompaction
 }
 
 type WorkerPresentation = {
@@ -74,6 +83,55 @@ type WorkerPresentation = {
 
 function truncate(s: string, maxWidth: number) {
   return s.length > maxWidth ? s.slice(0, maxWidth - 1) + '…' : s
+}
+
+function splitWorkerLabel(label: string): { badgeText: string; nameText: string } {
+  const match = label.match(/^(\[[^\]]+\])\s+(.+)$/)
+  if (match) return { badgeText: match[1], nameText: match[2] }
+  return { badgeText: '', nameText: label }
+}
+
+const NAME_MIN_WIDTH = 4
+
+function pickAssigneeLayout(args: {
+  agentIdWidth: number
+  iconWidth: number
+  badgeText: string
+  nameText: string
+  modelText: string
+  timerWidth: number
+  tokensWidth: number
+}) {
+  const { agentIdWidth, iconWidth, badgeText, nameText, modelText, timerWidth, tokensWidth } = args
+  const badgeWidth = badgeText ? badgeText.length + 1 : 0 // includes trailing space
+  const modelWidth = modelText ? ` · ${modelText}`.length : 0
+
+  const fits = (showBadge: boolean, showModel: boolean, showTokens: boolean, nameWidth: number) => {
+    const used = iconWidth
+      + (showBadge ? badgeWidth : 0)
+      + nameWidth
+      + (showModel ? modelWidth : 0)
+      + timerWidth
+      + (showTokens ? tokensWidth : 0)
+    return used <= agentIdWidth
+  }
+
+  // Try, in order: full → drop tokens → drop badge → drop model → truncate name
+  if (fits(!!badgeText, !!modelText, tokensWidth > 0, nameText.length)) {
+    return { showBadge: !!badgeText, showModel: !!modelText, showTokens: tokensWidth > 0, nameMaxWidth: nameText.length }
+  }
+  if (fits(!!badgeText, !!modelText, false, nameText.length)) {
+    return { showBadge: !!badgeText, showModel: !!modelText, showTokens: false, nameMaxWidth: nameText.length }
+  }
+  if (fits(false, !!modelText, false, nameText.length)) {
+    return { showBadge: false, showModel: !!modelText, showTokens: false, nameMaxWidth: nameText.length }
+  }
+  if (fits(false, false, false, nameText.length)) {
+    return { showBadge: false, showModel: false, showTokens: false, nameMaxWidth: nameText.length }
+  }
+  // Truncate name to whatever fits with just icon + timer
+  const nameMaxWidth = Math.max(NAME_MIN_WIDTH, agentIdWidth - iconWidth - timerWidth)
+  return { showBadge: false, showModel: false, showTokens: false, nameMaxWidth }
 }
 
 function getStatusGlyph(status: VisualStatus): '✓' | '○' {
@@ -161,7 +219,7 @@ function getWorkerPresentation(
             icon: assignee.icon,
             iconColor: slate[600],
             labelColor,
-            timerColor: labelColor,
+            timerColor: labelBaseColor,
             showTimer: true,
             showResumed: true,
             interactiveForkId: assignee.interactiveForkId,
@@ -221,6 +279,8 @@ function TaskRow({
   taskNameWidth,
   columnGap,
   agentIdWidth,
+  roleProfiles,
+  subscribeForkCompaction,
 }: TaskRowProps) {
   const theme = useTheme()
   const workerPresentation = getWorkerPresentation(task.assignee, now, theme, hovered)
@@ -244,6 +304,42 @@ function TaskRow({
     : false
   const canOpenWorkerFork = Boolean(workerPresentation?.interactiveForkId)
 
+  const workerForkId = workerPresentation?.interactiveForkId ?? null
+  const [workerTokens, setWorkerTokens] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!workerForkId) {
+      setWorkerTokens(null)
+      return
+    }
+    const unsub = subscribeForkCompaction(workerForkId, (state) => {
+      setWorkerTokens(state.lastActualInputTokens ?? (state.hasCompletedTurn ? state.tokenEstimate : null))
+    })
+    return unsub
+  }, [workerForkId, subscribeForkCompaction])
+
+  const workerRole = task.assignee.kind === 'worker' && 'role' in task.assignee ? task.assignee.role : null
+  const modelDisplayName = workerRole && isRoleId(workerRole)
+    ? (roleProfiles?.[workerRole]?.modelDisplayName ?? null)
+    : null
+  const tokensLabel = workerTokens != null ? formatTokensCompact(workerTokens) : null
+
+  const { badgeText, nameText } = splitWorkerLabel(workerLabel)
+  const iconText = workerPresentation?.icon ? `${workerPresentation.icon} ` : ''
+  const timerText = workerTimer ? ` · ${workerResumed ? '↺ ' : ''}${workerTimer}` : ''
+  const layout = pickAssigneeLayout({
+    agentIdWidth,
+    iconWidth: iconText.length,
+    badgeText,
+    nameText,
+    modelText: modelDisplayName ?? '',
+    timerWidth: timerText.length,
+    tokensWidth: tokensLabel ? ` · ${tokensLabel}`.length : 0,
+  })
+  const displayedName = layout.nameMaxWidth < nameText.length
+    ? truncate(nameText, layout.nameMaxWidth)
+    : nameText
+
   return (
     <box style={{ flexDirection: 'row', height: 1, minHeight: 1, maxHeight: 1 }}>
       <box style={{ width: taskNameWidth, minWidth: taskNameWidth, maxWidth: taskNameWidth, flexShrink: 0, flexDirection: 'row' }}>
@@ -259,30 +355,47 @@ function TaskRow({
               onMouseOut={() => onHoverEnd()}
             >
               <text style={{ fg: workerPresentation.labelColor }}>
-                <span fg={workerPresentation.iconColor}>{workerPresentation.icon ? `${workerPresentation.icon} ` : ''}</span>
-                <span fg={workerPresentation.labelColor}>{workerLabel}</span>
-                {workerTimer ? (
-                  <>
-                    <span fg={workerPresentation.timerColor}> · </span>
-                    {workerResumed ? <span fg={workerPresentation.timerColor}>↺ </span> : null}
-                    <span fg={workerPresentation.timerColor}>{workerTimer}</span>
-                  </>
-                ) : null}
+                <span fg={workerPresentation.iconColor}>{iconText}</span>
+                {layout.showBadge && badgeText ? <span fg={workerPresentation.labelColor}>{`${badgeText} `}</span> : null}
+                <span fg={workerPresentation.labelColor}>{displayedName}</span>
               </text>
             </Button>
           ) : (
             <text style={{ fg: workerPresentation.labelColor }}>
-              <span fg={workerPresentation.iconColor}>{workerPresentation.icon ? `${workerPresentation.icon} ` : ''}</span>
-              {truncate(workerLabel, agentIdWidth)}
+              <span fg={workerPresentation.iconColor}>{iconText}</span>
+              {layout.showBadge && badgeText ? <span fg={workerPresentation.labelColor}>{`${badgeText} `}</span> : null}
+              <span fg={workerPresentation.labelColor}>{displayedName}</span>
             </text>
           )}
+          {layout.showModel && modelDisplayName ? (
+            <text style={{ fg: theme.muted }}>{` · ${modelDisplayName}`}</text>
+          ) : null}
+          {workerTimer ? (
+            <text style={{ fg: workerPresentation.timerColor }}>
+              <span fg={workerPresentation.timerColor}>{' · '}</span>
+              {workerResumed ? <span fg={workerPresentation.timerColor}>↺ </span> : null}
+              <span fg={workerPresentation.timerColor}>{workerTimer}</span>
+            </text>
+          ) : null}
+          {layout.showTokens && tokensLabel ? (
+            <text style={{ fg: task.assignee.kind === 'worker' && task.assignee.tone === 'muted' ? theme.muted : theme.foreground }}>
+              <span fg={theme.muted}>{' · '}</span>
+              <span fg={task.assignee.kind === 'worker' && task.assignee.tone === 'muted' ? theme.muted : theme.foreground}>{tokensLabel}</span>
+            </text>
+          ) : null}
         </box>
       ) : null}
     </box>
   )
 }
 
-export function TaskList({ tasks, pushForkOverlay, scrollRefOverride }: Props) {
+export function TaskList({
+  tasks,
+  pushForkOverlay,
+  roleProfiles,
+  subscribeForkCompaction,
+  scrollRefOverride,
+}: Props) {
   const theme = useTheme()
   const [expanded, setExpanded] = useState(false)
   const [expandHovered, setExpandHovered] = useState(false)
@@ -294,7 +407,7 @@ export function TaskList({ tasks, pushForkOverlay, scrollRefOverride }: Props) {
   const usableWidth = Math.max(1, (box.width ?? 60) - 4)
   const columnGap = 2
   const contentWidth = Math.max(14, usableWidth - columnGap)
-  const agentIdWidth = Math.max(12, Math.floor(contentWidth * 0.43))
+  const agentIdWidth = Math.max(12, Math.floor(contentWidth * 0.55))
   const taskNameWidth = Math.max(1, contentWidth - agentIdWidth)
 
   const visibleAllTasks = tasks
@@ -382,9 +495,23 @@ export function TaskList({ tasks, pushForkOverlay, scrollRefOverride }: Props) {
           </box>
           <box style={{ width: columnGap, minWidth: columnGap, maxWidth: columnGap, flexShrink: 0 }} />
           <box style={{ width: agentIdWidth, minWidth: agentIdWidth, maxWidth: agentIdWidth, flexShrink: 0, flexDirection: 'row', justifyContent: 'space-between' }}>
-            <text style={{ fg: theme.muted }}>
-              {truncate(getAssigneeLabel(stickyRootSummary.task.assignee), agentIdWidth)}
-            </text>
+            {(() => {
+              const stickyAssignee = stickyRootSummary.task.assignee
+              const stickyRole = stickyAssignee.kind === 'worker' && 'role' in stickyAssignee ? stickyAssignee.role : null
+              const stickyModel = stickyRole && isRoleId(stickyRole) ? (roleProfiles?.[stickyRole]?.modelDisplayName ?? null) : null
+              const labelText = getAssigneeLabel(stickyAssignee)
+              const expandWidth = (expanded ? 'Collapse all ▼  ' : 'Expand all ▲  ').length
+              const availableWidth = Math.max(0, agentIdWidth - expandWidth)
+              const modelSuffix = stickyModel ? ` · ${stickyModel}` : ''
+              const showModel = stickyModel != null && labelText.length + modelSuffix.length <= availableWidth
+              const labelDisplay = truncate(labelText, Math.max(1, showModel ? availableWidth - modelSuffix.length : availableWidth))
+              return (
+                <text style={{ fg: theme.muted }}>
+                  <span fg={theme.muted}>{labelDisplay}</span>
+                  {showModel ? <span fg={theme.muted}>{modelSuffix}</span> : null}
+                </text>
+              )
+            })()}
             <Button onClick={() => setExpanded(prev => !prev)} onMouseOver={() => setExpandHovered(true)} onMouseOut={() => setExpandHovered(false)}>
               <text style={{ fg: expandHovered ? theme.foreground : theme.muted }}>{expanded ? 'Collapse all ▼  ' : 'Expand all ▲  '}</text>
             </Button>
@@ -443,6 +570,8 @@ export function TaskList({ tasks, pushForkOverlay, scrollRefOverride }: Props) {
               taskNameWidth={taskNameWidth}
               columnGap={columnGap}
               agentIdWidth={agentIdWidth}
+              roleProfiles={roleProfiles}
+              subscribeForkCompaction={subscribeForkCompaction}
             />
           ))}
         </scrollbox>
@@ -461,6 +590,8 @@ export function TaskList({ tasks, pushForkOverlay, scrollRefOverride }: Props) {
               taskNameWidth={taskNameWidth}
               columnGap={columnGap}
               agentIdWidth={agentIdWidth}
+              roleProfiles={roleProfiles}
+              subscribeForkCompaction={subscribeForkCompaction}
             />
           ))}
         </box>

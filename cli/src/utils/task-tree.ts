@@ -54,6 +54,7 @@ function toTaskListItem(task: TaskRecord, depth: number): TaskListItem {
           kind: 'worker' as const,
           variant: 'idle' as const,
           label: task.worker.role ? `[${task.worker.role}] ${task.worker.agentId}` : task.worker.agentId,
+          role: task.worker.role ?? null,
           icon: '●' as const,
           tone: 'muted' as const,
           interactiveForkId: task.worker.forkId,

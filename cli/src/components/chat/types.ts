@@ -1,4 +1,5 @@
-import type { Attachment, DisplayState } from '@magnitudedev/agent'
+import type { Attachment, CompactionState, DisplayState, RoleProfile } from '@magnitudedev/agent'
+import type { RoleId } from '@magnitudedev/roles'
 import type { TaskListItem } from './task-list/index'
 import type { BashResult } from '../../utils/bash-executor'
 import type { KeyEvent } from '@opentui/core'
@@ -48,6 +49,8 @@ export type ChatControllerServices = {
 }
 
 
+export type SubscribeForkCompaction = (forkId: string, cb: (state: CompactionState) => void) => () => void
+
 export type ChatControllerProps = {
   env: ChatControllerEnv
   services: ChatControllerServices
@@ -55,6 +58,8 @@ export type ChatControllerProps = {
   tasks: TaskListItem[]
   selectedForkId: string | null
   pushForkOverlay: (forkId: string) => void
+  roleProfiles: Partial<Record<RoleId, RoleProfile>> | null
+  subscribeForkCompaction: SubscribeForkCompaction
   isBlockingOverlayActive: boolean
   selectedFileOpen: boolean
   onCloseFilePanel: () => void
