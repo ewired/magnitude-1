@@ -2,7 +2,7 @@ import { Context, Effect, Duration } from "effect"
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
 import { Auth } from "@magnitudedev/ai"
-import type { RoleId } from "./contract"
+import type { RoleId, UsageWindowsResponse } from "./contract"
 import { createModelCatalog, type ModelCatalog } from "./catalog"
 import { createRoleSpec } from "./models"
 
@@ -43,6 +43,7 @@ export interface MagnitudeClientShape {
     query: string,
     schema?: Record<string, unknown>
   ) => Effect.Effect<WebSearchResult, WebSearchError, HttpClient.HttpClient>
+  readonly usage: Effect.Effect<UsageWindowsResponse, Error, HttpClient.HttpClient>
 }
 
 export class MagnitudeClient extends Context.Tag("MagnitudeClient")<
@@ -75,6 +76,34 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
         spec,
       }
     },
+
+    /** Fetch current usage windows for the authenticated user */
+    usage: Effect.gen(function* () {
+      const http = yield* HttpClient.HttpClient
+      const headers = new Headers()
+      auth(headers)
+      const headerRecord: Record<string, string> = {}
+      headers.forEach((value, key) => { headerRecord[key] = value })
+
+      const request = HttpClientRequest.get(`${endpoint}/usage`).pipe(
+        HttpClientRequest.setHeaders(headerRecord),
+      )
+      const response = yield* http.execute(request).pipe(
+        Effect.mapError((err) => new Error(`Failed to fetch usage: ${err.message}`)),
+      )
+      if (response.status < 200 || response.status >= 300) {
+        const body = yield* response.text.pipe(Effect.orElseSucceed(() => ""))
+        return yield* Effect.fail(new Error(`Failed to fetch usage: HTTP ${response.status} — ${body}`))
+      }
+      const text = yield* response.text.pipe(
+        Effect.mapError((err) => new Error(`Failed to read usage response: ${err}`)),
+      )
+      try {
+        return JSON.parse(text) as UsageWindowsResponse
+      } catch {
+        return yield* Effect.fail(new Error(`Failed to parse usage response: ${text.slice(0, 200)}`))
+      }
+    }),
 
     /** Search the web via Magnitude API */
     webSearch: (query, schema) =>

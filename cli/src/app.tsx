@@ -162,6 +162,7 @@ function AppInner({
   const systemMessageTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [showRecentChatsOverlay, setShowRecentChatsOverlay] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [usageOpen, setUsageOpen] = useState(false)
   const [roleProfiles, setRoleProfiles] = useState<Partial<Record<RoleId, RoleProfile>> | null>(null)
   const contextHardCap = roleProfiles?.leader?.contextWindow ?? null
 
@@ -785,6 +786,14 @@ function AppInner({
     setShowBrowserSetup(true)
   }, [])
 
+  const openUsage = useCallback(() => {
+    setUsageOpen(true)
+  }, [])
+
+  const onUsageClose = useCallback(() => {
+    setUsageOpen(false)
+  }, [])
+
   const exitBashMode = useCallback(() => {
     setBashMode(false)
   }, [])
@@ -828,7 +837,8 @@ function AppInner({
     initProject,
     openSettings,
     openBrowserSetup,
-  }), [resetConversation, showEphemeral, theme.error, exitApp, openRecentChats, enterBashMode, activateSkill, initProject, openSettings, openBrowserSetup])
+    openUsage,
+  }), [resetConversation, showEphemeral, theme.error, exitApp, openRecentChats, enterBashMode, activateSkill, initProject, openSettings, openBrowserSetup, openUsage])
 
 
 
@@ -862,6 +872,7 @@ function AppInner({
     : (expandedForkId && client) ? 'fork-detail'
     : showBrowserSetup ? 'browser-setup'
     : settingsOpen ? 'settings'
+    : usageOpen ? 'usage'
     : 'none'
 
   const isOverlayActive = activeOverlayKind !== 'none'
@@ -1077,6 +1088,8 @@ function AppInner({
       workspacePath={workspacePath}
       projectRoot={process.cwd()}
       showCopiedToast={clipboardToast}
+      usageVisible={usageOpen}
+      onUsageClose={onUsageClose}
     />
   )
 
@@ -1212,6 +1225,7 @@ function AppInner({
   const composerCanFocus = !showBrowserSetup
     && !showRecentChatsOverlay
     && !settingsOpen
+    && !usageOpen
     && expandedForkId === null
 
   const debugVisible = debugMode && debugPanelVisible

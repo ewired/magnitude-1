@@ -2,6 +2,7 @@ import { BrowserSetupOverlay } from './browser-setup-overlay'
 import { RecentChatsOverlay } from './recent-chats-overlay'
 import { ForkDetailOverlay } from './fork-detail-overlay'
 import { SettingsOverlay } from './settings-overlay'
+import { UsageOverlay } from './usage-overlay'
 import type { AgentStatusState } from '@magnitudedev/agent'
 import type { RecentChat } from '../data/recent-chats'
 import type { MagnitudeAuthState } from '../hooks/use-magnitude-auth'
@@ -41,6 +42,9 @@ export type AppOverlaysProps = {
   workspacePath: string | null
   projectRoot: string
   showCopiedToast: boolean
+
+  usageVisible: boolean
+  onUsageClose: () => void
 }
 
 export function AppOverlays({
@@ -66,6 +70,8 @@ export function AppOverlays({
   workspacePath,
   projectRoot,
   showCopiedToast,
+  usageVisible,
+  onUsageClose,
 }: AppOverlaysProps) {
   const theme = useTheme()
 
@@ -147,6 +153,18 @@ export function AppOverlays({
           onClose={onSettingsClose}
           auth={auth}
           roles={roles}
+        />
+      </box>
+    )
+  }
+
+  if (usageVisible) {
+    return (
+      <box style={{ flexDirection: 'column', height: '100%' }}>
+        <UsageOverlay
+          isVisible={usageVisible}
+          onClose={onUsageClose}
+          apiKey={auth.key}
         />
       </box>
     )

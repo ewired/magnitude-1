@@ -21,6 +21,8 @@ export interface CommandContext {
   openSettings: () => void
   /** Open the browser setup overlay */
   openBrowserSetup: () => void
+  /** Open the usage overlay */
+  openUsage: () => void
 }
 
 /**
@@ -132,6 +134,10 @@ export function routeSlashCommand(input: string, ctx: CommandContext): boolean {
 
     case 'settings':
       ctx.openSettings()
+      return true
+
+    case 'usage':
+      ctx.openUsage()
       return true
 
     case 'browser-setup':

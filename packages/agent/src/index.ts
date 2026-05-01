@@ -10,6 +10,7 @@ export type { StorageClient } from '@magnitudedev/storage'
 export { CodingAgent, createCodingAgentClient } from './coding-agent'
 export type { CreateClientOptions } from './coding-agent'
 export { fetchRoleProfiles, type RoleProfile } from './role-profiles'
+export { fetchUsageWindows, type UsageWindowsResponse } from './usage'
 
 // Events
 export type {
