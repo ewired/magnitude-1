@@ -1,73 +1,65 @@
-export type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+import type { TextPart, ImagePart, ImageMediaType } from '@magnitudedev/ai'
 
-export type ContentPart =
-  | { readonly type: 'text'; readonly text: string }
-  | { readonly type: 'image'; readonly base64: string; readonly mediaType: ImageMediaType; readonly width: number; readonly height: number }
+// Re-export ai types for convenience
+export type { TextPart, ImagePart, ImageMediaType } from '@magnitudedev/ai'
 
-export class ContentPartBuilder {
-  private parts: ContentPart[] = []
+/** ImagePart extended with dimensions — for agent-internal use where dimensions are known */
+export interface RichImagePart extends ImagePart {
+  readonly width: number
+  readonly height: number
+}
+
+/** The content part union — re-exported from ai */
+export type { UserPart } from '@magnitudedev/ai'
+
+/** Wrap a plain string as UserPart[] */
+export function textParts(s: string): [TextPart] {
+  return [{ _tag: 'TextPart', text: s }]
+}
+
+/** Extract all text from parts, joining with newline */
+export function textOf(parts: readonly (TextPart | ImagePart)[] | null | undefined): string {
+  if (!parts || !Array.isArray(parts)) return ''
+  return parts.filter((p): p is TextPart => p._tag === 'TextPart').map(p => p.text).join('\n')
+}
+
+/** Check if any part is an image */
+export function hasImages(parts: readonly (TextPart | ImagePart)[]): boolean {
+  return parts.some(p => p._tag === 'ImagePart')
+}
+
+/** Apply a transform to text content while preserving image parts */
+export function wrapTextParts(parts: readonly (TextPart | ImagePart)[], transform: (text: string) => string): (TextPart | ImagePart)[] {
+  const allText = parts.filter((p): p is TextPart => p._tag === 'TextPart').map(p => p.text).join('\n')
+  return [
+    { _tag: 'TextPart', text: transform(allText) } satisfies TextPart,
+    ...parts.filter((p): p is ImagePart => p._tag === 'ImagePart')
+  ]
+}
+
+/** Builder for assembling content parts with text coalescing */
+export class ContentBuilder {
+  private parts: (TextPart | ImagePart)[] = []
 
   pushText(text: string): void {
     if (!text) return
     const last = this.parts[this.parts.length - 1]
-    if (last?.type === 'text') {
-      this.parts[this.parts.length - 1] = { type: 'text', text: last.text + text }
+    if (last?._tag === 'TextPart') {
+      this.parts[this.parts.length - 1] = { _tag: 'TextPart', text: last.text + text }
     } else {
-      this.parts.push({ type: 'text', text })
+      this.parts.push({ _tag: 'TextPart', text })
     }
   }
 
-  pushPart(part: ContentPart): void {
-    if (part.type === 'text') this.pushText(part.text)
+  pushPart(part: TextPart | ImagePart): void {
+    if (part._tag === 'TextPart') this.pushText(part.text)
     else this.parts.push(part)
   }
 
-  pushParts(parts: readonly ContentPart[]): void {
+  pushParts(parts: readonly (TextPart | ImagePart)[]): void {
     for (const part of parts) this.pushPart(part)
   }
 
-  hasContent(): boolean {
-    return this.parts.length > 0
-  }
-
-  build(): ContentPart[] {
-    return [...this.parts]
-  }
-}
-
-/** Wrap a plain string as ContentPart[] */
-export function textParts(s: string): ContentPart[] {
-  return [{ type: 'text', text: s }]
-}
-
-/** Create an image ContentPart */
-export function imagePart(base64: string, mediaType: ImageMediaType, width: number, height: number): ContentPart {
-  return { type: 'image', base64, mediaType, width, height }
-}
-
-/** Extract all text from ContentPart[], joining with newline */
-export function textOf(parts: readonly ContentPart[] | null | undefined): string {
-  if (!parts || !Array.isArray(parts)) return ''
-  return parts.filter(p => p.type === 'text').map(p => p.text).join('\n')
-}
-
-/** Check if any part is an image */
-export function hasImages(parts: ContentPart[]): boolean {
-  return parts.some(p => p.type === 'image')
-}
-
-/** Apply a transform to text content while preserving image parts */
-export function wrapTextParts(parts: ContentPart[], transform: (text: string) => string): ContentPart[] {
-  const allText = parts.filter(p => p.type === 'text').map(p => p.text).join('\n')
-  const wrapped = transform(allText)
-  return [
-    { type: 'text', text: wrapped },
-    ...parts.filter(p => p.type !== 'text')
-  ]
-}
-
-/** Migration helper: convert old string content to ContentPart[] */
-export function migrateContent(content: string | ContentPart[]): ContentPart[] {
-  if (typeof content === 'string') return textParts(content)
-  return content
+  hasContent(): boolean { return this.parts.length > 0 }
+  build(): (TextPart | ImagePart)[] { return [...this.parts] }
 }

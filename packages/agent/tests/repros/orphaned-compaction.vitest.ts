@@ -32,7 +32,7 @@ describe.skip('orphaned compaction after interrupt (mnb0dvn5 reproduction)', () 
     messageId: 'orphan-msg',
     forkId: null,
     timestamp: Date.now(),
-    content: [{ type: 'text' as const, text: 'X'.repeat(60_000) }],
+    content: [{ _tag: 'TextPart' as const, text: 'X'.repeat(60_000) }],
     attachments: [] as never[],
     mode: 'text' as const,
     synthetic: false,

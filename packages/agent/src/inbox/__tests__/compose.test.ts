@@ -13,7 +13,7 @@ import {
   toTimelineUserPresence,
   toTimelineUserToAgent,
 } from '../compose'
-import type { ContentPart } from '../../content'
+import type { UserPart } from '@magnitudedev/ai'
 import type { AgentAtom, TimelineAttachment } from '../types'
 
 const TS = 1711641600000
@@ -34,7 +34,7 @@ describe('inbox compose', () => {
   test('toTimeline* constructors set correct kinds', () => {
     const attachments: readonly TimelineAttachment[] = [{ kind: 'mention', path: 'a.ts', contentType: 'text' }]
     const atoms: readonly AgentAtom[] = [{ kind: 'thought', timestamp: TS, text: 'thinking' }]
-    const parts: readonly ContentPart[] = [{ type: 'text', text: 'obs' }]
+    const parts: readonly UserPart[] = [{ _tag: 'TextPart', text: 'obs' }]
 
     expect(toTimelineUserMessage({ timestamp: TS, text: 'u', attachments }).kind).toBe('user_message')
     expect(toTimelineUserToAgent({ timestamp: TS, agentId: 'a1', text: 'u2a' }).kind).toBe('user_to_agent')
@@ -71,12 +71,10 @@ describe('inbox compose', () => {
   test('readonly arrays are preserved by reference', () => {
     const attachments: readonly TimelineAttachment[] = [{ kind: 'mention', path: 'x', contentType: 'text' }]
     const atoms: readonly AgentAtom[] = [{ kind: 'thought', timestamp: TS, text: 't' }]
-    const parts: readonly ContentPart[] = [{
-      type: 'image',
-      base64: 'abc',
+    const parts: readonly UserPart[] = [{
+      _tag: 'ImagePart',
+      data: 'abc',
       mediaType: 'image/png',
-      width: 1,
-      height: 1,
     }]
 
     const msg = toTimelineUserMessage({ timestamp: TS, text: 'hello', attachments })

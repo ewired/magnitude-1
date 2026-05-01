@@ -16,11 +16,12 @@ export type {
   UserMessage,
   AssistantMessage,
   ToolResultMessage,
+  UserPart,
   ToolResultPart,
   Message,
   TerminalMessage,
 } from "./prompt/messages"
-export type { TextPart, ImagePart, ToolCallPart, JsonValue } from "./prompt/parts"
+export type { TextPart, ImagePart, ImageMediaType, ToolCallPart, JsonValue } from "./prompt/parts"
 export type { ToolCallId } from "./prompt/ids"
 
 // Tools

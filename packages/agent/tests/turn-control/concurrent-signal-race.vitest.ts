@@ -14,7 +14,7 @@ describe('turn-control/concurrent-signal-race', () => {
         messageId: 'race-msg',
         forkId: null,
         timestamp: Date.now(),
-        content: [{ type: 'text', text: 'hello' }],
+        content: [{ _tag: 'TextPart', text: 'hello' }],
         attachments: [],
         mode: 'text',
         synthetic: false,

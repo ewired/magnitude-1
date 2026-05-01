@@ -19,7 +19,7 @@ const mkUserMessage = (id: string, text: string): Extract<AppEvent, { type: 'use
   messageId: id,
   forkId: null,
   timestamp: Date.now(),
-  content: [{ type: 'text', text }],
+  content: [{ _tag: 'TextPart', text }],
   attachments: [],
   mode: 'text',
   synthetic: false,

@@ -69,7 +69,7 @@ const inboxText = (inbox: Extract<ForkMemoryState['messages'][number], { type: '
     timezone: null,
     supportsVision: true,
   })
-    .filter((p): p is { type: 'text', text: string } => p.type === 'text')
+    .filter((p): p is { _tag: 'TextPart', text: string } => p._tag === 'TextPart')
     .map(p => p.text)
     .join('')
 

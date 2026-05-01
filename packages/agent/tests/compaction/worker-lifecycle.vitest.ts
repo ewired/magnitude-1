@@ -10,7 +10,7 @@ const largeUserMessage = {
   messageId: 'w',
   forkId: null,
   timestamp: Date.now(),
-  content: [{ type: 'text' as const, text: 'X'.repeat(60_000) }],
+  content: [{ _tag: 'TextPart' as const, text: 'X'.repeat(60_000) }],
   attachments: [],
   mode: 'text' as const,
   synthetic: false,

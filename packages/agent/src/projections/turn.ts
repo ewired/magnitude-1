@@ -99,9 +99,9 @@ function toPreview(text: string): string {
   return normalized.slice(0, 117) + '...'
 }
 
-function extractTextFromParts(parts: readonly { readonly type: string; readonly text?: string }[]): string {
+function extractTextFromParts(parts: readonly { readonly _tag: string; readonly text?: string }[]): string {
   return parts
-    .filter((part) => part.type === 'text')
+    .filter((part) => part._tag === 'TextPart')
     .map((part) => part.text ?? '')
     .join('')
 }

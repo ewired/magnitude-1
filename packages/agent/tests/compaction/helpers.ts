@@ -42,7 +42,7 @@ export const mkUserMessage = (options: {
   messageId: createId(),
   forkId: options.forkId ?? ROOT_FORK_ID,
   timestamp: options.timestamp ?? now(),
-  content: [{ type: 'text', text: options.text }],
+  content: [{ _tag: 'TextPart', text: options.text }],
   attachments: [],
   mode: 'text',
   synthetic: false,

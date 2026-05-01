@@ -7,7 +7,7 @@ const userMessage = (text: string, index: number): AppEvent => ({
   messageId: `m${index}`,
   forkId: null,
   timestamp: index,
-  content: [{ type: 'text', text }],
+  content: [{ _tag: 'TextPart' as const, text }],
   attachments: [],
   mode: 'text',
   synthetic: false,

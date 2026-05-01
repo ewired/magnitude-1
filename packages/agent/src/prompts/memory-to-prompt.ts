@@ -16,24 +16,8 @@
 
 import { Prompt, type AssistantMessage, type ToolResultMessage, type Message as AiMessage, type TerminalMessages } from '@magnitudedev/ai'
 import type { Message, ForkMemoryState } from '../projections/memory'
-import type { ContentPart } from '../content'
-import type { TextPart as AiTextPart, ImagePart as AiImagePart, ToolCallPart as AiToolCallPart, JsonValue } from '@magnitudedev/ai'
+import type { UserPart, ToolCallPart as AiToolCallPart, JsonValue } from '@magnitudedev/ai'
 import { formatInbox } from '../inbox/render'
-
-// ---------------------------------------------------------------------------
-// ContentPart → ai parts
-// ---------------------------------------------------------------------------
-
-function contentPartToUserPart(part: ContentPart): AiTextPart | AiImagePart {
-  if (part.type === 'text') {
-    return { _tag: 'TextPart', text: part.text }
-  }
-  return { _tag: 'ImagePart', data: part.base64, mediaType: part.mediaType }
-}
-
-function contentPartsToUserParts(parts: readonly ContentPart[]): (AiTextPart | AiImagePart)[] {
-  return parts.map(contentPartToUserPart)
-}
 
 // ---------------------------------------------------------------------------
 // assistant_turn → structured AssistantMessage
@@ -93,7 +77,7 @@ function inboxToAiMessages(
             _tag: 'ToolResultMessage',
             toolCallId: item.toolCallId,
             toolName: item.toolName,
-            parts: contentPartsToUserParts(item.content),
+            parts: item.content,
           } satisfies ToolResultMessage)
         }
       }
@@ -113,13 +97,13 @@ function inboxToAiMessages(
   })
 
   const hasText = inboxContent.some(
-    (p): p is Extract<ContentPart, { type: 'text' }> => p.type === 'text' && p.text.trim().length > 0,
+    (p): p is Extract<UserPart, { _tag: 'TextPart' }> => p._tag === 'TextPart' && p.text.trim().length > 0,
   )
 
   if (hasText) {
     aiMessages.push({
       _tag: 'UserMessage',
-      parts: contentPartsToUserParts(inboxContent),
+      parts: inboxContent,
     })
   }
 
@@ -151,7 +135,7 @@ export function memoryToPrompt(
       case 'compacted': {
         messages.push({
           _tag: 'UserMessage',
-          parts: contentPartsToUserParts(msg.content),
+          parts: msg.content,
         })
         break
       }

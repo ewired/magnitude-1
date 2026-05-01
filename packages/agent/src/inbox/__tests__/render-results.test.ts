@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { ContentPart } from '../../content'
+import type { UserPart } from '@magnitudedev/ai'
 import { formatResults } from '../render-results'
 
 describe('formatResults', () => {
@@ -11,21 +11,19 @@ describe('formatResults', () => {
         toolCallId: 'tc-view-1',
         content: [
           {
-            type: 'image',
-            base64: 'dGVzdA==',
+            _tag: 'ImagePart',
+            data: 'dGVzdA==',
             mediaType: 'image/png',
-            width: 100,
-            height: 100,
           },
         ],
       },
     ], true)
 
     expect(output).toEqual([
-      { type: 'text', text: '\n<view>' },
-      { type: 'image', base64: 'dGVzdA==', mediaType: 'image/png', width: 100, height: 100 },
-      { type: 'text', text: '</view>' },
-    ] satisfies ContentPart[])
+      { _tag: 'TextPart', text: '\n<view>' },
+      { _tag: 'ImagePart', data: 'dGVzdA==', mediaType: 'image/png' },
+      { _tag: 'TextPart', text: '</view>' },
+    ] satisfies UserPart[])
   })
 
   test('keeps runtime execution errors unchanged when no correct tool shape is present', () => {
@@ -40,10 +38,10 @@ describe('formatResults', () => {
 
     expect(output).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: '\n<tool name="read"><error>Failed to read does-not-exist.txt</error></tool>',
       },
-    ] satisfies ContentPart[])
+    ] satisfies UserPart[])
   })
 
   test('formats no-tools-or-messages notice as plain text result content', () => {
@@ -55,9 +53,9 @@ describe('formatResults', () => {
 
     expect(output).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: '\n(no tools or messages were used this turn)',
       },
-    ] satisfies ContentPart[])
+    ] satisfies UserPart[])
   })
 })

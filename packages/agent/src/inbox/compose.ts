@@ -1,4 +1,4 @@
-import type { ContentPart } from '../content'
+import type { UserPart } from '@magnitudedev/ai'
 import type {
   AgentAtom,
   ResultEntry,
@@ -209,7 +209,7 @@ export function toTimelineTaskUpdate(args: {
 
 export function toTimelineObservation(args: {
   timestamp: number
-  parts: readonly ContentPart[]
+  parts: readonly UserPart[]
 }): TimelineEntry {
   return {
     kind: 'observation',

@@ -542,7 +542,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
           const messages = getView(memory.messages, timezone, 'agent', true).map((message) => ({
             role: message.role,
             content: message.content
-              .map((part) => (part.type === 'text' ? part.text : '[image]'))
+              .map((part) => (part._tag === 'TextPart' ? part.text : '[image]'))
               .join(''),
           }))
 

@@ -27,7 +27,7 @@ import { buildSessionContextContent } from '../prompts/session-context'
 import { renderSystemPrompt } from '../prompts/system-prompt'
 import { buildResolvedToolSet } from '../tools/resolved-toolset'
 import { getToolkitForRole } from '../tools/toolkits'
-import { ContentPart } from '../content'
+import type { UserPart } from '@magnitudedev/ai'
 
 // =============================================================================
 // Context Limit Helpers
@@ -56,19 +56,20 @@ function computeContextLimitBlocked(
 
 /** Estimate tokens for content string or content parts using XML format constant */
 function estimateContentTokens(content: string): number
-function estimateContentTokens(content: ContentPart[], modelId?: string | null, providerId?: string | null): number
-function estimateContentTokens(content: string | ContentPart[], modelId?: string | null, providerId?: string | null): number {
+function estimateContentTokens(content: UserPart[], modelId?: string | null, providerId?: string | null): number
+function estimateContentTokens(content: string | UserPart[], modelId?: string | null, providerId?: string | null): number {
   if (typeof content === 'string') {
     return Math.ceil(content.length / CHARS_PER_TOKEN_XML)
   }
   let tokens = 0
   for (const part of content) {
-    switch (part.type) {
-      case 'text':
+    switch (part._tag) {
+      case 'TextPart':
         tokens += Math.ceil(part.text.length / CHARS_PER_TOKEN_XML)
         break
-      case 'image':
-        tokens += getImageTokenEstimator(modelId ?? null, providerId ?? null)(part.width, part.height)
+      case 'ImagePart':
+        // Image dimensions not available on UserPart; use conservative estimate
+        tokens += getImageTokenEstimator(modelId ?? null, providerId ?? null)(1024, 1024)
         break
     }
   }

@@ -129,7 +129,7 @@ describe('memory integration scenarios', () => {
         type: 'observations_captured',
         forkId: null,
         turnId: 't-1',
-        parts: [{ type: 'text', text: 'observation' }],
+        parts: [{ _tag: 'TextPart', text: 'observation' }],
       })
       yield* h.send({ type: 'assistant_message_start', forkId: null, turnId: 't-1', id: 'm-obs', destination: { kind: 'user' } })
       yield* h.send({ type: 'assistant_message_delta', forkId: null, turnId: 't-1', id: 'm-obs', text: 'done' })

@@ -23,7 +23,7 @@ export function sendUserMessage(h: Effect.Effect.Success<typeof TestHarness>, op
       messageId,
       forkId,
       timestamp,
-      content: [{ type: 'text', text: options.text }],
+      content: [{ _tag: 'TextPart', text: options.text }],
       attachments: options.attachments ?? [],
       mode: 'text',
       synthetic: false,

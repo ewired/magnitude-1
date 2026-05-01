@@ -139,7 +139,7 @@ describe('memory/timeline-events', () => {
         forkId: null,
         turnId: 't-obs-1',
         parts: [
-          { type: 'text', text: 'saw important output' },
+          { _tag: 'TextPart', text: 'saw important output' },
           { type: 'image', base64: 'aGVsbG8=', mediaType: 'image/png', width: 10, height: 10 },
         ],
       })

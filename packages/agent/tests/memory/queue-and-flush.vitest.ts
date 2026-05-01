@@ -8,7 +8,7 @@ function renderedUserTextFromMemory(messages: Parameters<typeof getView>[0]): st
   const rendered = getView(messages, 'UTC', 'agent', true)
   return rendered
     .filter(m => m.role === 'user')
-    .map(m => m.content.map(p => p.type === 'text' ? p.text : '').join('\n'))
+    .map(m => m.content.map(p => p._tag === 'TextPart' ? p.text : '').join('\n'))
     .join('\n')
 }
 
@@ -46,7 +46,7 @@ describe('memory queue and flush', () => {
           toolCallId: 'tc-1',
           toolName: 'shell',
           query: '.',
-          content: [{ type: 'text', text: '<stdout>ok</stdout>' }],
+          content: [{ _tag: 'TextPart', text: '<stdout>ok</stdout>' }],
         },
       })
       yield* h.send({

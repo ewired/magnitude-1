@@ -11,7 +11,12 @@ import { readImageFileForModel } from '../util/read-image-file'
 import { expandWorkspacePath } from '../workspace'
 import { Fs, resolveFsPath } from '../services/fs'
 import { ToolErrorSchema } from './errors'
-import { ToolImageSchema } from './image-types'
+const ToolImageSchema = Schema.Struct({
+  base64: Schema.String,
+  mediaType: Schema.Literal('image/png', 'image/jpeg', 'image/webp', 'image/gif'),
+  width: Schema.Number,
+  height: Schema.Number,
+}).annotations({ identifier: 'ToolImage' })
 
 // =============================================================================
 // Errors

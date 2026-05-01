@@ -13,7 +13,7 @@ import { Worker } from '@magnitudedev/event-core'
 import type { ChatMessage } from '@magnitudedev/llm-core'
 import { logger } from '@magnitudedev/logger'
 import type { AppEvent } from '../events'
-import { ContentPart } from '../content'
+import type { UserPart } from '@magnitudedev/ai'
 import { MemoryProjection, getView } from '../projections/memory'
 import type { LLMMessage } from '../projections/memory'
 import { SessionContextProjection } from '../projections/session-context'
@@ -21,11 +21,11 @@ import { SessionContextProjection } from '../projections/session-context'
 import { buildAutopilotSystemPrompt } from '../util/autopilot-prompts'
 /** Max recent messages to send to the autopilot LLM */
 const CONTEXT_MESSAGE_LIMIT = 10
-function toLLMContent(parts: ContentPart[]): (BamlImage | string)[] {
+function toLLMContent(parts: UserPart[]): (BamlImage | string)[] {
   return parts.map(part => {
-    switch (part.type) {
-      case 'text': return part.text
-      case 'image': return BamlImage.fromBase64(part.mediaType, part.base64)
+    switch (part._tag) {
+      case 'TextPart': return part.text
+      case 'ImagePart': return BamlImage.fromBase64(part.mediaType, part.data)
     }
   })
 }

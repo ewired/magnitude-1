@@ -23,10 +23,12 @@ export interface TextPart {
   readonly text: string
 }
 
+export type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+
 export interface ImagePart {
   readonly _tag: "ImagePart"
   readonly data: string
-  readonly mediaType: string
+  readonly mediaType: ImageMediaType
 }
 
 export interface ToolCallPart {
@@ -42,7 +44,7 @@ export const TextPartSchema = Schema.TaggedStruct("TextPart", {
 
 export const ImagePartSchema = Schema.TaggedStruct("ImagePart", {
   data: Schema.String,
-  mediaType: Schema.String,
+  mediaType: Schema.Literal('image/png', 'image/jpeg', 'image/webp', 'image/gif'),
 })
 
 export const ToolCallPartSchema = Schema.TaggedStruct("ToolCallPart", {

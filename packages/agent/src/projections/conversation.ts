@@ -12,6 +12,7 @@
 import { Projection } from '@magnitudedev/event-core'
 import type { AppEvent } from '../events'
 import { textOf } from '../content'
+// textOf already uses UserPart internally
 import { UserMessageResolutionProjection } from './user-message-resolution'
 
 // =============================================================================

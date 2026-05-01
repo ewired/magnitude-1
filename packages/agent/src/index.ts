@@ -217,5 +217,5 @@ export { initTraceSession, writeTrace, getTraceSessionId } from '@magnitudedev/t
 export type { TraceSessionMeta, AgentTrace } from '@magnitudedev/tracing'
 export { withTraceScope } from './tracing'
 export type { TraceScope } from './tracing'
-export type { ContentPart, ImageMediaType } from './content'
-export { textParts, imagePart, textOf, hasImages, wrapTextParts, migrateContent } from './content'
+export type { UserPart, TextPart, ImagePart, ImageMediaType } from '@magnitudedev/ai'
+export { textParts, textOf, hasImages, wrapTextParts } from './content'

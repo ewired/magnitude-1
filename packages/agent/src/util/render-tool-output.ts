@@ -1,10 +1,10 @@
 import type { ToolResult } from '@magnitudedev/harness'
-import type { ContentPart } from '../content'
+import type { UserPart } from '@magnitudedev/ai'
 
 // =============================================================================
 // renderToolOutput
 //
-// Converts a ToolResult into ContentPart[] for memory/LLM consumption.
+// Converts a ToolResult into UserPart[] for memory/LLM consumption.
 //
 // Format (for Success with object output):
 //   <fieldName>scalar value, raw and unescaped</fieldName>
@@ -13,12 +13,12 @@ import type { ContentPart } from '../content'
 // No outer wrapper — the chat template or codec provides the boundary.
 // =============================================================================
 
-function isImageOutput(output: unknown): output is ContentPart & { type: 'image' } {
+function isImageOutput(output: unknown): output is { _tag: 'ImagePart'; data: string; mediaType: string } {
   return (
     typeof output === 'object' &&
     output !== null &&
-    (output as Record<string, unknown>).type === 'image' &&
-    typeof (output as Record<string, unknown>).base64 === 'string' &&
+    (output as Record<string, unknown>)._tag === 'ImagePart' &&
+    typeof (output as Record<string, unknown>).data === 'string' &&
     typeof (output as Record<string, unknown>).mediaType === 'string'
   )
 }
@@ -53,44 +53,44 @@ function renderRejection(rejection: unknown): string {
 }
 
 /**
- * Convert a ToolResult into ContentPart[] for memory/LLM consumption.
+ * Convert a ToolResult into UserPart[] for memory/LLM consumption.
  */
-export function renderToolOutput(result: ToolResult): readonly ContentPart[] {
+export function renderToolOutput(result: ToolResult): readonly UserPart[] {
   switch (result._tag) {
     case 'Error':
-      return [{ type: 'text', text: `<error>${result.error}</error>` }]
+      return [{ _tag: 'TextPart', text: `<error>${result.error}</error>` }]
 
     case 'Rejected':
-      return [{ type: 'text', text: renderRejection(result.rejection) }]
+      return [{ _tag: 'TextPart', text: renderRejection(result.rejection) }]
 
     case 'Interrupted':
-      return [{ type: 'text', text: '<interrupted/>' }]
+      return [{ _tag: 'TextPart', text: '<interrupted/>' }]
 
     case 'Success': {
       const { output } = result
 
       if (output === undefined) {
-        return [{ type: 'text', text: '(no output)' }]
+        return [{ _tag: 'TextPart', text: '(no output)' }]
       }
 
       if (isImageOutput(output)) {
-        return [{ type: 'image', base64: output.base64, mediaType: output.mediaType, width: output.width, height: output.height }]
+        return [{ _tag: 'ImagePart', data: output.data, mediaType: output.mediaType }]
       }
 
       if (isScalar(output)) {
-        return [{ type: 'text', text: String(output) }]
+        return [{ _tag: 'TextPart', text: String(output) }]
       }
 
       if (Array.isArray(output)) {
-        return [{ type: 'text', text: JSON.stringify(output) }]
+        return [{ _tag: 'TextPart', text: JSON.stringify(output) }]
       }
 
       if (typeof output === 'object') {
         const text = renderObjectOutput(output as Record<string, unknown>)
-        return [{ type: 'text', text }]
+        return [{ _tag: 'TextPart', text }]
       }
 
-      return [{ type: 'text', text: JSON.stringify(output) }]
+      return [{ _tag: 'TextPart', text: JSON.stringify(output) }]
     }
   }
 }

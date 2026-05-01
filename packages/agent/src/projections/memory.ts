@@ -23,7 +23,8 @@ import { TaskGraphProjection, type TaskGraphState, type TaskRecord } from './tas
 import { isRoleId } from '../agents/role-validation'
 import { getAgentDefinition } from '../agents/registry'
 import { formatUserPresence, formatUserReturnedAfterAbsence } from '../prompts/presence'
-import { ContentPart, ImageMediaType, textParts, wrapTextParts } from '../content'
+import type { UserPart, ImageMediaType } from '@magnitudedev/ai'
+import { textParts, wrapTextParts } from '../content'
 
 import { EMPTY_RESPONSE_ERROR } from '../prompts/error-states'
 import { formatInbox } from '../inbox/render'
@@ -59,16 +60,16 @@ import {
 export type MessageSource = 'user' | 'agent' | 'system'
 
 export type Message =
-  | { readonly type: 'session_context'; readonly source: 'system'; readonly content: ContentPart[] }
+  | { readonly type: 'session_context'; readonly source: 'system'; readonly content: UserPart[] }
   | {
       readonly type: 'assistant_turn'
       readonly source: 'agent'
       readonly parts: TurnPart[]
-      readonly content: ContentPart[]
+      readonly content: UserPart[]
       readonly strategyId: StrategyId
     }
-  | { readonly type: 'compacted'; readonly source: 'system'; readonly content: ContentPart[] }
-  | { readonly type: 'fork_context'; readonly source: 'system'; readonly content: ContentPart[] }
+  | { readonly type: 'compacted'; readonly source: 'system'; readonly content: UserPart[] }
+  | { readonly type: 'fork_context'; readonly source: 'system'; readonly content: UserPart[] }
   | {
       readonly type: 'inbox'
       readonly source: 'system'
@@ -79,7 +80,7 @@ export type Message =
 
 export interface LLMMessage {
   readonly role: 'user' | 'assistant'
-  readonly content: ContentPart[]
+  readonly content: UserPart[]
 }
 
 export type Perspective = 'agent' | 'autopilot'
@@ -122,9 +123,9 @@ function resetPendingTurnState(fork: ForkMemoryState): ForkMemoryState {
 
 
 
-function extractText(parts: readonly ContentPart[]): string {
+function extractText(parts: readonly UserPart[]): string {
   return parts
-    .filter((p): p is Extract<ContentPart, { type: 'text' }> => p.type === 'text')
+    .filter((p): p is Extract<UserPart, { _tag: 'TextPart' }> => p._tag === 'TextPart')
     .map(p => p.text)
     .join('')
 }
@@ -260,17 +261,15 @@ function enqueueAgentAtomBlock(
   )
 }
 
-function toContentPartFromObservation(part: ObservationPart): ContentPart {
+function toUserPartFromObservation(part: ObservationPart): UserPart {
   if (part.type === 'text') {
-    return { type: 'text', text: part.text }
+    return { _tag: 'TextPart', text: part.text }
   }
 
   return {
-    type: 'image',
-    base64: part.base64,
+    _tag: 'ImagePart',
+    data: part.base64,
     mediaType: part.mediaType as ImageMediaType,
-    width: part.width,
-    height: part.height,
   }
 }
 
@@ -561,7 +560,7 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
                     kind: 'tool_observation',
                     toolName,
                     toolCallId: event.toolCallId,
-                    content: renderToolOutput(result) as ContentPart[],
+                    content: renderToolOutput(result),
                   },
                 ],
               }
@@ -694,7 +693,7 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
       if (fork.currentTurnId !== event.turnId) return fork
       const nextFork = enqueueTimeline(
         fork,
-        toTimelineObservation({ timestamp: event.timestamp, parts: event.parts.map(toContentPartFromObservation) }),
+        toTimelineObservation({ timestamp: event.timestamp, parts: event.parts.map(toUserPartFromObservation) }),
         event.timestamp,
       )
       return flushQueue(nextFork, read(TaskGraphProjection))
@@ -1074,7 +1073,7 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
       const text = extractText(value.content)
       const imageAttachments: TimelineAttachment[] = (value.attachments ?? [])
         .filter((a): a is ImageAttachment => a.type === 'image')
-        .map(a => ({ kind: 'image' as const, image: { type: 'image' as const, base64: a.base64, mediaType: a.mediaType, width: a.width, height: a.height }, filename: a.filename }))
+        .map(a => ({ kind: 'image' as const, image: { _tag: 'ImagePart' as const, data: a.base64, mediaType: a.mediaType, width: a.width, height: a.height }, filename: a.filename }))
       const mentionAttachments: TimelineAttachment[] = value.resolvedMentions.map(m => ({
         kind: 'mention' as const,
         ...m,

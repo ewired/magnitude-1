@@ -1,4 +1,5 @@
-import type { ContentPart } from '../content'
+import type { UserPart } from '@magnitudedev/ai'
+import type { RichImagePart } from '../content'
 import type {
   ResolvedMention,
   ToolResultStatus,
@@ -24,7 +25,7 @@ export type LifecycleReminderFormatterMap = Record<string, LifecycleReminderForm
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-type ImagePart = Extract<ContentPart, { readonly type: 'image' }>
+// ImagePart imported directly from @magnitudedev/ai
 
 type Timestamped<K extends string> = {
   readonly kind: K
@@ -62,7 +63,7 @@ export type AgentAtom =
 // ---------------------------------------------------------------------------
 
 export type TimelineAttachment =
-  | { readonly kind: 'image'; readonly image: ImagePart; readonly filename?: string }
+  | { readonly kind: 'image'; readonly image: RichImagePart; readonly filename?: string }
   | ({ readonly kind: 'mention' } & ResolvedMention)
 
 // ---------------------------------------------------------------------------
@@ -91,7 +92,7 @@ export type ToolObservationResultItem = {
   readonly kind: 'tool_observation'
   readonly toolName: string
   readonly toolCallId: string
-  readonly content: readonly ContentPart[]
+  readonly content: readonly UserPart[]
 }
 
 export type MessageAckResultItem = {
@@ -161,7 +162,7 @@ export type TimelineEntry =
       readonly nextStatus?: string
       readonly cancelledCount?: number
     })
-  | (Timestamped<'observation'> & { readonly parts: readonly ContentPart[] })
+  | (Timestamped<'observation'> & { readonly parts: readonly UserPart[] })
 
 // ---------------------------------------------------------------------------
 // QueuedEntry

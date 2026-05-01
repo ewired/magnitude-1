@@ -13,7 +13,7 @@ function toLine(index: number, event: AppEvent): string | null {
   switch (event.type) {
     case 'user_message': {
       const contentText = event.content
-        .filter((c): c is Extract<(typeof event.content)[number], { type: 'text' }> => c.type === 'text')
+        .filter((c): c is Extract<(typeof event.content)[number], { _tag: 'TextPart' }> => c._tag === 'TextPart')
         .map(c => c.text)
         .join('\n')
         .trim()

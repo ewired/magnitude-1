@@ -53,7 +53,7 @@ describe('prompt caching consistency', () => {
         type: 'observations_captured',
         forkId: null,
         turnId: 't-1',
-        parts: [{ type: 'text', text: 'observation note' }],
+        parts: [{ _tag: 'TextPart', text: 'observation note' }],
       })
 
       const afterRendered = yield* getRenderedUserText(h)

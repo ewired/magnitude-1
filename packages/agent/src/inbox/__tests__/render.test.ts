@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { YIELD_USER } from '@magnitudedev/xml-act'
-import type { ContentPart } from '../../content'
+import type { UserPart } from '@magnitudedev/ai'
 import type { ResultEntry, TimelineEntry } from '../types'
 import { formatInbox } from '../render'
 import { formatInterrupted, formatNoop } from '../render-results'
@@ -28,7 +28,7 @@ describe('formatInbox', () => {
 
     const out = formatInbox({ results, timeline: [], timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
-      { type: 'text', text: '<turn_result>' + formatInterrupted() + '<error>boom</error>' + formatNoop() + '\n</turn_result>\n' },
+      { _tag: 'TextPart', text: '<turn_result>' + formatInterrupted() + '<error>boom</error>' + formatNoop() + '\n</turn_result>\n' },
     ])
   })
 
@@ -38,7 +38,7 @@ describe('formatInbox', () => {
     ]
     expect(formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>`,
       },
@@ -60,17 +60,17 @@ describe('formatInbox', () => {
             truncated: true,
             originalBytes: 42,
           },
-          { kind: 'image', image: { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 } },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' } },
         ],
       },
     ]
 
     expect(formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: '--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n<mention path="src/a.ts" type="text" truncated="true" original_bytes="42">export const a = 1</mention>',
       },
-      { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 },
+      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' },
     ])
   })
 
@@ -82,7 +82,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">a</magnitude:message>\n\n--- 16:01 ---\n<magnitude:message from="user">b</magnitude:message>`,
       },
@@ -96,7 +96,7 @@ describe('formatInbox', () => {
     ]
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out[0]).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
         `--- 2024-03-28 16:01 ---\n<magnitude:message from="user">second</magnitude:message>\n\n--- 16:00 ---\n<magnitude:message from="user">first</magnitude:message>`,
     })
@@ -116,7 +116,7 @@ describe('formatInbox', () => {
             content: 'const x = 1', truncated: true, originalBytes: 123,
           },
           { kind: 'mention', path: 'c.ts', contentType: 'text', error: 'not found' },
-          { kind: 'image', image: { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 } },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' } },
         ],
       },
       { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'builder', hookType: 'spawn' },
@@ -125,11 +125,11 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '--- 2024-03-28 16:00 ---\n<magnitude:message from="user">see this</magnitude:message>\n<mention path="b.ts" type="text" truncated="true" original_bytes="123">const x = 1</mention>\n<mention path="c.ts" type="text" error="not found"/>',
       },
-      { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 },
+      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' },
     ])
   })
 
@@ -156,7 +156,7 @@ describe('formatInbox', () => {
     ]
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out[0]).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
         `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">first-input</magnitude:message>\n<magnitude:message from="user">second-input</magnitude:message>`,
     })
@@ -179,19 +179,19 @@ describe('formatInbox', () => {
 
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out[0]).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
         `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hi</magnitude:message>\n<agent id="builder-a" role="builder" status="idle">\n${YIELD_USER}\n</agent>\n\n<attention>\n- user message at 16:00\n- builder-a went idle at 16:00\n</attention>`,
     })
   })
 
-  test('passes through observation image ContentParts', () => {
-    const img: ContentPart = { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 }
+  test('passes through observation image UserParts', () => {
+    const img: UserPart = { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' }
     const timeline: readonly TimelineEntry[] = [
       {
         kind: 'observation',
         timestamp: TS0,
-        parts: [{ type: 'text', text: 'seen' }, img],
+        parts: [{ _tag: 'TextPart', text: 'seen' }, img],
       },
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'builder', hookType: 'spawn' },
     ]
@@ -199,7 +199,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: '--- 2024-03-28 16:00 ---\nseen',
       },
       img,
@@ -216,7 +216,7 @@ describe('formatInbox', () => {
 
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: '<turn_result><error>failed</error>\n</turn_result>\n',
       },
     ])
@@ -233,7 +233,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '<task_updates>\n- Task t1 created: "Title"\n- Task t1 status changed: pending -> working\n- Task t1 completed\n- Task t2 cancelled (3 tasks removed)\n</task_updates>',
       },
@@ -249,7 +249,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '<task_updates>\n- Task t1 cancelled (2 tasks removed)\n</task_updates>\n\n<task_tree>\n- [ ] t3 next\n</task_tree>',
       },
@@ -265,7 +265,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n\n<task_updates>\n- Task t1 created: "Title"\n</task_updates>`,
       },
@@ -301,7 +301,7 @@ describe('formatInbox', () => {
 
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out[0]).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
         `--- 2024-03-28 16:00 ---\n<agent id="builder-x" role="builder" status="idle">\nthinking\n<read path="src/a.ts"/>\n<magnitude:message to="lead">done?</magnitude:message>\n<error>oops</error>\n${YIELD_USER}\n</agent>\n\n<reminders>\n- ${WORKER_PROGRESS_USER_MESSAGE_REMINDER}\n</reminders>\n\n<attention>\n- builder-x errored at 16:00\n</attention>`,
     })
@@ -323,7 +323,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '--- 2024-03-28 16:00 ---\n<user_bash_command cwd="/tmp" exit_code="0">\n<command>ls -la</command>\n<stdout>file-a</stdout>\n<stderr></stderr>\n</user_bash_command>',
       },
@@ -348,7 +348,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     const text = out[0]
     expect(text).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
         `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">u</magnitude:message>\n<user-to-agent agent="a1">direct</user-to-agent>\n<subagent-user-killed agent="a2" type="builder"/>\n<user-presence confirmed="true">back</user-presence>`,
     })
@@ -363,7 +363,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '--- 2024-03-28 16:00 ---\n<magnitude:message from="parent">from parent</magnitude:message>',
       },
@@ -398,7 +398,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '--- 2024-03-28 16:00 ---\n<agent id="builder-x" role="builder" status="working">\nthinking\n<read path="src/a.ts"/>\n<error>oops</error>\n</agent>\n\n<attention>\n- builder-x errored at 16:00\n</attention>',
       },
@@ -414,7 +414,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '<reminders>\n- Worker builder-z for task t1 ("Build thing") has finished. Review output and either send feedback or mark complete.\n</reminders>',
       },
@@ -438,7 +438,7 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n<agent id="builder-x" role="builder" status="working">\n<magnitude:message to="lead">progress update</magnitude:message>\n</agent>\n\n<reminders>\n- ${WORKER_PROGRESS_USER_MESSAGE_REMINDER}\n</reminders>`,
       },
@@ -453,7 +453,7 @@ describe('formatInbox', () => {
         timestamp: TS0,
         text: 'look at this',
         attachments: [
-          { kind: 'image', image: { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1920, height: 1080 }, filename: 'screenshot.png' },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' }, filename: 'screenshot.png' },
         ],
       },
     ]
@@ -461,9 +461,9 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: false })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: `--- 2024-03-28 16:00 ---
-<magnitude\u003amessage from="user">look at this</magnitude\u003amessage>[Image placeholder: current model does not support images — screenshot.png 1920x1080]`,
+<magnitude\u003amessage from="user">look at this</magnitude\u003amessage>[Image placeholder: current model does not support images — screenshot.png]`,
       },
     ])
   })
@@ -475,7 +475,7 @@ describe('formatInbox', () => {
         timestamp: TS0,
         text: 'look at this',
         attachments: [
-          { kind: 'image', image: { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1920, height: 1080 }, filename: 'screenshot.png' },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' }, filename: 'screenshot.png' },
         ],
       },
     ]
@@ -483,21 +483,21 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: `--- 2024-03-28 16:00 ---
 <magnitude\u003amessage from="user">look at this</magnitude\u003amessage>`,
       },
-      { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1920, height: 1080 },
+      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' },
     ])
   })
 
   test('replaces observation images with placeholder when supportsVision is false', () => {
-    const img: ContentPart = { type: 'image', base64: 'abc', mediaType: 'image/png', width: 100, height: 100 }
+    const img: UserPart = { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' }
     const timeline: readonly TimelineEntry[] = [
       {
         kind: 'observation',
         timestamp: TS0,
-        parts: [{ type: 'text', text: 'seen' }, img],
+        parts: [{ _tag: 'TextPart', text: 'seen' }, img],
       },
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'builder', hookType: 'spawn' },
     ]
@@ -505,9 +505,9 @@ describe('formatInbox', () => {
     const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: false })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: `--- 2024-03-28 16:00 ---
-seen[Image placeholder: current model does not support images — 100x100]`,
+seen[Image placeholder: current model does not support images — image/png]`,
       },
     ])
   })

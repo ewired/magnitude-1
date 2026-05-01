@@ -1,4 +1,5 @@
-import { ContentPartBuilder, type ContentPart } from '../content'
+import { ContentBuilder } from '../content'
+import type { UserPart } from '@magnitudedev/ai'
 import {
   USER_MESSAGE_RESPONSE_REMINDER,
   WORKER_PROGRESS_USER_MESSAGE_REMINDER,
@@ -92,8 +93,8 @@ function renderAgentAtom(atom: AgentAtom): string {
   }
 }
 
-function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_message' }>, supportsVision: boolean): ContentPart[] {
-  const builder = new ContentPartBuilder()
+function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_message' }>, supportsVision: boolean): UserPart[] {
+  const builder = new ContentBuilder()
   builder.pushText(`<magnitude:message from="user">${entry.text}</magnitude:message>`)
   for (const attachment of entry.attachments) {
     if (attachment.kind === 'image') {
@@ -210,8 +211,8 @@ function renderTaskUpdateLine(entry: Extract<TimelineEntry, { kind: 'task_update
   return `- Task ${entry.taskId} status changed: ${previousStatus} -> ${nextStatus}`
 }
 
-export function formatInbox(input: FormatInboxInput): ContentPart[] {
-  const builder = new ContentPartBuilder()
+export function formatInbox(input: FormatInboxInput): UserPart[] {
+  const builder = new ContentBuilder()
 
   if (input.results.length > 0) {
     builder.pushText('<turn_result>')
@@ -270,14 +271,14 @@ export function formatInbox(input: FormatInboxInput): ContentPart[] {
 
     if (entry.kind === 'observation') {
       for (const part of entry.parts) {
-        if (part.type === 'text') builder.pushText(`\n${part.text}`)
+        if (part._tag === 'TextPart') builder.pushText(`\n${part.text}`)
         else if (input.supportsVision) builder.pushPart(part)
-        else builder.pushText(imagePlaceholder({ mediaType: part.mediaType, width: part.width, height: part.height }))
+        else builder.pushText(imagePlaceholder({ mediaType: part.mediaType }))
       }
     } else if (entry.kind === 'user_message') {
       const parts = renderUserMessageParts(entry, input.supportsVision)
       for (const part of parts) {
-        if (part.type === 'text') builder.pushText(`\n${part.text}`)
+        if (part._tag === 'TextPart') builder.pushText(`\n${part.text}`)
         else builder.pushPart(part)
       }
     } else {

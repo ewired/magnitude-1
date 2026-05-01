@@ -7,8 +7,8 @@
  */
 
 
-import type { ContentPart } from './content'
-import type { ImageMediaType } from './content'
+import type { UserPart } from './content'
+import type { ImageMediaType } from '@magnitudedev/ai'
 import type { ToolLifecycleEvent } from '@magnitudedev/harness'
 import type { ValidationIssue } from '@magnitudedev/ai'
 import type { ToolKey } from './tools/toolkits'
@@ -95,7 +95,7 @@ export interface UserMessage {
   readonly messageId: string
   readonly forkId: string | null
   readonly timestamp: number
-  readonly content: ContentPart[]
+  readonly content: UserPart[]
   readonly attachments: Attachment[]
   readonly mode: 'text' | 'audio'
   readonly synthetic: boolean  // true when sent by autopilot
@@ -153,7 +153,7 @@ export interface ObservedResult {
   readonly toolCallId: string
   readonly toolName: string
   readonly query: string
-  readonly content: ContentPart[]
+  readonly content: UserPart[]
 }
 
 export interface TurnOutcomeEvent {

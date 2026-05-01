@@ -9,7 +9,8 @@
 
 import { INSPECT_CHAR_LIMIT, INSPECT_TOKEN_LIMIT } from '../constants'
 import { INTERRUPT_MESSAGE } from '../prompts/constants'
-import { ContentPartBuilder, type ContentPart } from '../content'
+import { ContentBuilder } from '../content'
+import type { UserPart } from '@magnitudedev/ai'
 import { imagePlaceholder } from './render'
 import type {
   MessageAckResultItem,
@@ -31,8 +32,8 @@ function formatToolError(item: ToolErrorResultItem): string {
 }
 
 /** Format ordered turn results for LLM context */
-export function formatResults(items: readonly TurnResultItem[], supportsVision: boolean = true): ContentPart[] {
-  const builder = new ContentPartBuilder()
+export function formatResults(items: readonly TurnResultItem[], supportsVision: boolean = true): UserPart[] {
+  const builder = new ContentBuilder()
 
   for (const item of items) {
     if (item.kind === 'tool_error') {
@@ -41,14 +42,14 @@ export function formatResults(items: readonly TurnResultItem[], supportsVision: 
     }
 
     if (item.kind === 'tool_observation') {
-      const textChars = item.content.reduce((sum, part) => sum + (part.type === 'text' ? part.text.length : 0), 0)
+      const textChars = item.content.reduce((sum, part) => sum + (part._tag === 'TextPart' ? part.text.length : 0), 0)
       if (textChars > INSPECT_CHAR_LIMIT) {
         const approxTokens = Math.ceil(textChars / 4)
         builder.pushText(`\n<${item.toolName}>Output too large (~${approxTokens} tokens, limit is ${INSPECT_TOKEN_LIMIT}). Retry with a more targeted query.</${item.toolName}>`)
         for (const part of item.content) {
-          if (part.type === 'image') {
+          if (part._tag === 'ImagePart') {
             if (supportsVision) builder.pushPart(part)
-            else builder.pushText(imagePlaceholder({ mediaType: part.mediaType, width: part.width, height: part.height }))
+            else builder.pushText(imagePlaceholder({ mediaType: part.mediaType }))
           }
         }
         continue
@@ -56,9 +57,9 @@ export function formatResults(items: readonly TurnResultItem[], supportsVision: 
 
       builder.pushText(`\n<${item.toolName}>`)
       for (const part of item.content) {
-        if (part.type === 'text') builder.pushText(part.text)
+        if (part._tag === 'TextPart') builder.pushText(part.text)
         else if (supportsVision) builder.pushPart(part)
-        else builder.pushText(imagePlaceholder({ mediaType: part.mediaType, width: part.width, height: part.height }))
+        else builder.pushText(imagePlaceholder({ mediaType: part.mediaType }))
       }
       builder.pushText(`</${item.toolName}>`)
       continue
