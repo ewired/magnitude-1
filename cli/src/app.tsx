@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleContextWindows, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot } from '@magnitudedev/agent'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
 import { JsonChatPersistence, loadSessionSummary } from './persistence'
@@ -66,7 +66,7 @@ import { useFilePanel } from './hooks/use-file-panel'
 import { useLazyClient } from './hooks/use-lazy-client'
 import { useMagnitudeAuth } from './hooks/use-magnitude-auth'
 import { MagnitudeLoginScreen } from './components/magnitude-login-screen'
-import { createRoles, ROLE_IDS } from '@magnitudedev/roles'
+import { createRoles, ROLE_IDS, type RoleId } from '@magnitudedev/roles'
 
 export const getSelectedForkContentVersion = (
   selectedForkId: string | null,
@@ -162,7 +162,8 @@ function AppInner({
   const systemMessageTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [showRecentChatsOverlay, setShowRecentChatsOverlay] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [contextHardCap, setContextHardCap] = useState<number | null>(null)
+  const [roleContextWindows, setRoleContextWindows] = useState<Partial<Record<RoleId, number>> | null>(null)
+  const contextHardCap = roleContextWindows?.leader ?? null
 
   const [bashMode, setBashMode] = useState(false)
   const [bashOutputs, setBashOutputs] = useState<BashResult[]>([])
@@ -236,6 +237,17 @@ function AppInner({
   useEffect(() => {
     initTelemetry({ telemetryEnabled: true })
   }, [])
+
+  useEffect(() => {
+    if (!auth.loaded || !auth.key) return
+    let cancelled = false
+    fetchRoleContextWindows(auth.key)
+      .then(map => {
+        if (!cancelled) setRoleContextWindows(map)
+      })
+      .catch(err => logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'Failed to load role context windows'))
+    return () => { cancelled = true }
+  }, [auth.loaded, auth.key])
 
   // Subscribe to live logs for debug panel
   useEffect(() => {
@@ -599,9 +611,7 @@ function AppInner({
     return { provider: 'Magnitude', model: forkRole }
   }, [forkRole])
 
-  // Fork context cap: for now, use the main context cap.
-  // TODO: resolve per-fork context limits from Magnitude API when available.
-  const forkContextHardCap = contextHardCap
+  const forkContextHardCap = forkRole ? (roleContextWindows?.[forkRole] ?? null) : null
 
   const mainTimelineMessages = useMemo(
     () => (activeDisplay?.messages ?? []).filter(m => {

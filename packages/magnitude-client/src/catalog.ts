@@ -96,7 +96,7 @@ export function createModelCatalog(config: ModelCatalogConfig): ModelCatalog {
   const getByRole: ModelCatalog["getByRole"] = (role) =>
     Effect.gen(function* () {
       const models = yield* list
-      const model = models.find((m) => m.role === role)
+      const model = models.find((m) => m.roles.includes(role))
       if (!model) {
         return yield* Effect.fail(new Error(`No model found for role: ${role}`))
       }

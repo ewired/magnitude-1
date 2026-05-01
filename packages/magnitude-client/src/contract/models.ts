@@ -21,7 +21,7 @@ export interface MagnitudeModelInfo {
   readonly id: string
   readonly object: "model"
   readonly owned_by: string
-  readonly role: RoleId | null
+  readonly roles: readonly RoleId[]
   readonly contextWindow: number
   readonly maxOutputTokens: number
   readonly capabilities: ModelCapabilities
