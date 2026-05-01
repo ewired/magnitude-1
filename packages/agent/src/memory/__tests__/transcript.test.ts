@@ -16,21 +16,21 @@ const userMessage = (text: string, index: number): AppEvent => ({
 
 const assistantUserMessageEvents = (text: string, turnId = 't1'): AppEvent[] => [
   {
-    type: 'assistant_message_start',
+    type: 'message_start',
     forkId: null,
     turnId,
     id: `${turnId}-msg`,
     destination: { kind: 'user' },
   },
   {
-    type: 'assistant_message_delta',
+    type: 'message_chunk',
     forkId: null,
     turnId,
     id: `${turnId}-msg`,
     text,
   },
   {
-    type: 'assistant_message_end',
+    type: 'message_end',
     forkId: null,
     turnId,
     id: `${turnId}-msg`,

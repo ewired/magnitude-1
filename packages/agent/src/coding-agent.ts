@@ -18,7 +18,7 @@ import type { DebugSnapshot } from './projections/debug-introspection'
 import { SessionContextProjection } from './projections/session-context'
 import { TurnProjection } from './projections/turn'
 import { CanonicalTurnProjection } from './projections/canonical-turn'
-import { MemoryProjection } from './projections/memory'
+import { WindowProjection } from './projections/window'
 import { SubagentActivityProjection } from './projections/subagent-activity'
 import { DisplayProjection } from './projections/display'
 import { ToolStateProjection } from './projections/tool-state'
@@ -104,7 +104,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
     OutboundMessagesProjection,
     UserMessageResolutionProjection,
     ToolStateProjection,
-    MemoryProjection,
+    WindowProjection,
     TaskWorkerProjection,
     DisplayProjection,
     ConversationProjection,
@@ -139,7 +139,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
       display: DisplayProjection,
       toolState: ToolStateProjection,
       turn: TurnProjection,
-      memory: MemoryProjection,
+      memory: WindowProjection,
       compaction: CompactionProjection,
       agentRouting: AgentRoutingProjection,
       agentStatus: AgentStatusProjection,

@@ -61,7 +61,7 @@ describe('display subagent lifecycle think steps', () => {
         forkId: 'fork-sub',
         parentForkId: null,
         agentId: 'agent-sub',
-        role: 'builder',
+        role: 'engineer',
         name: 'Builder',
         context: 'ctx',
         mode: 'spawn',
@@ -157,7 +157,7 @@ describe('display subagent lifecycle think steps', () => {
 
     expect(started.length).toBe(2)
     expect(started[0]).toMatchObject({
-      subagentType: 'builder',
+      subagentType: 'engineer',
       subagentId: 'agent-sub',
       title: 'Builder',
       resumed: false,
@@ -169,14 +169,14 @@ describe('display subagent lifecycle think steps', () => {
 
     expect(finished.length).toBe(2)
     expect(finished[0]).toMatchObject({
-      subagentType: 'builder',
+      subagentType: 'engineer',
       subagentId: 'agent-sub',
       cumulativeTotalTimeMs: 5,
       cumulativeTotalToolsUsed: 1,
       resumed: false,
     })
     expect(finished[1]).toMatchObject({
-      subagentType: 'builder',
+      subagentType: 'engineer',
       subagentId: 'agent-sub',
       cumulativeTotalTimeMs: 10,
       cumulativeTotalToolsUsed: 2,
@@ -192,7 +192,7 @@ describe('display subagent lifecycle think steps', () => {
         forkId: 'fork-sub',
         parentForkId: null,
         agentId: 'agent-sub',
-        role: 'builder',
+        role: 'engineer',
         name: 'Builder',
         context: 'ctx',
         mode: 'spawn',
@@ -219,7 +219,7 @@ describe('display subagent lifecycle think steps', () => {
     const killed = allSteps.filter((s: any) => s.type === 'subagent_killed')
     expect(killed.length).toBe(1)
     expect(killed[0]).toMatchObject({
-      subagentType: 'builder',
+      subagentType: 'engineer',
       subagentId: 'agent-sub',
       title: 'Builder',
     })
@@ -233,7 +233,7 @@ describe('display subagent lifecycle think steps', () => {
         forkId: 'fork-sub',
         parentForkId: null,
         agentId: 'agent-sub',
-        role: 'builder',
+        role: 'engineer',
         name: 'Builder',
         context: 'ctx',
         mode: 'spawn',
@@ -257,7 +257,7 @@ describe('display subagent lifecycle think steps', () => {
     const userKilled = allSteps.filter((s: any) => s.type === 'subagent_user_killed')
     expect(userKilled.length).toBe(1)
     expect(userKilled[0]).toMatchObject({
-      subagentType: 'builder',
+      subagentType: 'engineer',
       subagentId: 'agent-sub',
       title: 'Builder',
     })
@@ -271,7 +271,7 @@ describe('display subagent lifecycle think steps', () => {
         forkId: 'fork-sub',
         parentForkId: null,
         agentId: 'agent-sub',
-        role: 'builder',
+        role: 'engineer',
         name: 'Builder',
         context: 'ctx',
         mode: 'spawn',

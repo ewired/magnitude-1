@@ -19,9 +19,9 @@ import { editTool, writeTool } from '../tools/fs'
 import { shellTool } from '../tools/shell'
 import { expandWorkspacePath } from '../workspace/workspace-path'
 
-type ShellInput = Schema.Schema.Type<typeof shellTool.inputSchema>
-type FileWriteInput = Schema.Schema.Type<typeof writeTool.inputSchema>
-type FileEditInput = Schema.Schema.Type<typeof editTool.inputSchema>
+type ShellInput = Schema.Schema.Type<typeof shellTool.definition.inputSchema>
+type FileWriteInput = Schema.Schema.Type<typeof writeTool.definition.inputSchema>
+type FileEditInput = Schema.Schema.Type<typeof editTool.definition.inputSchema>
 
 const NO_MATCHING_POLICY_RULE = 'No matching policy rule'
 const deny = (reason: string): Decision => ({ decision: 'deny', reason })

@@ -148,10 +148,10 @@ describe('Event Serialization', () => {
     test('serializes and deserializes streaming events', () => {
       const events: AppEvent[] = [
         {
-          type: 'assistant_message_delta',
+          type: 'message_chunk',
           forkId: null,
           turnId: 'turn-1',
-          messageId: 'm1',
+          id: 'm1',
           text: 'Hello '
         },
         {
@@ -161,10 +161,10 @@ describe('Event Serialization', () => {
           text: 'I should...'
         },
         {
-          type: 'assistant_message_end',
+          type: 'message_end',
           forkId: null,
           turnId: 'turn-1',
-          messageId: 'm1'
+          id: 'm1'
         }
       ]
 

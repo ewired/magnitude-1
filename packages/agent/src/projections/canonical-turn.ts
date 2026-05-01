@@ -1,5 +1,8 @@
 import { Projection } from '@magnitudedev/event-core'
 import type { AppEvent, MessageDestination } from '../events'
+import type { CompletedTurn, TurnFeedback } from '../inbox/types'
+import type { AssistantMessage, ToolResultMessage, ToolCallPart, ToolCallId, JsonValue } from '@magnitudedev/ai'
+import { renderToolOutput } from '../util/render-tool-output'
 
 export interface ThinkBlock {
   about: string | null
@@ -21,17 +24,12 @@ export interface CanonicalToolCall {
   readonly order: number
 }
 
-export interface CompletedTurn {
-  readonly turnId: string
-  readonly clean: boolean
-  readonly estimatedTokens: number
-}
-
 export interface CanonicalTurnState {
   readonly turnId: string | null
   readonly thinkBlocks: readonly ThinkBlock[]
   readonly messages: readonly CanonicalMessage[]
   readonly toolCalls: readonly CanonicalToolCall[]
+  readonly pendingToolResults: readonly ToolResultMessage[]
   readonly orderCounter: number
   readonly lastCompleted: CompletedTurn | null
 }
@@ -41,6 +39,7 @@ export const createInitialCanonicalTurnState = (): CanonicalTurnState => ({
   thinkBlocks: [],
   messages: [],
   toolCalls: [],
+  pendingToolResults: [],
   orderCounter: 0,
   lastCompleted: null,
 })
@@ -58,6 +57,52 @@ function estimateCanonicalTokens(state: CanonicalTurnState): number {
   return Math.ceil(chars / CHARS_PER_TOKEN)
 }
 
+/**
+ * Convert canonical turn state into an AssistantMessage (AI primitive).
+ * ThinkBlocks → reasoning, messages → text, tool calls → toolCalls.
+ */
+function canonicalToAssistantMessage(state: CanonicalTurnState): AssistantMessage {
+  let reasoning: string | undefined
+  let text: string | undefined
+  const toolCalls: ToolCallPart[] = []
+
+  // ThinkBlocks → reasoning
+  for (const block of state.thinkBlocks) {
+    reasoning = reasoning ? reasoning + '\n' + block.content : block.content
+  }
+
+  // Interleave messages and tool calls by order
+  type OrderedItem =
+    | { kind: 'message'; item: CanonicalMessage }
+    | { kind: 'tool_call'; item: CanonicalToolCall }
+
+  const ordered: OrderedItem[] = [
+    ...state.messages.map(m => ({ kind: 'message' as const, item: m })),
+    ...state.toolCalls.map(tc => ({ kind: 'tool_call' as const, item: tc })),
+  ]
+  ordered.sort((a, b) => a.item.order - b.item.order)
+
+  for (const entry of ordered) {
+    if (entry.kind === 'message') {
+      text = text ? text + '\n' + entry.item.text : entry.item.text
+    } else {
+      toolCalls.push({
+        _tag: 'ToolCallPart',
+        id: entry.item.toolCallId as ToolCallId,
+        name: entry.item.toolName,
+        input: entry.item.input as JsonValue,
+      })
+    }
+  }
+
+  return {
+    _tag: 'AssistantMessage',
+    reasoning,
+    text,
+    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+  }
+}
+
 function resetActive(state: CanonicalTurnState): CanonicalTurnState {
   return {
     ...state,
@@ -65,6 +110,7 @@ function resetActive(state: CanonicalTurnState): CanonicalTurnState {
     thinkBlocks: [],
     messages: [],
     toolCalls: [],
+    pendingToolResults: [],
     orderCounter: 0,
   }
 }
@@ -156,6 +202,18 @@ export const CanonicalTurnProjection = Projection.defineForked<AppEvent, Canonic
           return { ...fork, toolCalls: next }
         }
 
+        case 'ToolExecutionEnded': {
+          const { toolCallId, toolName } = event.event
+          const result = event.event.result
+          const toolResult: ToolResultMessage = {
+            _tag: 'ToolResultMessage',
+            toolCallId: toolCallId as ToolCallId,
+            toolName,
+            parts: [...renderToolOutput(result)],
+          }
+          return { ...fork, pendingToolResults: [...fork.pendingToolResults, toolResult] }
+        }
+
         default:
           return fork
       }
@@ -166,12 +224,23 @@ export const CanonicalTurnProjection = Projection.defineForked<AppEvent, Canonic
 
       const clean = event.outcome._tag === 'Completed'
 
+      // Derive message_ack feedback from parent-directed messages
+      const feedback: TurnFeedback[] = []
+      for (const msg of fork.messages) {
+        if (msg.destination.kind === 'parent') {
+          feedback.push({ kind: 'message_ack', destination: 'parent', chars: msg.text.length })
+        }
+      }
+
       const finalized: CanonicalTurnState = {
         ...fork,
         lastCompleted: {
           turnId: event.turnId,
-          clean,
+          assistant: canonicalToAssistantMessage(fork),
+          toolResults: [...fork.pendingToolResults],
+          feedback,
           estimatedTokens: estimateCanonicalTokens(fork),
+          clean,
         }
       }
 

@@ -1,5 +1,5 @@
 import type { ToolResult } from '@magnitudedev/harness'
-import type { UserPart } from '@magnitudedev/ai'
+import type { UserPart, ImageMediaType } from '@magnitudedev/ai'
 
 // =============================================================================
 // renderToolOutput
@@ -13,7 +13,7 @@ import type { UserPart } from '@magnitudedev/ai'
 // No outer wrapper — the chat template or codec provides the boundary.
 // =============================================================================
 
-function isImageOutput(output: unknown): output is { _tag: 'ImagePart'; data: string; mediaType: string } {
+function isImageOutput(output: unknown): output is { _tag: 'ImagePart'; data: string; mediaType: ImageMediaType } {
   return (
     typeof output === 'object' &&
     output !== null &&

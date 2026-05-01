@@ -5,7 +5,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import type { AppEvent } from '@magnitudedev/agent'
 import {
-  MemoryProjection,
+  WindowProjection,
   TurnProjection,
   DisplayProjection,
   CompactionProjection,
@@ -299,7 +299,7 @@ const InspectAgent = Agent.define<AppEvent>()({
     SessionContextProjection,
     CompactionProjection,
     TurnProjection,
-    MemoryProjection,
+    WindowProjection,
     DisplayProjection,
     ReplayProjection,
     AgentRoutingProjection,
@@ -311,7 +311,7 @@ const InspectAgent = Agent.define<AppEvent>()({
       sessionContext: SessionContextProjection,
       compaction: CompactionProjection,
       turn: TurnProjection,
-      memory: MemoryProjection,
+      memory: WindowProjection,
       display: DisplayProjection,
       replay: ReplayProjection,
       agentRouting: AgentRoutingProjection,

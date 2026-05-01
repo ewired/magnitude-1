@@ -5,7 +5,7 @@ import type { AppEvent, SessionContext } from '../../src/events'
 import type { RoleId } from '../../src/agents/role-validation'
 import { CHARS_PER_TOKEN_XML } from '../../src/constants'
 import { CompactionProjection } from '../../src/projections/compaction'
-import { MemoryProjection } from '../../src/projections/memory'
+import { WindowProjection } from '../../src/projections/window'
 import { TurnProjection } from '../../src/projections/turn'
 import { TestHarness } from '../../src/test-harness/harness'
 
@@ -130,7 +130,7 @@ export const getTurn = (h: Harness, forkId: string | null = ROOT_FORK_ID) =>
   h.projectionFork(TurnProjection.Tag, forkId)
 
 export const getMemory = (h: Harness, forkId: string | null = ROOT_FORK_ID) =>
-  h.projectionFork(MemoryProjection.Tag, forkId)
+  h.projectionFork(WindowProjection.Tag, forkId)
 
 export const expectCompactionUnblocked = (h: Harness, forkId: string | null = ROOT_FORK_ID) =>
   Effect.gen(function* () {

@@ -4,25 +4,25 @@
  * Replays events from a Magnitude session's events.jsonl through the actual
  * agent projection system to extract the exact LLM conversation messages.
  * 
- * Uses MemoryProjection + its dependencies (ForkProjection, TaskGraphProjection).
+ * Uses WindowProjection + its dependencies (ForkProjection, TaskGraphProjection).
  * to reconstruct the conversation as the model saw it.
  */
 
 import { Agent } from '@magnitudedev/event-core'
 import {
-  MemoryProjection,
+  WindowProjection,
   getView,
   ForkProjection,
   TaskGraphProjection,
   type LLMMessage,
-  type ForkMemoryState
+  type ForkWindowState
 } from '@magnitudedev/agent'
 import type { AppEvent } from '@magnitudedev/agent'
 import { readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 
 // ---------------------------------------------------------------------------
-// Minimal Replay Agent — only projections needed for MemoryProjection
+// Minimal Replay Agent — only projections needed for WindowProjection
 // ---------------------------------------------------------------------------
 
 const ReplayAgent = Agent.define<AppEvent>()({
@@ -30,12 +30,12 @@ const ReplayAgent = Agent.define<AppEvent>()({
   projections: [
     ForkProjection,
     TaskGraphProjection,
-    MemoryProjection
+    WindowProjection
   ],
   workers: [],
   expose: {
     state: {
-      memory: MemoryProjection
+      memory: WindowProjection
     }
   }
 })
@@ -74,10 +74,10 @@ export async function replaySession(eventsJsonlPath: string): Promise<ReplayResu
     }
 
     // Read the root fork's memory state
-    const memoryState: ForkMemoryState = await client.state.memory.getFork(null)
+    const windowState: ForkWindowState = await client.state.memory.getFork(null)
 
     // Transform to LLM messages using the actual getView function
-    const llmMessages = getView(memoryState.messages, timezone, 'agent')
+    const llmMessages = getView(windowState.messages, timezone, 'agent')
 
     return {
       messages: llmMessages,

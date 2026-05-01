@@ -1,9 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import {
-  toResultError,
-  toResultInterrupted,
-  toResultNoop,
-  toResultTurnResults,
   toTimelineAgentBlock,
   toTimelineObservation,
   toTimelineTaskUpdate,
@@ -19,18 +15,6 @@ import type { AgentAtom, TimelineAttachment } from '../types'
 const TS = 1711641600000
 
 describe('inbox compose', () => {
-  test('toResult* constructors set correct kinds', () => {
-    const turnResults = toResultTurnResults({ items: [] })
-    const interrupted = toResultInterrupted()
-    const error = toResultError({ message: 'bad' })
-    const noop = toResultNoop()
-
-    expect(turnResults.kind).toBe('turn_results')
-    expect(interrupted.kind).toBe('interrupted')
-    expect(error.kind).toBe('error')
-    expect(noop.kind).toBe('noop')
-  })
-
   test('toTimeline* constructors set correct kinds', () => {
     const attachments: readonly TimelineAttachment[] = [{ kind: 'mention', path: 'a.ts', contentType: 'text' }]
     const atoms: readonly AgentAtom[] = [{ kind: 'thought', timestamp: TS, text: 'thinking' }]
@@ -43,7 +27,7 @@ describe('inbox compose', () => {
       firstAtomTimestamp: TS,
       lastAtomTimestamp: TS,
       agentId: 'a1',
-      role: 'builder',
+      role: 'engineer',
       atoms,
     }).kind).toBe('agent_block')
     expect(toTimelineSubagentUserKilled({ timestamp: TS, agentId: 'a1', agentType: 'builder' }).kind).toBe('subagent_user_killed')
@@ -52,7 +36,7 @@ describe('inbox compose', () => {
       toTimelineLifecycleHook({
         timestamp: TS,
         agentId: 'a1',
-        role: 'builder',
+        role: 'engineer',
         hookType: 'spawn',
       }).kind,
     ).toBe('lifecycle_hook')
@@ -83,7 +67,7 @@ describe('inbox compose', () => {
       firstAtomTimestamp: TS,
       lastAtomTimestamp: TS,
       agentId: 'a',
-      role: 'builder',
+      role: 'engineer',
       atoms,
     })
     const obs = toTimelineObservation({ timestamp: TS, parts })
@@ -103,7 +87,7 @@ describe('inbox compose', () => {
       firstAtomTimestamp: TS,
       lastAtomTimestamp: TS,
       agentId: 'a',
-      role: 'builder',
+      role: 'engineer',
       atoms: [],
     })
     const update = toTimelineTaskUpdate({

@@ -12,7 +12,9 @@ import type { ImageMediaType } from '@magnitudedev/ai'
 import type { ToolLifecycleEvent } from '@magnitudedev/harness'
 import type { ValidationIssue } from '@magnitudedev/ai'
 import type { ToolKey } from './tools/toolkits'
-import type { ObservationPart } from '@magnitudedev/roles'
+export type ObservationPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly base64: string; readonly mediaType: string }
 import type { Skill } from '@magnitudedev/skills'
 import type { RoleId } from '@magnitudedev/roles'
 import type { TaskAssignee } from './tasks/types'

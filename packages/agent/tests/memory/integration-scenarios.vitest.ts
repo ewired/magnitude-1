@@ -17,9 +17,9 @@ describe('memory integration scenarios', () => {
       })
 
       yield* h.send({ type: 'turn_started', forkId: null, turnId: 't-1', chainId: 'c-1' })
-      yield* h.send({ type: 'assistant_message_start', forkId: null, turnId: 't-1', id: 'm-t1', destination: { kind: 'user' } })
-      yield* h.send({ type: 'assistant_message_delta', forkId: null, turnId: 't-1', id: 'm-t1', text: 'first answer' })
-      yield* h.send({ type: 'assistant_message_end', forkId: null, turnId: 't-1', id: 'm-t1' })
+      yield* h.send({ type: 'message_start', forkId: null, turnId: 't-1', id: 'm-t1', destination: { kind: 'user' } })
+      yield* h.send({ type: 'message_chunk', forkId: null, turnId: 't-1', id: 'm-t1', text: 'first answer' })
+      yield* h.send({ type: 'message_end', forkId: null, turnId: 't-1', id: 'm-t1' })
       yield* h.send({
         type: 'turn_outcome',
 
@@ -72,7 +72,7 @@ describe('memory integration scenarios', () => {
         parentForkId: null,
         agentId: 'builder-1',
         name: 'builder',
-        role: 'builder',
+        role: 'engineer',
         context: '',
         mode: 'spawn',
         taskId: 'task-1',
@@ -81,21 +81,21 @@ describe('memory integration scenarios', () => {
 
       yield* h.send({ type: 'turn_started', forkId: null, turnId: 't-1', chainId: 'c-1' })
       yield* h.send({
-        type: 'assistant_message_start',
+        type: 'message_start',
         forkId: 'f-sub',
         turnId: 'sub-turn',
         id: 'm1',
         destination: { kind: 'parent' },
       })
       yield* h.send({
-        type: 'assistant_message_delta',
+        type: 'message_chunk',
         forkId: 'f-sub',
         turnId: 'sub-turn',
         id: 'm1',
         text: 'progress update',
       })
       yield* h.send({
-        type: 'assistant_message_end',
+        type: 'message_end',
         forkId: 'f-sub',
         turnId: 'sub-turn',
         id: 'm1',
@@ -129,11 +129,11 @@ describe('memory integration scenarios', () => {
         type: 'observations_captured',
         forkId: null,
         turnId: 't-1',
-        parts: [{ _tag: 'TextPart', text: 'observation' }],
+        parts: [{ type: 'text', text: 'observation' }],
       })
-      yield* h.send({ type: 'assistant_message_start', forkId: null, turnId: 't-1', id: 'm-obs', destination: { kind: 'user' } })
-      yield* h.send({ type: 'assistant_message_delta', forkId: null, turnId: 't-1', id: 'm-obs', text: 'done' })
-      yield* h.send({ type: 'assistant_message_end', forkId: null, turnId: 't-1', id: 'm-obs' })
+      yield* h.send({ type: 'message_start', forkId: null, turnId: 't-1', id: 'm-obs', destination: { kind: 'user' } })
+      yield* h.send({ type: 'message_chunk', forkId: null, turnId: 't-1', id: 'm-obs', text: 'done' })
+      yield* h.send({ type: 'message_end', forkId: null, turnId: 't-1', id: 'm-obs' })
       yield* h.send({
         type: 'turn_outcome',
 
@@ -155,9 +155,9 @@ describe('memory integration scenarios', () => {
       const inbox = inboxMessages(memory)
       expect(inbox.length).toBeGreaterThan(1)
 
-      const firstUserInbox = inbox.find(m => m.type === 'inbox' && m.timeline.some(t => t.kind === 'user_message'))
-      expect(firstUserInbox?.type).toBe('inbox')
-      if (firstUserInbox?.type === 'inbox') {
+      const firstUserInbox = inbox.find(m => m.type === 'context' && m.timeline.some(t => t.kind === 'user_message'))
+      expect(firstUserInbox?.type).toBe('context')
+      if (firstUserInbox?.type === 'context') {
         const userEntry = firstUserInbox.timeline.find(t => t.kind === 'user_message')
         expect(userEntry?.kind).toBe('user_message')
         if (userEntry?.kind === 'user_message') {
@@ -223,9 +223,9 @@ describe('memory integration scenarios', () => {
         timestamp: 1711641600000,
         text: 'while queued',
       })
-      yield* h.send({ type: 'assistant_message_start', forkId: null, turnId: 't-1', id: 'm-done', destination: { kind: 'user' } })
-      yield* h.send({ type: 'assistant_message_delta', forkId: null, turnId: 't-1', id: 'm-done', text: 'assistant done' })
-      yield* h.send({ type: 'assistant_message_end', forkId: null, turnId: 't-1', id: 'm-done' })
+      yield* h.send({ type: 'message_start', forkId: null, turnId: 't-1', id: 'm-done', destination: { kind: 'user' } })
+      yield* h.send({ type: 'message_chunk', forkId: null, turnId: 't-1', id: 'm-done', text: 'assistant done' })
+      yield* h.send({ type: 'message_end', forkId: null, turnId: 't-1', id: 'm-done' })
       yield* h.send({
         type: 'turn_outcome',
 

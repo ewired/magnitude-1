@@ -4,14 +4,12 @@ import {
   USER_MESSAGE_RESPONSE_REMINDER,
   WORKER_PROGRESS_USER_MESSAGE_REMINDER,
 } from '../prompts/lead-communication-reminders'
-import type { AgentAtom, ResultEntry, TimelineEntry } from './types'
-import { formatError, formatInterrupted, formatNoop, formatResults, formatYieldWorkerRetrigger } from './render-results'
+import type { AgentAtom, TimelineEntry } from './types'
 import { renderCompactToolCall } from './render-tool-call'
 
 import { taskIdleReminder, taskCompleteReminder } from '../prompts/tasks/index'
 
-export interface FormatInboxInput {
-  results: readonly ResultEntry[]
+export interface RenderTimelineInput {
   timeline: readonly TimelineEntry[]
   timezone: string | null
   supportsVision: boolean
@@ -211,20 +209,8 @@ function renderTaskUpdateLine(entry: Extract<TimelineEntry, { kind: 'task_update
   return `- Task ${entry.taskId} status changed: ${previousStatus} -> ${nextStatus}`
 }
 
-export function formatInbox(input: FormatInboxInput): UserPart[] {
+export function renderTimeline(input: RenderTimelineInput): UserPart[] {
   const builder = new ContentBuilder()
-
-  if (input.results.length > 0) {
-    builder.pushText('<turn_result>')
-    for (const result of input.results) {
-      if (result.kind === 'turn_results') builder.pushParts(formatResults(result.items, input.supportsVision))
-      else if (result.kind === 'interrupted') builder.pushText(formatInterrupted())
-      else if (result.kind === 'error') builder.pushText(formatError(result.message))
-      else if (result.kind === 'yield_worker_retrigger') builder.pushText(formatYieldWorkerRetrigger())
-      else builder.pushText(formatNoop())
-    }
-    builder.pushText('\n</turn_result>\n')
-  }
 
   if (input.timeline.length === 0) return builder.build()
 

@@ -28,7 +28,7 @@ import {
   DriverError,
   type Driver,
 } from '@magnitudedev/drivers'
-import type { Message } from '../../src/projections/memory'
+import type { WindowEntry } from '../../src/projections/window'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ function makeModel(opts: MakeModelOpts = {}): NativeBoundModel {
   }
 }
 
-const memoryEmpty: Message[] = []
+const memoryEmpty: WindowEntry[] = []
 const toolsEmpty  = new Map<string, never>()
 const toolDefsEmpty: ToolDef[] = []
 

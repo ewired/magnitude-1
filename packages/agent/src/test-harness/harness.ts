@@ -4,7 +4,7 @@ import { YIELD_USER } from '@magnitudedev/xml-act'
 import type { RoleDefinition } from '@magnitudedev/roles'
 
 import type { AppEvent, SessionContext } from '../events'
-import { textParts } from '../content'
+import { textParts, textOf } from '../content'
 import { createId } from '../util/id'
 
 
@@ -13,7 +13,7 @@ import { SessionContextProjection } from '../projections/session-context'
 import { TaskGraphProjection } from '../projections/task-graph'
 import { TurnProjection } from '../projections/turn'
 import { CanonicalTurnProjection } from '../projections/canonical-turn'
-import { MemoryProjection, getView } from '../projections/memory'
+import { WindowProjection } from '../projections/window'
 import { SubagentActivityProjection } from '../projections/subagent-activity'
 import { DisplayProjection } from '../projections/display'
 import { ToolStateProjection } from '../projections/tool-state'
@@ -255,7 +255,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
         UserMessageResolutionProjection,
         ToolStateProjection,
         TaskWorkerProjection,
-        MemoryProjection,
+        WindowProjection,
         DisplayProjection,
         ConversationProjection,
         UserPresenceProjection,
@@ -270,7 +270,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
           toolState: ToolStateProjection,
           taskWorker: TaskWorkerProjection,
           turn: TurnProjection,
-          memory: MemoryProjection,
+          memory: WindowProjection,
           compaction: CompactionProjection,
           agentRouting: AgentRoutingProjection,
           agentStatus: AgentStatusProjection,
@@ -533,18 +533,31 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
       inspect: {
         context: async (forkId: string | null = null): Promise<ContextSnapshot> => {
           const [memory, sessionContext, compaction] = await Promise.all([
-            client.runEffect(Effect.flatMap(MemoryProjection.Tag, (projection) => projection.getFork(forkId))),
+            client.runEffect(Effect.flatMap(WindowProjection.Tag, (projection) => projection.getFork(forkId))),
             client.runEffect(Effect.flatMap(SessionContextProjection.Tag, (projection) => projection.get)),
             client.runEffect(Effect.flatMap(CompactionProjection.Tag, (projection) => projection.getFork(forkId))),
           ])
 
-          const timezone = sessionContext.context?.timezone ?? null
-          const messages = getView(memory.messages, timezone, 'agent', true).map((message) => ({
-            role: message.role,
-            content: message.content
-              .map((part) => (part._tag === 'TextPart' ? part.text : '[image]'))
-              .join(''),
-          }))
+          const messages = memory.messages.map((msg) => {
+            switch (msg.type) {
+              case 'assistant_turn':
+                return {
+                  role: 'assistant' as const,
+                  content: [
+                    ...(msg.turn.assistant.reasoning ? [`[thought] ${msg.turn.assistant.reasoning}`] : []),
+                    ...(msg.turn.assistant.text ? [msg.turn.assistant.text] : []),
+                    ...(msg.turn.assistant.toolCalls ?? []).map((tc) => `[tool_call] ${tc.toolName}`),
+                  ].join('\n'),
+                }
+              case 'context':
+                return { role: 'user' as const, content: '[context]' }
+              default:
+                return {
+                  role: 'user' as const,
+                  content: textOf(msg.content),
+                }
+            }
+          })
 
           return {
             messages,
@@ -562,7 +575,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
           ] = await Promise.all([
             client.runEffect(Effect.flatMap(CompactionProjection.Tag, (projection) => projection.getFork(null))),
             client.runEffect(Effect.flatMap(TurnProjection.Tag, (projection) => projection.getFork(null))),
-            client.runEffect(Effect.flatMap(MemoryProjection.Tag, (projection) => projection.getFork(null))),
+            client.runEffect(Effect.flatMap(WindowProjection.Tag, (projection) => projection.getFork(null))),
             client.runEffect(Effect.flatMap(AgentRoutingProjection.Tag, (projection) => projection.get)),
             client.runEffect(Effect.flatMap(AgentStatusProjection.Tag, (projection) => projection.get)),
             client.runEffect(Effect.flatMap(SessionContextProjection.Tag, (projection) => projection.get)),
@@ -571,7 +584,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
           return {
             CompactionProjection: compaction,
             TurnProjection: turn,
-            MemoryProjection: memory,
+            WindowProjection: memory,
             AgentRoutingProjection: agentRouting,
             AgentStatusProjection: agentStatus,
             SessionContextProjection: sessionContext,

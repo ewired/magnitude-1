@@ -14,11 +14,11 @@ bun session events <id> --from 10 --to 50          # slice by index range
 bun session event <id> <index>                      # show one event's full payload as JSON
 bun session search <keyword> <id>                   # search event payloads for keyword, shows index/type/snippet
 bun session search <keyword> --last 5              # search across last 5 sessions
-bun session projection <id> Memory                  # replay events and dump named projection state as JSON
+bun session projection <id> Window                  # replay events and dump named projection state as JSON
 bun session projection <id> all --at 42            # all projections at point-in-time (after event 42)
 ```
 
-Supported projections: `Memory`, `Fork`, `TaskGraph`, `Turn`, `Display`, `Compaction`, `WorkingState`, `SessionContext`, `Proposal`, `AgentRegistry`, `Artifact`, `ChatTitle`, `Replay`, `SkillMode`, `all`
+Supported projections: `Window`, `Fork`, `TaskGraph`, `Turn`, `Display`, `Compaction`, `WorkingState`, `SessionContext`, `Proposal`, `AgentRegistry`, `Artifact`, `ChatTitle`, `Replay`, `SkillMode`, `all`
 
 Projection output is JSON — pipe to `jq` for querying. Events are 0-indexed.
 

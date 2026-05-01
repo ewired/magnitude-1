@@ -1,46 +1,37 @@
 /**
- * MemoryProjection (Forked)
+ * WindowProjection (Forked)
  *
  * LLM conversation history, per-fork.
  * Each fork has independent message history.
  */
 
 import { Projection } from '@magnitudedev/event-core'
-import type { ObservationPart } from '@magnitudedev/roles'
-import type { AppEvent, StrategyId, ImageAttachment, ProviderNotReadyDetail, ConnectionFailureDetail, SafetyStopReason } from '../events'
-import type { TurnPart, ThoughtPart, MessagePart, ToolCallPart } from '@magnitudedev/codecs'
-import { renderToolOutput } from '../util/render-tool-output'
+import type { AppEvent, StrategyId, ImageAttachment, ProviderNotReadyDetail, ConnectionFailureDetail, SafetyStopReason, ObservationPart } from '../events'
 import { getAgentByForkId, AgentStatusProjection } from './agent-status'
 import { SubagentActivityProjection } from './subagent-activity'
 import { OutboundMessagesProjection } from './outbound-messages'
-import { compactionSummaryTag } from '../prompts/constants'
+import { CanonicalTurnProjection } from './canonical-turn'
 import { buildSessionContextContent } from '../prompts/session-context'
+import { compactionSummaryTag } from '../prompts/constants'
 import { TASK_TREE_COMPLETION_REMINDER } from '../prompts/task-tree'
 import { SkillsAmbient } from '../ambient/skills-ambient'
 import { UserPresenceProjection } from './user-presence'
 import { UserMessageResolutionProjection } from './user-message-resolution'
 import { TaskGraphProjection, type TaskGraphState, type TaskRecord } from './task-graph'
-import { isRoleId } from '../agents/role-validation'
-import { getAgentDefinition } from '../agents/registry'
+
 import { formatUserPresence, formatUserReturnedAfterAbsence } from '../prompts/presence'
 import type { UserPart, ImageMediaType } from '@magnitudedev/ai'
-import { textParts, wrapTextParts } from '../content'
+import { textParts } from '../content'
 
 import { EMPTY_RESPONSE_ERROR } from '../prompts/error-states'
-import { formatInbox } from '../inbox/render'
 import type {
-  ResultEntry,
+  CompletedTurn,
+  TurnFeedback,
   TimelineEntry,
   TimelineAttachment,
-  QueuedEntry,
   AgentAtom,
-  TurnResultItem,
 } from '../inbox/types'
 import {
-  toResultTurnResults,
-  toResultInterrupted,
-  toResultError,
-  toResultNoop,
   toTimelineUserMessage,
   toTimelineParentMessage,
   toTimelineUserToAgent,
@@ -57,66 +48,38 @@ import {
   toTimelineTaskUpdate,
 } from '../inbox/compose'
 
-export type MessageSource = 'user' | 'agent' | 'system'
+export type WindowEntrySource = 'user' | 'agent' | 'system'
 
-export type Message =
+export type WindowEntry =
   | { readonly type: 'session_context'; readonly source: 'system'; readonly content: UserPart[] }
   | {
       readonly type: 'assistant_turn'
       readonly source: 'agent'
-      readonly parts: TurnPart[]
-      readonly content: UserPart[]
+      readonly turn: CompletedTurn
       readonly strategyId: StrategyId
     }
   | { readonly type: 'compacted'; readonly source: 'system'; readonly content: UserPart[] }
   | { readonly type: 'fork_context'; readonly source: 'system'; readonly content: UserPart[] }
   | {
-      readonly type: 'inbox'
+      readonly type: 'context'
       readonly source: 'system'
-      readonly results: readonly ResultEntry[]
-      readonly outcomes: readonly ResultEntry[]
       readonly timeline: readonly TimelineEntry[]
     }
 
-export interface LLMMessage {
-  readonly role: 'user' | 'assistant'
-  readonly content: UserPart[]
-}
-
-export type Perspective = 'agent' | 'autopilot'
-
-type PendingParentMessage = {
-  readonly body: string
-  readonly destination: 'parent'
-}
-
-export interface ForkMemoryState {
-  readonly messages: readonly Message[]
-  readonly queuedEntries: readonly QueuedEntry[]
+export interface ForkWindowState {
+  readonly messages: readonly WindowEntry[]
+  readonly queuedTimeline: readonly QueuedTimelineEntry[]
   readonly currentTurnId: string | null
   readonly currentChainId: string | null
   readonly pendingPresenceText: string | null
   readonly nextQueueSeq: number
-  readonly pendingResultItems: readonly TurnResultItem[]
-  readonly pendingParentMessages: ReadonlyMap<string, PendingParentMessage>
-  readonly workingParts: TurnPart[]
-  readonly workingThoughtText: string | null
-  readonly workingMessageId: string | null
-  readonly workingMessageText: string | null
-  readonly workingToolCallNames: ReadonlyMap<string, string>
 }
 
-function resetPendingTurnState(fork: ForkMemoryState): ForkMemoryState {
-  return {
-    ...fork,
-    pendingResultItems: [],
-    pendingParentMessages: new Map(),
-    workingParts: [],
-    workingThoughtText: null,
-    workingMessageId: null,
-    workingMessageText: null,
-    workingToolCallNames: new Map(),
-  }
+interface QueuedTimelineEntry {
+  readonly timestamp: number
+  readonly seq: number
+  readonly entry: TimelineEntry
+  readonly coalesceKey?: string
 }
 
 
@@ -130,54 +93,32 @@ function extractText(parts: readonly UserPart[]): string {
     .join('')
 }
 
-function appendNewInbox(messages: readonly Message[], options: { results?: readonly ResultEntry[], timeline?: readonly TimelineEntry[] }): readonly Message[] {
-  const results = options.results ?? []
-  const timeline = options.timeline ?? []
-  if (results.length === 0 && timeline.length === 0) return messages
-  return [...messages, { type: 'inbox', source: 'system', results: [...results], outcomes: [...results], timeline: [...timeline] }]
-}
-
-function enqueueResult(
-  fork: ForkMemoryState,
-  entry: ResultEntry,
-  timestamp: number,
-  coalesceKey?: string,
-): ForkMemoryState {
-  const seq = fork.nextQueueSeq
-  const queued: QueuedEntry = { lane: 'result', timestamp, seq, entry, coalesceKey }
-  const queuedEntries = coalesceKey
-    ? [...fork.queuedEntries.filter(q => q.coalesceKey !== coalesceKey), queued]
-    : [...fork.queuedEntries, queued]
-  return { ...fork, queuedEntries, nextQueueSeq: seq + 1 }
+function appendTimeline(messages: readonly WindowEntry[], timeline: readonly TimelineEntry[]): readonly WindowEntry[] {
+  if (timeline.length === 0) return messages
+  return [...messages, { type: 'context', source: 'system', timeline: [...timeline] }]
 }
 
 function enqueueTimeline(
-  fork: ForkMemoryState,
+  fork: ForkWindowState,
   entry: TimelineEntry,
   timestamp: number,
   coalesceKey?: string,
-): ForkMemoryState {
+): ForkWindowState {
   const seq = fork.nextQueueSeq
-  const queued: QueuedEntry = { lane: 'timeline', timestamp, seq, entry, coalesceKey }
-  const queuedEntries = coalesceKey
-    ? [...fork.queuedEntries.filter(q => q.coalesceKey !== coalesceKey), queued]
-    : [...fork.queuedEntries, queued]
-  return { ...fork, queuedEntries, nextQueueSeq: seq + 1 }
+  const queued: QueuedTimelineEntry = { timestamp, seq, entry, coalesceKey }
+  const queuedTimeline = coalesceKey
+    ? [...fork.queuedTimeline.filter(q => q.coalesceKey !== coalesceKey), queued]
+    : [...fork.queuedTimeline, queued]
+  return { ...fork, queuedTimeline, nextQueueSeq: seq + 1 }
 }
 
-function flushQueue(fork: ForkMemoryState, taskGraphState: TaskGraphState): ForkMemoryState {
-  const sorted = [...fork.queuedEntries].sort((a, b) => (a.timestamp - b.timestamp) || (a.seq - b.seq))
-  const results: ResultEntry[] = []
+function flushQueue(fork: ForkWindowState, taskGraphState: TaskGraphState): ForkWindowState {
+  const sorted = [...fork.queuedTimeline].sort((a, b) => (a.timestamp - b.timestamp) || (a.seq - b.seq))
   const timeline: TimelineEntry[] = []
   const dirtyTaskIds = new Set<string>()
   let latestDirtyTimestamp: number | null = null
 
   for (const queued of sorted) {
-    if (queued.lane === 'result') {
-      results.push(queued.entry)
-      continue
-    }
-
     if (queued.entry.kind === 'task_tree_dirty') {
       dirtyTaskIds.add(queued.entry.taskId)
       latestDirtyTimestamp = latestDirtyTimestamp === null
@@ -203,26 +144,25 @@ function flushQueue(fork: ForkMemoryState, taskGraphState: TaskGraphState): Fork
 
   return {
     ...fork,
-    messages: appendNewInbox(fork.messages, { results, timeline }),
-    queuedEntries: [],
+    messages: appendTimeline(fork.messages, timeline),
+    queuedTimeline: [],
   }
 }
 
 function enqueueAgentAtomBlock(
-  fork: ForkMemoryState,
+  fork: ForkWindowState,
   args: {
     timestamp: number
     agentId: string
     role: string
     atoms: readonly AgentAtom[]
   },
-): ForkMemoryState {
+): ForkWindowState {
   if (args.atoms.length === 0) return fork
 
-  const last = fork.queuedEntries[fork.queuedEntries.length - 1]
+  const last = fork.queuedTimeline[fork.queuedTimeline.length - 1]
   if (
     last
-    && last.lane === 'timeline'
     && last.entry.kind === 'agent_block'
     && last.entry.agentId === args.agentId
   ) {
@@ -235,7 +175,7 @@ function enqueueAgentAtomBlock(
       atoms: [...last.entry.atoms, ...args.atoms],
     })
 
-    const mergedQueued: QueuedEntry = {
+    const mergedQueued: QueuedTimelineEntry = {
       ...last,
       timestamp: Math.min(last.timestamp, args.timestamp),
       entry: mergedEntry,
@@ -243,7 +183,7 @@ function enqueueAgentAtomBlock(
 
     return {
       ...fork,
-      queuedEntries: [...fork.queuedEntries.slice(0, -1), mergedQueued],
+      queuedTimeline: [...fork.queuedTimeline.slice(0, -1), mergedQueued],
     }
   }
 
@@ -325,24 +265,9 @@ function findTaskForAgent(state: TaskGraphState, args: { agentId: string, forkId
   return null
 }
 
-function getAgentDefinitionForFork(read: <T>(projection: T) => any, forkId: string | null) {
-  if (forkId === null) return getAgentDefinition('leader')
-  const role = getAgentByForkId(read(AgentStatusProjection), forkId)?.role
-  return role && isRoleId(role) ? getAgentDefinition(role) : undefined
-}
 
-function toToolErrorResult(args: {
-  toolName: string
-  status: Extract<TurnResultItem, { kind: 'tool_error' }>['status']
-  message?: string
-}): TurnResultItem {
-  return {
-    kind: 'tool_error',
-    toolName: args.toolName,
-    status: args.status,
-    message: args.message,
-  }
-}
+
+
 
 function describeProviderNotReady(detail: ProviderNotReadyDetail): string {
   switch (detail._tag) {
@@ -379,58 +304,24 @@ function describeSafetyStop(reason: SafetyStopReason): string {
   }
 }
 
-function transformMessage(message: Message, timezone: string | null, perspective: Perspective, supportsVision: boolean): LLMMessage {
-  const content = message.type === 'inbox'
-    ? formatInbox({ results: message.results, timeline: message.timeline, timezone, supportsVision })
-    : message.content
-
-  if (message.type === 'compacted') {
-    return { role: 'user', content: wrapTextParts(content, text => compactionSummaryTag(text)) }
-  }
-
-  switch (perspective) {
-    case 'agent':
-      switch (message.source) {
-        case 'agent': return { role: 'assistant', content }
-        case 'system': return { role: 'user', content }
-      }
-    case 'autopilot':
-      switch (message.source) {
-        case 'agent': return { role: 'user', content: wrapTextParts(content, text => `<agent>\n${text}\n</agent>`) }
-        case 'system': return { role: 'user', content }
-      }
-  }
-}
-
-export function getView(messages: readonly Message[], timezone: string | null, perspective: Perspective, supportsVision: boolean): LLMMessage[] {
-  return messages.map(msg => transformMessage(msg, timezone, perspective, supportsVision))
-}
-
-export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryState>()({
-  name: 'Memory',
-  reads: [AgentStatusProjection, SubagentActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection] as const,
+export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowState>()({
+  name: 'Window',
+  reads: [AgentStatusProjection, SubagentActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection, CanonicalTurnProjection] as const,
   ambients: [SkillsAmbient] as const,
   signals: {},
   initialFork: {
     messages: [],
-    queuedEntries: [],
+    queuedTimeline: [],
     currentTurnId: null,
     currentChainId: null,
     pendingPresenceText: null,
     nextQueueSeq: 0,
-    pendingResultItems: [],
-    pendingParentMessages: new Map(),
-    workingParts: [],
-    workingThoughtText: null,
-    workingMessageId: null,
-    workingMessageText: null,
-    workingToolCallNames: new Map(),
   },
 
   eventHandlers: {
     session_initialized: ({ event, fork }) => {
       const content = buildSessionContextContent(event.context)
-      const sessionMsg: Message = { type: 'session_context', source: 'system', content: textParts(content) }
+      const sessionMsg: WindowEntry = { type: 'session_context', source: 'system', content: textParts(content) }
       return { ...fork, messages: [sessionMsg, ...fork.messages] }
     },
 
@@ -480,212 +371,15 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
       const flushProducedInbox = messages.length > preFlushMessageCount
       const lastMessage = messages[messages.length - 1]
       if (!flushProducedInbox && lastMessage?.source === 'agent') {
-        messages = [...messages, { type: 'inbox', source: 'system', results: [toResultNoop()], outcomes: [toResultNoop()], timeline: [] }]
+        messages = [...messages, { type: 'context', source: 'system', timeline: [] }]
       }
 
       return {
-        ...resetPendingTurnState(flushed),
+        ...flushed,
         messages,
         currentTurnId: event.turnId,
         currentChainId: event.chainId,
         pendingPresenceText: null,
-      }
-    },
-
-    thinking_start: ({ event, fork }) => {
-      if (fork.currentTurnId !== event.turnId) return fork
-      return { ...fork, workingThoughtText: '' }
-    },
-
-    thinking_chunk: ({ event, fork }) => {
-      if (fork.currentTurnId !== event.turnId) return fork
-      if (fork.workingThoughtText === null) return fork
-      return { ...fork, workingThoughtText: fork.workingThoughtText + event.text }
-    },
-
-    thinking_end: ({ event, fork }) => {
-      if (fork.currentTurnId !== event.turnId) return fork
-      if (fork.workingThoughtText === null) return fork
-      const part: ThoughtPart = {
-        type: 'thought',
-        id: `thought-${fork.workingParts.length}`,
-        level: 'medium',
-        text: fork.workingThoughtText,
-      }
-      return {
-        ...fork,
-        workingParts: [...fork.workingParts, part],
-        workingThoughtText: null,
-      }
-    },
-
-    tool_event: ({ event, fork, read }) => {
-      if (fork.currentTurnId !== event.turnId) return fork
-
-      switch (event.event._tag) {
-        case 'ToolInputStarted': {
-          const names = new Map(fork.workingToolCallNames)
-          names.set(event.toolCallId, event.event.toolName)
-          return { ...fork, workingToolCallNames: names }
-        }
-
-        case 'ToolInputReady': {
-          return fork
-        }
-
-        case 'ToolExecutionStarted': {
-          const toolName = fork.workingToolCallNames.get(event.toolCallId) ?? 'unknown'
-          const part: ToolCallPart = {
-            type: 'tool_call',
-            id: event.toolCallId,
-            toolName,
-            input: event.event.input,
-          }
-          return {
-            ...fork,
-            workingParts: [...fork.workingParts, part],
-          }
-        }
-
-        case 'ToolExecutionEnded': {
-          const result = event.event.result
-          const toolName = event.event.toolName ?? event.toolKey
-          switch (result._tag) {
-            case 'Success': {
-              return {
-                ...fork,
-                pendingResultItems: [
-                  ...fork.pendingResultItems,
-                  {
-                    kind: 'tool_observation',
-                    toolName,
-                    toolCallId: event.toolCallId,
-                    content: renderToolOutput(result),
-                  },
-                ],
-              }
-            }
-            case 'Error':
-              return {
-                ...fork,
-                pendingResultItems: [
-                  ...fork.pendingResultItems,
-                  toToolErrorResult({
-                    toolName,
-                    status: 'error',
-                    message: typeof result.error === 'string' ? result.error : String(result.error),
-                  }),
-                ],
-              }
-            case 'Rejected':
-              return {
-                ...fork,
-                pendingResultItems: [
-                  ...fork.pendingResultItems,
-                  toToolErrorResult({
-                    toolName,
-                    status: 'rejected',
-                    message: typeof result.rejection === 'string' ? result.rejection : undefined,
-                  }),
-                ],
-              }
-            case 'Interrupted':
-              return {
-                ...fork,
-                pendingResultItems: [
-                  ...fork.pendingResultItems,
-                  toToolErrorResult({
-                    toolName,
-                    status: 'interrupted',
-                  }),
-                ],
-              }
-          }
-        }
-
-        default:
-          return fork
-      }
-    },
-
-    message_start: ({ event, fork }) => {
-      if (fork.currentTurnId !== event.turnId) return fork
-
-      let nextFork: ForkMemoryState = {
-        ...fork,
-        workingMessageId: event.id,
-        workingMessageText: '',
-      }
-
-      if (event.forkId === null || event.destination.kind !== 'parent') return nextFork
-
-      return {
-        ...nextFork,
-        pendingParentMessages: new Map(nextFork.pendingParentMessages).set(event.id, {
-          body: '',
-          destination: 'parent',
-        }),
-      }
-    },
-
-    message_chunk: ({ event, fork }) => {
-      if (fork.currentTurnId !== event.turnId) return fork
-
-      let nextFork = fork
-      if (fork.workingMessageId === event.id && fork.workingMessageText !== null) {
-        nextFork = {
-          ...nextFork,
-          workingMessageText: nextFork.workingMessageText + event.text,
-        }
-      }
-
-      const pending = nextFork.pendingParentMessages.get(event.id)
-      if (!pending) return nextFork
-
-      return {
-        ...nextFork,
-        pendingParentMessages: new Map(nextFork.pendingParentMessages).set(event.id, {
-          ...pending,
-          body: pending.body + event.text,
-        }),
-      }
-    },
-
-    message_end: ({ event, fork }) => {
-      if (fork.currentTurnId !== event.turnId) return fork
-
-      let nextFork: ForkMemoryState = fork
-      if (fork.workingMessageId === event.id && fork.workingMessageText !== null) {
-        const part: MessagePart = {
-          type: 'message',
-          id: event.id,
-          text: fork.workingMessageText,
-        }
-        nextFork = {
-          ...nextFork,
-          workingParts: [...nextFork.workingParts, part],
-          workingMessageId: null,
-          workingMessageText: null,
-        }
-      }
-
-      const pending = nextFork.pendingParentMessages.get(event.id)
-      if (!pending) return nextFork
-
-      const pendingParentMessages = new Map(nextFork.pendingParentMessages)
-      pendingParentMessages.delete(event.id)
-
-      return {
-        ...nextFork,
-        pendingParentMessages,
-        pendingResultItems: [
-          ...nextFork.pendingResultItems,
-          {
-            kind: 'message_ack',
-            destination: pending.destination,
-            chars: pending.body.length,
-          },
-        ],
       }
     },
 
@@ -708,165 +402,117 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
           ? (event as any).result
           : { _tag: 'SystemError' as const, message: (event as any).message ?? 'Unknown error' }
 
-      const rawResponse = ''
-      const hasAssistantContent = fork.workingParts.length > 0
+      // Read the completed turn from CanonicalTurnProjection
+      const canonical = read(CanonicalTurnProjection)
+      const completedTurn = canonical.lastCompleted
 
-      const newMessages: Message[] = [...fork.messages]
-      if (hasAssistantContent) {
-        const textContent = fork.workingParts.map(p => {
-          switch (p.type) {
-            case 'thought': return `<thought>\n${p.text}\n</thought>`
-            case 'message': return p.text
-            case 'tool_call': return `<tool_call name="${p.toolName}">${JSON.stringify(p.input)}</tool_call>`
+      // Build feedback from outcome
+      // CanonicalTurn already includes message_acks in completedTurn.feedback
+      const feedback: TurnFeedback[] = [...(completedTurn?.feedback ?? [])]
+
+      switch (outcome._tag) {
+        case 'Completed': {
+          // Check for empty response
+          const hasContent = completedTurn && completedTurn.turnId === event.turnId &&
+            (completedTurn.assistant.text || completedTurn.assistant.reasoning || completedTurn.assistant.toolCalls?.length || completedTurn.toolResults.length > 0)
+
+          if (!hasContent) {
+            feedback.push({ kind: 'error', message: EMPTY_RESPONSE_ERROR })
+          } else if (completedTurn!.toolResults.length === 0 && feedback.filter(f => f.kind === 'message_ack').length === 0) {
+            feedback.push({ kind: 'no_tools_or_messages' })
           }
-        }).join('\n\n')
 
+          for (const fb of outcome.completion.feedback) {
+            switch (fb._tag) {
+              case 'InvalidMessageDestination':
+                feedback.push({ kind: 'error', message: fb.message })
+                break
+              case 'YieldWorkerRetriggered':
+                feedback.push({ kind: 'yield_worker_retrigger' })
+                break
+            }
+          }
+          break
+        }
+
+        case 'ParseFailure':
+          feedback.push({ kind: 'error', message: outcome.error.message })
+          break
+
+        case 'ConnectionFailure':
+          feedback.push({ kind: 'error', message: describeConnectionFailure(outcome.detail) })
+          break
+
+        case 'ProviderNotReady':
+          feedback.push({ kind: 'error', message: describeProviderNotReady(outcome.detail) })
+          break
+
+        case 'ContextWindowExceeded':
+          feedback.push({ kind: 'error', message: 'Context window exceeded; waiting for compaction or context reduction.' })
+          break
+
+        case 'OutputTruncated':
+          feedback.push({ kind: 'error', message: 'Output was truncated. Respond in smaller, more bounded steps.' })
+          break
+
+        case 'SafetyStop':
+          feedback.push({ kind: 'error', message: describeSafetyStop(outcome.reason) })
+          break
+
+        case 'Cancelled':
+          feedback.push({ kind: 'interrupted' })
+          break
+
+        case 'UnexpectedError':
+          feedback.push({ kind: 'error', message: outcome.message })
+          break
+
+        case 'SystemError':
+          feedback.push({ kind: 'error', message: outcome.message })
+          break
+      }
+
+      // Build the final CompletedTurn with feedback
+      const newMessages: WindowEntry[] = [...fork.messages]
+      if (completedTurn && completedTurn.turnId === event.turnId) {
+        const turn: CompletedTurn = { ...completedTurn, feedback }
         newMessages.push({
           type: 'assistant_turn',
           source: 'agent',
-          parts: fork.workingParts,
-          content: textParts(textContent),
+          turn,
+          strategyId: event.strategyId,
+        })
+      } else if (feedback.length > 0) {
+        // No turn from canonical but we have feedback (e.g. connection failure before any output)
+        const emptyTurn: CompletedTurn = {
+          turnId: event.turnId,
+          assistant: { _tag: 'AssistantMessage' as const },
+          toolResults: [],
+          feedback,
+          estimatedTokens: 0,
+          clean: false,
+        }
+        newMessages.push({
+          type: 'assistant_turn',
+          source: 'agent',
+          turn: emptyTurn,
           strategyId: event.strategyId,
         })
       }
 
-      let nextFork: ForkMemoryState = { ...fork, messages: newMessages, currentTurnId: null }
-
-      switch (outcome._tag) {
-        case 'Completed': {
-          if (fork.pendingResultItems.length === 0) {
-            nextFork = {
-              ...nextFork,
-              pendingResultItems: [
-                ...nextFork.pendingResultItems,
-                { kind: 'no_tools_or_messages' },
-              ],
-            }
-          }
-
-          const hasSubstantivePendingResults = nextFork.pendingResultItems.some(item => item.kind !== 'no_tools_or_messages')
-
-          if (!hasAssistantContent && !hasSubstantivePendingResults) {
-            nextFork = {
-              ...nextFork,
-              messages: [
-                ...nextFork.messages,
-                {
-                  type: 'assistant_turn',
-                  source: 'agent',
-                  parts: [],
-                  content: textParts('(empty response)'),
-                  strategyId: event.strategyId,
-                },
-              ],
-            }
-            nextFork = enqueueResult(nextFork, toResultError({ message: EMPTY_RESPONSE_ERROR }), event.timestamp)
-          }
-
-          if (nextFork.pendingResultItems.length > 0) {
-            nextFork = enqueueResult(
-              nextFork,
-              toResultTurnResults({ items: nextFork.pendingResultItems }),
-              event.timestamp,
-            )
-          }
-
-          for (const feedback of outcome.completion.feedback) {
-            switch (feedback._tag) {
-              case 'InvalidMessageDestination':
-                nextFork = enqueueResult(nextFork, toResultError({ message: feedback.message }), event.timestamp)
-                break
-              case 'YieldWorkerRetriggered':
-                nextFork = enqueueResult(nextFork, { kind: 'yield_worker_retrigger' }, event.timestamp)
-                break
-            }
-          }
-
-          break
-        }
-
-        case 'ParseFailure': {
-          nextFork = enqueueResult(
-            nextFork,
-            toResultError({ message: outcome.error.message }),
-            event.timestamp,
-          )
-          break
-        }
-
-        case 'ConnectionFailure':
-          nextFork = enqueueResult(
-            nextFork,
-            toResultError({ message: describeConnectionFailure(outcome.detail) }),
-            event.timestamp,
-          )
-          break
-
-        case 'ProviderNotReady':
-          nextFork = enqueueResult(
-            nextFork,
-            toResultError({ message: describeProviderNotReady(outcome.detail) }),
-            event.timestamp,
-          )
-          break
-
-        case 'ContextWindowExceeded':
-          nextFork = enqueueResult(
-            nextFork,
-            toResultError({ message: 'Context window exceeded; waiting for compaction or context reduction.' }),
-            event.timestamp,
-          )
-          break
-
-        case 'OutputTruncated':
-          nextFork = enqueueResult(
-            nextFork,
-            toResultError({ message: 'Output was truncated. Respond in smaller, more bounded steps.' }),
-            event.timestamp,
-          )
-          break
-
-        case 'SafetyStop':
-          nextFork = enqueueResult(
-            nextFork,
-            toResultError({ message: describeSafetyStop(outcome.reason) }),
-            event.timestamp,
-          )
-          break
-
-        case 'Cancelled':
-          nextFork = enqueueResult(nextFork, toResultInterrupted(), event.timestamp)
-          break
-
-        case 'UnexpectedError':
-          nextFork = enqueueResult(
-            nextFork,
-            toResultError({ message: outcome.message }),
-            event.timestamp,
-          )
-          break
-
-        case 'SystemError':
-          nextFork = enqueueResult(
-            nextFork,
-            toResultError({ message: outcome.message }),
-            event.timestamp,
-          )
-          break
-      }
-
-      return resetPendingTurnState(flushQueue(nextFork, read(TaskGraphProjection)))
+      const nextFork: ForkWindowState = { ...fork, messages: newMessages, currentTurnId: null }
+      return flushQueue(nextFork, read(TaskGraphProjection))
     },
 
     interrupt: ({ fork }) => fork,
 
     compaction_completed: ({ event, fork }) => {
       const remainingMessages = fork.messages.slice(1 + event.compactedMessageCount)
-      const sessionContext: Message = event.refreshedContext
+      const sessionContext: WindowEntry = event.refreshedContext
         ? { type: 'session_context', source: 'system', content: textParts(buildSessionContextContent(event.refreshedContext)) }
         : fork.messages[0]
 
-      const summaryMessage: Message = { type: 'compacted', source: 'system', content: textParts(event.summary) }
+      const summaryMessage: WindowEntry = { type: 'compacted', source: 'system', content: textParts(compactionSummaryTag(event.summary)) }
       return { ...fork, messages: [sessionContext, summaryMessage, ...remainingMessages], currentChainId: null }
     },
   },
@@ -880,27 +526,20 @@ export const MemoryProjection = Projection.defineForked<AppEvent, ForkMemoryStat
     agent_created: ({ event, state }) => {
       const { forkId, parentForkId } = event
       const parentState = state.forks.get(parentForkId)
-      if (!parentState) throw new Error(`Parent fork ${parentForkId} not found in MemoryProjection`)
+      if (!parentState) throw new Error(`Parent fork ${parentForkId} not found in WindowProjection`)
 
       const normalizedContext = typeof event.context === 'string' ? event.context : ''
-      const contextMessage: Message[] = normalizedContext
+      const contextMessage: WindowEntry[] = normalizedContext
         ? [{ type: 'fork_context', source: 'system', content: textParts(normalizedContext) }]
         : []
 
-      let newForkState: ForkMemoryState = {
+      let newForkState: ForkWindowState = {
         messages: [...contextMessage],
-        queuedEntries: [],
+        queuedTimeline: [],
         currentTurnId: null,
         currentChainId: null,
         pendingPresenceText: null,
         nextQueueSeq: 0,
-        pendingResultItems: [],
-        pendingParentMessages: new Map(),
-        workingParts: [],
-        workingThoughtText: null,
-        workingMessageId: null,
-        workingMessageText: null,
-        workingToolCallNames: new Map(),
       }
 
       newForkState = enqueueTimeline(

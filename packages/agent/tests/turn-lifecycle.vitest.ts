@@ -67,7 +67,7 @@ describe('turn lifecycle', () => {
       yield* h.user('no script queued')
       const completed = yield* h.wait.turnCompleted(null)
       const chunk = yield* h.wait.event(
-        'assistant_message_delta',
+        'message_chunk',
         (e) => e.forkId === null && e.turnId === completed.turnId,
       )
 

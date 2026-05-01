@@ -37,8 +37,7 @@ const transport = makeNativeTransport(codec, driver)
 // Build a minimal memory: one user inbox message
 const memory = [
   {
-    type: 'inbox',
-    results: [],
+    type: 'context',
     timeline: [
       {
         kind:        'user_message',

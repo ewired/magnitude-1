@@ -1,8 +1,7 @@
-import type { UserPart } from '@magnitudedev/ai'
+import type { UserPart, AssistantMessage, ToolResultMessage } from '@magnitudedev/ai'
 import type { RichImagePart } from '../content'
 import type {
   ResolvedMention,
-  ToolResultStatus,
 } from '../events'
 
 
@@ -78,47 +77,6 @@ type PhaseCriteriaBase<S extends string> = {
 }
 
 // ---------------------------------------------------------------------------
-// TurnResultItem / ResultEntry
-// ---------------------------------------------------------------------------
-
-export type ToolErrorResultItem = {
-  readonly kind: 'tool_error'
-  readonly toolName: string
-  readonly status: Exclude<ToolResultStatus, 'success'>
-  readonly message?: string
-}
-
-export type ToolObservationResultItem = {
-  readonly kind: 'tool_observation'
-  readonly toolName: string
-  readonly toolCallId: string
-  readonly content: readonly UserPart[]
-}
-
-export type MessageAckResultItem = {
-  readonly kind: 'message_ack'
-  readonly destination: 'parent'
-  readonly chars: number
-}
-
-export type NoToolsOrMessagesResultItem = {
-  readonly kind: 'no_tools_or_messages'
-}
-
-export type TurnResultItem =
-  | ToolErrorResultItem
-  | ToolObservationResultItem
-  | MessageAckResultItem
-  | NoToolsOrMessagesResultItem
-
-export type ResultEntry =
-  | { readonly kind: 'turn_results'; readonly items: readonly TurnResultItem[] }
-  | { readonly kind: 'interrupted' }
-  | { readonly kind: 'error'; readonly message: string }
-  | { readonly kind: 'noop' }
-  | { readonly kind: 'yield_worker_retrigger' }
-
-// ---------------------------------------------------------------------------
 // TimelineEntry
 // ---------------------------------------------------------------------------
 
@@ -165,9 +123,28 @@ export type TimelineEntry =
   | (Timestamped<'observation'> & { readonly parts: readonly UserPart[] })
 
 // ---------------------------------------------------------------------------
+// CompletedTurn / ToolResult / TurnFeedback
+// ---------------------------------------------------------------------------
+
+export type TurnFeedback =
+  | { readonly kind: 'message_ack'; readonly destination: 'parent'; readonly chars: number }
+  | { readonly kind: 'no_tools_or_messages' }
+  | { readonly kind: 'error'; readonly message: string }
+  | { readonly kind: 'interrupted' }
+  | { readonly kind: 'yield_worker_retrigger' }
+
+export interface CompletedTurn {
+  readonly turnId: string
+  readonly assistant: AssistantMessage
+  readonly toolResults: readonly ToolResultMessage[]
+  readonly feedback: readonly TurnFeedback[]
+  readonly estimatedTokens: number
+  readonly clean: boolean
+}
+
+// ---------------------------------------------------------------------------
 // QueuedEntry
 // ---------------------------------------------------------------------------
 
 export type QueuedEntry =
-  | { readonly lane: 'result'; readonly timestamp: number; readonly seq: number; readonly entry: ResultEntry; readonly coalesceKey?: string }
   | { readonly lane: 'timeline'; readonly timestamp: number; readonly seq: number; readonly entry: TimelineEntry; readonly coalesceKey?: string }

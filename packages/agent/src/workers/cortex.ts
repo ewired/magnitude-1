@@ -18,7 +18,7 @@ import { renderToolDocs } from '../prompts/render-tool-docs'
 
 import type { AppEvent, TurnOutcome } from '../events'
 
-import { MemoryProjection } from '../projections/memory'
+import { WindowProjection } from '../projections/window'
 import { SessionContextProjection } from '../projections/session-context'
 import { AgentStatusProjection } from '../projections/agent-status'
 
@@ -27,12 +27,12 @@ import { getAgentDefinition, getForkInfo } from '../agents/registry'
 import { getToolkitForRole } from '../tools/toolkits'
 import { createHarnessAdapter } from '../execution/harness-adapter'
 import { buildSystemPrompt } from '../prompts/system-prompt-builder'
-import { memoryToPrompt } from '../prompts/memory-to-prompt'
+import { windowToPrompt } from '../prompts/window-to-prompt'
 
 import { ExecutionManager } from '../execution/types'
 import { SkillsAmbient } from '../ambient/skills-ambient'
 import { buildInterruptedTurnOutcome } from '../util/interrupt-utils'
-import type { ObservationPart } from '@magnitudedev/roles'
+import type { ObservationPart } from '../events'
 import { isToolKey, type ToolKey } from '../tools/toolkits'
 import { persistResult } from '../runtime/result-persistence'
 import { PolicyContextProviderTag } from '../agents/types'
@@ -122,7 +122,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // ──────────────────────────────────────────────────────────────────────
         const sessionCtx   = yield* read(SessionContextProjection)
         const agentState   = yield* read(AgentStatusProjection)
-        const memoryState  = yield* read(MemoryProjection, forkId)
+        const windowState  = yield* read(WindowProjection, forkId)
         // TODO(Phase 3E): Pass replay state to harness for crash recovery.
         // ReplayProjection uses turn-engine EngineState; harness uses its own EngineState.
         // Needs type migration before it can be wired through.
@@ -210,7 +210,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // ──────────────────────────────────────────────────────────────────────
         const timezone = sessionCtx.context?.timezone ?? null
         const supportsVision = agentModel.profile.capabilities.vision
-        const prompt = memoryToPrompt(memoryState, systemPrompt, timezone, supportsVision)
+        const prompt = windowToPrompt(windowState, systemPrompt, timezone, supportsVision)
 
         // ──────────────────────────────────────────────────────────────────────
         // 7. Build adapter

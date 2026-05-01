@@ -337,10 +337,10 @@ describe('ChatPersistenceService - JSON Backend', () => {
   describe('large sessions', () => {
     test('handles 1000+ events', async () => {
       const events: AppEvent[] = Array.from({ length: 1000 }, (_, i) => ({
-        type: 'assistant_message_delta' as const,
+        type: 'message_chunk' as const,
         forkId: null,
         turnId: 'turn-1',
-        messageId: `m-${i}`,
+        id: `m-${i}`,
         text: `Chunk ${i}`
       }))
 

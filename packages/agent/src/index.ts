@@ -64,9 +64,8 @@ export type { Skill } from '@magnitudedev/skills'
 export * from './workspace'
 
 // Projections
-export { MemoryProjection } from './projections/memory'
-export { getView } from './projections/memory'
-export type { Message, MessageSource, LLMMessage, Perspective, ForkMemoryState } from './projections/memory'
+export { WindowProjection } from './projections/window'
+export type { WindowEntry, WindowEntrySource, ForkWindowState } from './projections/window'
 export type { QueuedEntry } from './inbox/types'
 
 export { CompactionProjection } from './projections/compaction'

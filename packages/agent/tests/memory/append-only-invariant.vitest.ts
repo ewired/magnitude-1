@@ -38,7 +38,7 @@ describe('memory/append-only-invariant', () => {
         type: 'observations_captured',
         forkId: null,
         turnId: 'turn-obs',
-        parts: [{ _tag: 'TextPart', text: 'observation text' }],
+        parts: [{ type: 'text', text: 'observation text' }],
       })
 
       const after = yield* getRootMemory(h)
@@ -101,7 +101,7 @@ describe('memory/append-only-invariant', () => {
         type: 'observations_captured',
         forkId: null,
         turnId: 'turn-mixed',
-        parts: [{ _tag: 'TextPart', text: 'obs in mixed flow' }],
+        parts: [{ type: 'text', text: 'obs in mixed flow' }],
       })
       state = yield* getRootMemory(h)
       expect(state.messages.length).toBe(snap.refs.length + 1)

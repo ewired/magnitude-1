@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
 import { createObservable } from '@magnitudedev/roles'
-import type { ObservationPart } from '@magnitudedev/roles'
+import type { ObservationPart } from '../events'
 import { BrowserHarnessTag } from '../tools/browser-tools'
 
 export const browserObservable = createObservable({
@@ -25,7 +25,7 @@ export const browserObservable = createObservable({
     const tabText = `Current page: ${tabState.tabs[tabState.activeTab]?.url ?? 'unknown'}\nViewport: ${width}x${height}\nTabs:\n${tabLines.join('\n')}`
     return [
       { type: 'text' as const, text: tabText },
-      { type: 'image' as const, base64, mediaType: `image/${format}`, width, height },
+      { type: 'image' as const, base64, mediaType: `image/${format}` },
     ] satisfies ObservationPart[]
   })
 })

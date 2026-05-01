@@ -7,35 +7,8 @@
  * preview and send after a countdown.
  */
 
-import { Effect } from 'effect'
-import { Image as BamlImage } from '@boundaryml/baml'
 import { Worker } from '@magnitudedev/event-core'
-import type { ChatMessage } from '@magnitudedev/llm-core'
-import { logger } from '@magnitudedev/logger'
 import type { AppEvent } from '../events'
-import type { UserPart } from '@magnitudedev/ai'
-import { MemoryProjection, getView } from '../projections/memory'
-import type { LLMMessage } from '../projections/memory'
-import { SessionContextProjection } from '../projections/session-context'
-
-import { buildAutopilotSystemPrompt } from '../util/autopilot-prompts'
-/** Max recent messages to send to the autopilot LLM */
-const CONTEXT_MESSAGE_LIMIT = 10
-function toLLMContent(parts: UserPart[]): (BamlImage | string)[] {
-  return parts.map(part => {
-    switch (part._tag) {
-      case 'TextPart': return part.text
-      case 'ImagePart': return BamlImage.fromBase64(part.mediaType, part.data)
-    }
-  })
-}
-
-function toBamlMessages(messages: LLMMessage[]): ChatMessage[] {
-  return messages.map(m => ({
-    role: m.role,
-    content: toLLMContent(m.content)
-  }))
-}
 
 // =============================================================================
 // Worker

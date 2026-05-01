@@ -34,8 +34,7 @@ async function runNativeTurn(): Promise<TurnEngineEvent[]> {
 
   const memory = [
     {
-      type: 'inbox',
-      results: [],
+      type: 'context',
       timeline: [
         {
           kind:        'user_message',

@@ -8,7 +8,7 @@ import {
 } from '@magnitudedev/event-core'
 import type { AppEvent } from '../../events'
 import { AgentStatusProjection } from '../agent-status'
-import { MemoryProjection, type ForkMemoryState } from '../memory'
+import { WindowProjection, type ForkWindowState } from '../window'
 
 import { SubagentActivityProjection } from '../subagent-activity'
 import { UserPresenceProjection } from '../user-presence'
@@ -18,7 +18,7 @@ import { TaskGraphProjection } from '../task-graph'
 
 const ts = (n: number) => 1_700_100_000_000 + n
 
-describe('MemoryProjection subagent_user_killed awareness', () => {
+describe('WindowProjection subagent_user_killed awareness', () => {
   it('queues parent system notification for subagent_user_killed and flushes to system_inbox on next turn', async () => {
     const projectionBusLayer = Layer.provideMerge(
       makeProjectionBusLayer<AppEvent>(),
@@ -35,12 +35,12 @@ describe('MemoryProjection subagent_user_killed awareness', () => {
       Layer.provide(OutboundMessagesProjection.Layer, projectionBusLayer),
       Layer.provide(UserMessageResolutionProjection.Layer, projectionBusLayer),
       Layer.provide(TaskGraphProjection.Layer, projectionBusLayer),
-      Layer.provide(MemoryProjection.Layer, projectionBusLayer),
+      Layer.provide(WindowProjection.Layer, projectionBusLayer),
     )
 
     const program = Effect.gen(function* () {
       const bus = yield* ProjectionBusTag<AppEvent>()
-      const projection = yield* MemoryProjection.Tag
+      const projection = yield* WindowProjection.Tag
 
       yield* bus.processEvent({
         type: 'session_initialized',
@@ -58,7 +58,7 @@ describe('MemoryProjection subagent_user_killed awareness', () => {
         forkId: 'fork-sub',
         parentForkId: null,
         agentId: 'agent-sub',
-        role: 'builder',
+        role: 'engineer',
         name: 'Builder',
         context: 'ctx',
         mode: 'spawn',
@@ -87,16 +87,16 @@ describe('MemoryProjection subagent_user_killed awareness', () => {
       return yield* projection.getFork(null)
     })
 
-    const rootFork = await Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)) as any) as ForkMemoryState
+    const rootFork = await Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)) as any) as ForkWindowState
     expect(rootFork).toBeTruthy()
 
-    const inbox = rootFork!.messages.findLast((m: any) => m.type === 'inbox') as any
-    expect(inbox).toBeTruthy()
+    const ctx = rootFork!.messages.findLast((m: any) => m.type === 'context') as any
+    expect(ctx).toBeTruthy()
 
-    const userKilled = inbox.timeline.find((e: any) => e.kind === 'subagent_user_killed')
+    const userKilled = ctx.timeline.find((e: any) => e.kind === 'subagent_user_killed')
     expect(userKilled).toBeTruthy()
     expect(userKilled.agentId).toBe('agent-sub')
-    expect(userKilled.agentType).toBe('builder')
+    expect(userKilled.agentType).toBe('engineer')
   })
 
   it('does not queue parent subagent_user_killed notification for subagent_idle_closed', async () => {
@@ -115,12 +115,12 @@ describe('MemoryProjection subagent_user_killed awareness', () => {
       Layer.provide(OutboundMessagesProjection.Layer, projectionBusLayer),
       Layer.provide(UserMessageResolutionProjection.Layer, projectionBusLayer),
       Layer.provide(TaskGraphProjection.Layer, projectionBusLayer),
-      Layer.provide(MemoryProjection.Layer, projectionBusLayer),
+      Layer.provide(WindowProjection.Layer, projectionBusLayer),
     )
 
     const program = Effect.gen(function* () {
       const bus = yield* ProjectionBusTag<AppEvent>()
-      const projection = yield* MemoryProjection.Tag
+      const projection = yield* WindowProjection.Tag
 
       yield* bus.processEvent({
         type: 'session_initialized',
@@ -138,7 +138,7 @@ describe('MemoryProjection subagent_user_killed awareness', () => {
         forkId: 'fork-sub',
         parentForkId: null,
         agentId: 'agent-sub',
-        role: 'builder',
+        role: 'engineer',
         name: 'Builder',
         context: 'ctx',
         mode: 'spawn',
@@ -167,16 +167,16 @@ describe('MemoryProjection subagent_user_killed awareness', () => {
       return yield* projection.getFork(null)
     })
 
-    const rootFork = await Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)) as any) as ForkMemoryState
+    const rootFork = await Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)) as any) as ForkWindowState
     expect(rootFork).toBeTruthy()
 
-    const inbox = rootFork!.messages.findLast((m: any) => m.type === 'inbox') as any
-    if (!inbox) {
-      expect(inbox).toBeFalsy()
+    const ctx = rootFork!.messages.findLast((m: any) => m.type === 'context') as any
+    if (!ctx) {
+      expect(ctx).toBeFalsy()
       return
     }
 
-    const userKilled = inbox.timeline.find((e: any) => e.kind === 'subagent_user_killed')
+    const userKilled = ctx.timeline.find((e: any) => e.kind === 'subagent_user_killed')
     expect(userKilled).toBeUndefined()
   })
 })

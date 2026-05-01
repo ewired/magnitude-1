@@ -59,7 +59,7 @@ describe('ToolStateProjection', () => {
         toolKey: 'spawnWorker',
         event: {
           _tag: 'ToolInputReady',
-          input: { id: 'task-1', role: 'builder', message: 'do it' },
+          input: { id: 'task-1', role: 'engineer', message: 'do it' },
         },
       } as any,
       {
@@ -78,7 +78,7 @@ describe('ToolStateProjection', () => {
     expect(handle.toolKey).toBe('spawnWorker')
     expect(handle.state).toMatchObject({
       id: 'task-1',
-      role: 'builder',
+      role: 'engineer',
       message: 'do it',
       phase: 'executing',
     })

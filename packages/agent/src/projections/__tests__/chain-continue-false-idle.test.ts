@@ -86,7 +86,7 @@ const subagentScenario = (outcome: TurnOutcome): AppEvent[] => [
     forkId: 'fork-sub',
     parentForkId: null,
     agentId: 'agent-sub',
-    role: 'builder',
+    role: 'engineer',
     name: 'Builder',
     context: 'ctx',
     mode: 'spawn',
@@ -101,12 +101,12 @@ const subagentScenario = (outcome: TurnOutcome): AppEvent[] => [
     forkId: null,
     taskId: 'task-1',
     assignee: 'worker',
-    workerRole: 'builder',
+    workerRole: 'engineer',
     message: '',
     workerInfo: {
       agentId: 'agent-sub',
       forkId: 'fork-sub',
-      role: 'builder',
+      role: 'engineer',
     },
   } as any,
 

@@ -72,7 +72,7 @@ describe('turn control invariants', () => {
         parentForkId: null,
         agentId: 'agent-a',
         name: 'builder',
-        role: 'builder',
+        role: 'engineer',
         context: '',
         mode: 'spawn',
         taskId: 'task-a',

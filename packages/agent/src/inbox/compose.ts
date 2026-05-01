@@ -1,44 +1,14 @@
 import type { UserPart } from '@magnitudedev/ai'
 import type {
   AgentAtom,
-  ResultEntry,
   TimelineAttachment,
   TimelineEntry,
-  TurnResultItem,
 } from './types'
 
 export interface ComposeContextDeps {
   resolveAgentByForkId(
     forkId: string,
   ): { agentId: string; role: string; parentForkId: string | null } | null
-}
-
-export function toResultTurnResults(args: {
-  items: readonly TurnResultItem[]
-}): ResultEntry {
-  return {
-    kind: 'turn_results',
-    ...args,
-  }
-}
-
-export function toResultInterrupted(): ResultEntry {
-  return {
-    kind: 'interrupted',
-  }
-}
-
-export function toResultError(args: { message: string }): ResultEntry {
-  return {
-    kind: 'error',
-    ...args,
-  }
-}
-
-export function toResultNoop(): ResultEntry {
-  return {
-    kind: 'noop',
-  }
 }
 
 export function toTimelineUserMessage(args: {

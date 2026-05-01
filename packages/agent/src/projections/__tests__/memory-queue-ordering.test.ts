@@ -8,7 +8,7 @@ import {
 } from '@magnitudedev/event-core'
 import type { AppEvent } from '../../events'
 import { AgentStatusProjection } from '../agent-status'
-import { MemoryProjection, type ForkMemoryState } from '../memory'
+import { WindowProjection, type ForkWindowState } from '../window'
 import { SubagentActivityProjection } from '../subagent-activity'
 import { UserPresenceProjection } from '../user-presence'
 import { OutboundMessagesProjection } from '../outbound-messages'
@@ -33,7 +33,7 @@ const makeRuntimeLayer = () => {
     Layer.provide(OutboundMessagesProjection.Layer, projectionBusLayer),
     Layer.provide(UserMessageResolutionProjection.Layer, projectionBusLayer),
     Layer.provide(TaskGraphProjection.Layer, projectionBusLayer),
-    Layer.provide(MemoryProjection.Layer, projectionBusLayer),
+    Layer.provide(WindowProjection.Layer, projectionBusLayer),
   )
 }
 
@@ -42,7 +42,7 @@ const runEvents = async (events: AppEvent[]) => {
 
   const program = Effect.gen(function* () {
     const bus = yield* ProjectionBusTag<AppEvent>()
-    const projection = yield* MemoryProjection.Tag
+    const projection = yield* WindowProjection.Tag
 
     for (const event of events) {
       yield* bus.processEvent(event as any)
@@ -51,16 +51,16 @@ const runEvents = async (events: AppEvent[]) => {
     return yield* projection.getFork(null)
   })
 
-  return Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)) as any) as Promise<ForkMemoryState>
+  return Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)) as any) as Promise<ForkWindowState>
 }
 
-const getLastInbox = (fork: ForkMemoryState) => {
-  const inbox = [...fork.messages].reverse().find(m => m.type === 'inbox')
-  expect(inbox).toBeTruthy()
-  return inbox as Extract<ForkMemoryState['messages'][number], { type: 'inbox' }>
+const getLastContext = (fork: ForkWindowState) => {
+  const ctx = [...fork.messages].reverse().find(m => m.type === 'context')
+  expect(ctx).toBeTruthy()
+  return ctx as Extract<ForkWindowState['messages'][number], { type: 'context' }>
 }
 
-describe('MemoryProjection queue ordering regressions', () => {
+describe('WindowProjection queue ordering regressions', () => {
   it('skill_activated on root idle queues only and flushes in order on turn_started', async () => {
     const rootFork = await runEvents([
       {
@@ -78,7 +78,7 @@ describe('MemoryProjection queue ordering regressions', () => {
         forkId: 'fork-sub',
         parentForkId: null,
         agentId: 'agent-sub',
-        role: 'builder',
+        role: 'engineer',
         name: 'Builder',
         context: 'ctx',
         mode: 'spawn',
@@ -111,10 +111,10 @@ describe('MemoryProjection queue ordering regressions', () => {
       } as any,
     ])
 
-    expect(rootFork.queuedEntries).toEqual([])
-    const inbox = getLastInbox(rootFork)
-    expect(inbox.timeline.map(e => e.kind)).toEqual(['lifecycle_hook', 'subagent_user_killed', 'user_message'])
-    const user = inbox.timeline.find(e => e.kind === 'user_message')
+    expect(rootFork.queuedTimeline).toEqual([])
+    const ctx = getLastContext(rootFork)
+    expect(ctx.timeline.map(e => e.kind)).toEqual(['lifecycle_hook', 'subagent_user_killed', 'user_message'])
+    const user = ctx.timeline.find(e => e.kind === 'user_message')
     expect(user).toBeTruthy()
     expect((user as any).text).toBe('/debug issue')
   })
@@ -150,10 +150,10 @@ describe('MemoryProjection queue ordering regressions', () => {
       } as any,
     ])
 
-    expect(rootFork.queuedEntries).toEqual([])
-    const inbox = getLastInbox(rootFork)
-    expect(inbox.timeline.map(e => e.kind)).toEqual(['user_bash_command'])
-    const cmd = inbox.timeline[0] as any
+    expect(rootFork.queuedTimeline).toEqual([])
+    const ctx = getLastContext(rootFork)
+    expect(ctx.timeline.map(e => e.kind)).toEqual(['user_bash_command'])
+    const cmd = ctx.timeline[0] as any
     expect(cmd.command).toBe('pwd')
     expect(cmd.stdout).toBe('/tmp')
   })
@@ -175,7 +175,7 @@ describe('MemoryProjection queue ordering regressions', () => {
         forkId: 'fork-sub',
         parentForkId: null,
         agentId: 'agent-sub',
-        role: 'builder',
+        role: 'engineer',
         name: 'Builder',
         context: 'ctx',
         mode: 'spawn',
@@ -217,10 +217,10 @@ describe('MemoryProjection queue ordering regressions', () => {
       } as any,
     ])
 
-    expect(rootFork.queuedEntries).toEqual([])
-    const inbox = getLastInbox(rootFork)
-    expect(inbox.timeline.map(e => e.kind)).toEqual(['lifecycle_hook', 'subagent_user_killed', 'user_message'])
-    const user = inbox.timeline.find(e => e.kind === 'user_message')
+    expect(rootFork.queuedTimeline).toEqual([])
+    const ctx = getLastContext(rootFork)
+    expect(ctx.timeline.map(e => e.kind)).toEqual(['lifecycle_hook', 'subagent_user_killed', 'user_message'])
+    const user = ctx.timeline.find(e => e.kind === 'user_message')
     expect(user).toBeTruthy()
     expect((user as any).text).toBe('hello root')
   })
@@ -261,11 +261,11 @@ describe('MemoryProjection queue ordering regressions', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    expect(inbox.timeline.map(e => e.kind)).toEqual(['user_message', 'observation'])
-    expect((inbox.timeline[0] as any).text).toBe('/plan')
-    expect((inbox.timeline[1] as any).parts[0].text).toBe('obs text')
-    expect(rootFork.queuedEntries).toEqual([])
+    const ctx = getLastContext(rootFork)
+    expect(ctx.timeline.map(e => e.kind)).toEqual(['user_message', 'observation'])
+    expect((ctx.timeline[0] as any).text).toBe('/plan')
+    expect((ctx.timeline[1] as any).parts[0].text).toBe('obs text')
+    expect(rootFork.queuedTimeline).toEqual([])
   })
 
   it('turn_outcome queues + flushes immediately and clears currentTurnId', async () => {
@@ -304,12 +304,11 @@ describe('MemoryProjection queue ordering regressions', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    expect(inbox.outcomes.map(r => r.kind)).toEqual(['error'])
-    expect((inbox.outcomes[0] as any).message).toBe('boom')
-    expect(inbox.timeline.map(e => e.kind)).toEqual(['user_message'])
-    expect((inbox.timeline[0] as any).text).toBe('/review')
-    expect(rootFork.queuedEntries).toEqual([])
+    const ctx = getLastContext(rootFork)
+    // Tool results now live on CompletedTurn, not context entries
+    expect(ctx.timeline.map(e => e.kind)).toEqual(['user_message'])
+    expect((ctx.timeline[0] as any).text).toBe('/review')
+    expect(rootFork.queuedTimeline).toEqual([])
     expect(rootFork.currentTurnId).toBeNull()
   })
 
@@ -358,11 +357,10 @@ describe('MemoryProjection queue ordering regressions', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    expect(inbox.outcomes.map(r => r.kind)).toEqual(['error'])
-    expect((inbox.outcomes[0] as any).message).toBe('turn failed')
-    expect(inbox.timeline.map(e => e.kind)).toEqual(['user_message'])
-    expect((inbox.timeline[0] as any).text).toBe('/plan')
-    expect(rootFork.queuedEntries).toEqual([])
+    const ctx = getLastContext(rootFork)
+    // Tool results now live on CompletedTurn, not context entries
+    expect(ctx.timeline.map(e => e.kind)).toEqual(['user_message'])
+    expect((ctx.timeline[0] as any).text).toBe('/plan')
+    expect(rootFork.queuedTimeline).toEqual([])
   })
 })
