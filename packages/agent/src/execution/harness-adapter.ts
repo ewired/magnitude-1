@@ -302,7 +302,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
               inputTokens: event.usage.inputTokens ?? null,
               outputTokens: event.usage.outputTokens ?? null,
               cacheReadTokens: event.usage.cacheReadTokens ?? null,
-              cacheWriteTokens: null,
+              cacheWriteTokens: event.usage.cacheWriteTokens ?? null,
             }
           }
 

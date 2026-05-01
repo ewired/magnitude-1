@@ -82,7 +82,6 @@ import { publishConfigFromMagnitude } from './ambient/config-ambient'
 import { loadSkills } from '@magnitudedev/skills'
 import { SkillsAmbient, publishSkills } from './ambient/skills-ambient'
 
-
 // =============================================================================
 // Agent
 // =============================================================================

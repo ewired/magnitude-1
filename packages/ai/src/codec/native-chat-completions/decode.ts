@@ -59,6 +59,7 @@ function toUsage(
     inputTokens: usage.prompt_tokens,
     outputTokens: usage.completion_tokens,
     cacheReadTokens: usage.prompt_tokens_details?.cached_tokens ?? 0,
+    cacheWriteTokens: 0,
   }
 }
 
