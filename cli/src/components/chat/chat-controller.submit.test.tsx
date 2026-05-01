@@ -71,7 +71,7 @@ function makeProps(overrides: Partial<ChatControllerProps> = {}): ChatController
       hasRunningForks: false,
       bashMode: false,
       modelsConfigured: true,
-      modelSummary: { provider: 'provider', model: 'model' },
+      modelSummary: { role: 'role', model: 'model' },
       tokenUsage: null,
       contextHardCap: null,
       isCompacting: false,

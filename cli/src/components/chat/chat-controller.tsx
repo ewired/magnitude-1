@@ -179,8 +179,6 @@ export function ChatController(props: ChatControllerProps) {
   const [nextEscWillKillAll, setNextEscWillKillAll] = useState(false)
   const killAllTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const [isProviderHovered, setIsProviderHovered] = useState(false)
-  const [isModelHovered, setIsModelHovered] = useState(false)
   const [pendingKillForkId, setPendingKillForkId] = useState<string | null>(null)
   const [isKillCancelHovered, setIsKillCancelHovered] = useState(false)
   const [isKillConfirmHovered, setIsKillConfirmHovered] = useState(false)
@@ -592,21 +590,11 @@ export function ChatController(props: ChatControllerProps) {
               <box style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
                 {env.bashMode ? (
                   <text style={{ fg: orange[400] }} attributes={TextAttributes.BOLD}>Bash Mode</text>
-                ) : env.isSubagentView ? (
-                  <>
-                    <text style={{ fg: env.theme.muted }}>{env.modelSummary?.provider ?? '-'}</text>
-                    <text style={{ fg: env.theme.muted }}> {'\u00b7'} </text>
-                    <text style={{ fg: env.theme.foreground }}>{env.modelSummary?.model ?? '-'}</text>
-                  </>
                 ) : (
                   <>
-                    <Button onClick={() => services.openSettings()} onMouseOver={() => setIsProviderHovered(true)} onMouseOut={() => setIsProviderHovered(false)}>
-                      <text style={{ fg: isProviderHovered ? env.theme.primary : env.theme.muted }}>{env.modelSummary?.provider ?? 'No provider'}</text>
-                    </Button>
+                    <text style={{ fg: env.theme.muted }}>{env.modelSummary?.role ?? '-'}</text>
                     <text style={{ fg: env.theme.muted }}> {'\u00b7'} </text>
-                    <Button onClick={() => services.openSettings()} onMouseOver={() => setIsModelHovered(true)} onMouseOut={() => setIsModelHovered(false)}>
-                      <text style={{ fg: isModelHovered ? env.theme.primary : env.theme.foreground }}>{env.modelSummary?.model ?? 'No model'}</text>
-                    </Button>
+                    <text style={{ fg: env.theme.foreground }}>{env.modelSummary?.model ?? '-'}</text>
                   </>
                 )}
               </box>

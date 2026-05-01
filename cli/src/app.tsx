@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleContextWindows, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleProfiles, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot, type RoleProfile } from '@magnitudedev/agent'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
 import { JsonChatPersistence, loadSessionSummary } from './persistence'
@@ -162,8 +162,8 @@ function AppInner({
   const systemMessageTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [showRecentChatsOverlay, setShowRecentChatsOverlay] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [roleContextWindows, setRoleContextWindows] = useState<Partial<Record<RoleId, number>> | null>(null)
-  const contextHardCap = roleContextWindows?.leader ?? null
+  const [roleProfiles, setRoleProfiles] = useState<Partial<Record<RoleId, RoleProfile>> | null>(null)
+  const contextHardCap = roleProfiles?.leader?.contextWindow ?? null
 
   const [bashMode, setBashMode] = useState(false)
   const [bashOutputs, setBashOutputs] = useState<BashResult[]>([])
@@ -241,11 +241,11 @@ function AppInner({
   useEffect(() => {
     if (!auth.loaded || !auth.key) return
     let cancelled = false
-    fetchRoleContextWindows(auth.key)
-      .then(map => {
-        if (!cancelled) setRoleContextWindows(map)
+    fetchRoleProfiles(auth.key)
+      .then(profiles => {
+        if (!cancelled) setRoleProfiles(profiles)
       })
-      .catch(err => logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'Failed to load role context windows'))
+      .catch(err => logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'Failed to load role profiles'))
     return () => { cancelled = true }
   }, [auth.loaded, auth.key])
 
@@ -580,20 +580,23 @@ function AppInner({
     return ROLE_IDS.map(id => ({
       id,
       description: roles[id].description,
-      model: 'magnitude/' + id,
+      modelDisplayName: roleProfiles?.[id]?.modelDisplayName ?? null,
     }))
-  }, [])
+  }, [roleProfiles])
 
-  // Model summary derived from agent status (role-based, no provider lookup)
+  const labelForRole = (id: RoleId): string => id.charAt(0).toUpperCase() + id.slice(1)
+  const modelNameForRole = (id: RoleId): string => roleProfiles?.[id]?.modelDisplayName ?? '-'
+
   const activeModelSummary = useMemo(() => {
-    if (!selectedForkId || !agentStatusState) {
-      return { provider: 'Magnitude', model: 'leader' }
-    }
-    const agentId = agentStatusState.agentByForkId.get(selectedForkId)
-    const agent = agentId ? agentStatusState.agents.get(agentId) : undefined
-    if (!agent) return { provider: 'Magnitude', model: 'leader' }
-    return { provider: 'Magnitude', model: agent.role }
-  }, [selectedForkId, agentStatusState])
+    const role: RoleId = (() => {
+      if (!selectedForkId || !agentStatusState) return 'leader'
+      const agentId = agentStatusState.agentByForkId.get(selectedForkId)
+      const agent = agentId ? agentStatusState.agents.get(agentId) : undefined
+      const r = agent?.role
+      return r && (ROLE_IDS as readonly string[]).includes(r) ? (r as RoleId) : 'leader'
+    })()
+    return { role: labelForRole(role), model: modelNameForRole(role) }
+  }, [selectedForkId, agentStatusState, roleProfiles])
 
   // Vision support — assume true since Magnitude handles model capabilities server-side
   const activeModelSupportsVision = true
@@ -608,10 +611,10 @@ function AppInner({
 
   const forkModelSummary = useMemo(() => {
     if (!forkRole) return null
-    return { provider: 'Magnitude', model: forkRole }
-  }, [forkRole])
+    return { role: labelForRole(forkRole), model: modelNameForRole(forkRole) }
+  }, [forkRole, roleProfiles])
 
-  const forkContextHardCap = forkRole ? (roleContextWindows?.[forkRole] ?? null) : null
+  const forkContextHardCap = forkRole ? (roleProfiles?.[forkRole]?.contextWindow ?? null) : null
 
   const mainTimelineMessages = useMemo(
     () => (activeDisplay?.messages ?? []).filter(m => {

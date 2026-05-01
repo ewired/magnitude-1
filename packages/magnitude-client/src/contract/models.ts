@@ -19,6 +19,7 @@ export interface ModelCapabilities {
 
 export interface MagnitudeModelInfo {
   readonly id: string
+  readonly displayName: string
   readonly object: "model"
   readonly owned_by: string
   readonly roles: readonly RoleId[]

@@ -17,7 +17,7 @@ interface ForkDetailOverlayProps {
   forkRole: string
   onClose: () => void
   onForkExpand?: (forkId: string) => void
-  modelSummary: { provider: string; model: string } | null
+  modelSummary: { role: string; model: string } | null
   contextHardCap: number | null
   workspacePath: string | null
   projectRoot: string
@@ -234,7 +234,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
       <box style={{ flexShrink: 0, paddingTop: 1, paddingLeft: 2, paddingRight: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
         <box style={{ flexDirection: 'row', alignItems: 'center' }}>
           <text>
-            <span fg={theme.muted}>{modelSummary?.provider ?? '—'}</span>
+            <span fg={theme.muted}>{modelSummary?.role ?? '—'}</span>
             <span fg={theme.muted}> {'\u00b7'} </span>
             <span fg={theme.foreground}>{modelSummary?.model ?? '—'}</span>
           </text>

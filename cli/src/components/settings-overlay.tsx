@@ -13,7 +13,7 @@ interface SettingsOverlayProps {
   roles: ReadonlyArray<{
     id: string
     description: string
-    model: string
+    modelDisplayName: string | null
   }>
 }
 
@@ -343,17 +343,22 @@ export const SettingsOverlay = memo(function SettingsOverlay({
           contentOptions: { paddingLeft: 2, paddingRight: 2 },
         }}
       >
-        {roles.map((role) => (
-          <box key={role.id} style={{ flexDirection: 'column', paddingBottom: 1 }}>
-            <text style={{ fg: theme.primary }}>
-              <span attributes={TextAttributes.BOLD}>{role.id}</span>
-              <span style={{ fg: theme.muted }}>{', '}{role.description}</span>
-            </text>
-            <text style={{ fg: theme.muted }}>
-              <span attributes={TextAttributes.DIM}>{'  '}{role.model}</span>
-            </text>
-          </box>
-        ))}
+        {roles.map((role) => {
+          const roleLabel = role.id.charAt(0).toUpperCase() + role.id.slice(1)
+          return (
+            <box key={role.id} style={{ flexDirection: 'column', paddingBottom: 1 }}>
+              <text style={{ fg: theme.primary }}>
+                <span attributes={TextAttributes.BOLD}>{roleLabel}</span>
+                {role.modelDisplayName && (
+                  <span style={{ fg: theme.muted }}>{' · '}{role.modelDisplayName}</span>
+                )}
+              </text>
+              <text style={{ fg: theme.muted }}>
+                <span attributes={TextAttributes.DIM}>{role.description}</span>
+              </text>
+            </box>
+          )
+        })}
       </scrollbox>
     </box>
   )

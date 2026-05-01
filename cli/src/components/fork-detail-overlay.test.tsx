@@ -100,7 +100,7 @@ function propsWithDisplay(display: DisplayState) {
     forkRole: 'builder',
     onClose: noop,
     onForkExpand: noop,
-    modelSummary: { provider: 'provider', model: 'model' },
+    modelSummary: { role: 'role', model: 'model' },
     contextHardCap: null,
     workspacePath: '/tmp',
     projectRoot: '/tmp',

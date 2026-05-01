@@ -10,7 +10,7 @@ export type ChatControllerEnv = {
   hasRunningForks: boolean
   bashMode: boolean
   modelsConfigured: boolean
-  modelSummary: { provider: string; model: string } | null
+  modelSummary: { role: string; model: string } | null
   tokenUsage: number | null
   contextHardCap: number | null
   isCompacting: boolean

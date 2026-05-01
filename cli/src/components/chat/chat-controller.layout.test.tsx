@@ -185,7 +185,7 @@ function makeProps(): ChatControllerProps {
       hasRunningForks: false,
       bashMode: false,
       modelsConfigured: true,
-      modelSummary: { provider: 'provider', model: 'model' },
+      modelSummary: { role: 'role', model: 'model' },
       tokenUsage: 0,
       contextHardCap: null,
       isCompacting: false,

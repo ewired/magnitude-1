@@ -21,7 +21,7 @@ export type AppOverlaysProps = {
   roles: ReadonlyArray<{
     id: string
     description: string
-    model: string
+    modelDisplayName: string | null
   }>
 
   showRecentChatsOverlay: boolean
@@ -34,7 +34,7 @@ export type AppOverlaysProps = {
   expandedForkId: string | null
   client: AgentClient | null
   agentStatusState: AgentStatusState | null
-  forkModelSummary: { provider: string; model: string } | null
+  forkModelSummary: { role: string; model: string } | null
   forkContextHardCap: number | null
   popForkOverlay: () => void
   pushForkOverlay: (forkId: string) => void
