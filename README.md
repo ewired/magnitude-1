@@ -10,11 +10,12 @@
   <strong>Opinionated coding agent for open models</strong>
 </p>
 
-Magnitude gets the most out of open models for coding. We do the testing, tuning, and curation so you don't have to. You get a coding agent that just works, on the best open models, for $20/month.
+Magnitude gets the most out of open models for coding. We continuously test and tweak our setup so you don't have to. 
 
-- **Specialized agents.** Each running on the open model best suited to its role.
-- **Best models, always.** We benchmark constantly. New model wins, you get it.
-- **Verified providers.** Only the ones serving the models correctly and fast.
+- **Multi-model** - GLM 5.1, Kimi K2.6, DeepSeek V4, all used for the right job
+- **Verified providers** - Only the ones serving the models correctly and fast
+- **Opinionated** - We continuously test and lean into model capabilities
+- **Sustainable** - No wild inference subsidization. Built for what comes next
 
 <p align="center">
   <img src="interface.png" alt="Magnitude interface" width="100%" />
@@ -28,7 +29,7 @@ Magnitude gets the most out of open models for coding. We do the testing, tuning
 
 3 day free trial, no card required. Add a card to continue at $20/month.
 
-> If you are on Windows, you will need to use `wsl`. We do not have native Windows support yet.
+> If you are on Windows, you will need to use `wsl`.
 
 ## Specialized agents
 
