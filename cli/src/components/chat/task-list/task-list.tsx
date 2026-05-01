@@ -378,10 +378,7 @@ function TaskRow({
             </text>
           ) : null}
           {layout.showTokens && tokensLabel ? (
-            <text style={{ fg: task.assignee.kind === 'worker' && task.assignee.tone === 'muted' ? theme.muted : theme.foreground }}>
-              <span fg={theme.muted}>{' · '}</span>
-              <span fg={task.assignee.kind === 'worker' && task.assignee.tone === 'muted' ? theme.muted : theme.foreground}>{tokensLabel}</span>
-            </text>
+            <text style={{ fg: theme.muted }}>{` · ${tokensLabel}`}</text>
           ) : null}
         </box>
       ) : null}
