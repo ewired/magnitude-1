@@ -12,14 +12,14 @@ import type { FolderNode } from './tree'
 
 // Token costs
 const REMAINDER_COST = 5 // tokens for "... (N more)\n"
-import { CHARS_PER_TOKEN } from '../constants'
+import { CHARS_PER_TOKEN_UPPER } from '../constants'
 
 export type { FolderNode }
 
 /** Format a byte count as a human-readable token annotation */
 function formatTokenAnnotation(totalBytes: number): string {
   if (totalBytes === 0) return ''
-  const tokens = Math.round(totalBytes / CHARS_PER_TOKEN)
+  const tokens = Math.round(totalBytes / CHARS_PER_TOKEN_UPPER)
   if (tokens < 1000) return ` (~${tokens} tok)`
   return ` (~${Math.round(tokens / 1000)}k tok)`
 }
@@ -29,7 +29,7 @@ function formatTokenAnnotation(totalBytes: number): string {
  */
 function folderLineCost(depth: number, name: string, totalBytes: number = 0): number {
   const annotation = formatTokenAnnotation(totalBytes)
-  return Math.ceil((depth * 2 + name.length + 1 + annotation.length + 1) / CHARS_PER_TOKEN)
+  return Math.ceil((depth * 2 + name.length + 1 + annotation.length + 1) / CHARS_PER_TOKEN_UPPER)
 }
 
 /**

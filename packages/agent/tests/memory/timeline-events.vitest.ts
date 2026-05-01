@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { TestHarness, TestHarnessLive } from '../../src/test-harness/harness'
-import { getView } from '../../src/projections/memory'
+import { windowToPrompt } from '../../src/prompts/window-to-prompt'
 import { getRootMemory, inboxMessages, lastInboxMessage, getRenderedUserText } from './helpers'
 
 describe('memory/timeline-events', () => {
@@ -16,7 +16,7 @@ describe('memory/timeline-events', () => {
         parentForkId: null,
         agentId: 'builder-auth',
         name: 'builder-auth',
-        role: 'builder',
+        role: 'engineer',
         context: '',
         mode: 'spawn',
         taskId: 'task-sub-1',
@@ -36,7 +36,7 @@ describe('memory/timeline-events', () => {
         strategyId: 'xml-act',
 
 
-        outcome: { _tag: 'Completed', completion: { yieldTarget: 'user', feedback: [] } },
+        outcome: { _tag: 'Completed', completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] } },
         inputTokens: null,
         outputTokens: null,
         cacheReadTokens: null,
@@ -57,8 +57,8 @@ describe('memory/timeline-events', () => {
 
       const memory = yield* getRootMemory(h)
       const inbox = lastInboxMessage(memory)
-      expect(inbox?.type).toBe('inbox')
-      if (inbox?.type === 'inbox') {
+      expect(inbox?.type).toBe('context')
+      if (inbox?.type === 'context') {
         const blocks = inbox.timeline.filter(t => t.kind === 'agent_block')
         expect(blocks.length).toBeGreaterThan(0)
       }
@@ -78,7 +78,7 @@ describe('memory/timeline-events', () => {
       yield* h.send({ type: 'turn_started', forkId: null, turnId: 't-presence-1', chainId: 'c-presence-1' })
 
       const after = yield* getRootMemory(h)
-      const timeline = inboxMessages(after).flatMap(m => m.type === 'inbox' ? m.timeline : [])
+      const timeline = inboxMessages(after).flatMap(m => m.type === 'context' ? m.timeline : [])
       expect(timeline.some(t => t.kind === 'user_presence')).toBe(true)
 
       const rendered = yield* getRenderedUserText(h)
@@ -103,7 +103,8 @@ describe('memory/timeline-events', () => {
         outcome: {
           _tag: 'Completed',
           completion: {
-            yieldTarget: 'user',
+            toolCallsCount: 0,
+            finishReason: 'stop',
             feedback: [{ _tag: 'InvalidMessageDestination', destination: 'unknown', message: 'follow up on deployment checks' }],
           },
         },
@@ -118,9 +119,12 @@ describe('memory/timeline-events', () => {
 
       const memory = yield* getRootMemory(h)
       const inbox = lastInboxMessage(memory)
-      expect(inbox?.type).toBe('inbox')
-      if (inbox?.type === 'inbox') {
-        expect(inbox.outcomes.some(r => r.kind === 'error' && r.message.includes('follow up on deployment checks'))).toBe(true)
+      expect(inbox?.type).toBe('context')
+      // Turn errors/feedback now live on the assistant_turn's CompletedTurn
+      const assistantTurn = memory.messages.find(m => m.type === 'assistant_turn')
+      expect(assistantTurn).toBeDefined()
+      if (assistantTurn?.type === 'assistant_turn') {
+        expect(assistantTurn.turn.feedback.some(f => f.kind === 'error')).toBe(true)
       }
 
       const rendered = yield* getRenderedUserText(h)
@@ -139,7 +143,7 @@ describe('memory/timeline-events', () => {
         turnId: 't-obs-1',
         parts: [
           { type: 'text', text: 'saw important output' },
-          { type: 'image', base64: 'aGVsbG8=', mediaType: 'image/png', width: 10, height: 10 },
+          { type: 'image', base64: 'aGVsbG8=', mediaType: 'image/png' },
         ],
       })
 
@@ -149,19 +153,20 @@ describe('memory/timeline-events', () => {
       const last = allInbox[allInbox.length - 1]
       const prev = allInbox.length > 1 ? allInbox[allInbox.length - 2] : undefined
 
-      expect(last?.type).toBe('inbox')
-      if (last?.type === 'inbox') {
+      expect(last?.type).toBe('context')
+      if (last?.type === 'context') {
         expect(last.timeline.some(t => t.kind === 'observation')).toBe(true)
       }
-      if (prev && prev.type === 'inbox') {
+      if (prev && prev.type === 'context') {
         expect(prev.timeline.some(t => t.kind === 'observation')).toBe(false)
       }
 
-      const rendered = getView(memory.messages, 'UTC', 'agent', true)
-        .filter(m => m.role === 'user')
-        .flatMap(m => m.content)
-      const hasObservationText = rendered.some(p => p.type === 'text' && p.text.includes('saw important output'))
-      const hasImage = rendered.some(p => p.type === 'image')
+      const prompt = windowToPrompt(memory, '', 'UTC', true)
+      const rendered = prompt.messages
+        .filter(m => m._tag === 'UserMessage')
+        .flatMap(m => m.parts)
+      const hasObservationText = rendered.some(p => p._tag === 'TextPart' && p.text.includes('saw important output'))
+      const hasImage = rendered.some(p => p._tag === 'ImagePart')
       expect(hasObservationText).toBe(true)
       expect(hasImage).toBe(true)
     }).pipe(Effect.provide(TestHarnessLive()))

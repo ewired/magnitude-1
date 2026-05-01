@@ -1,6 +1,5 @@
 import { Effect } from 'effect'
-import { TraceEmitter, TracePersister } from '@magnitudedev/providers'
-import type { TraceInput } from '@magnitudedev/providers/src/resolver/tracing'
+import { TraceEmitter, TracePersister, type TraceInput } from './tracing'
 import type { AgentTraceMeta } from '@magnitudedev/tracing'
 
 export interface TraceScope {

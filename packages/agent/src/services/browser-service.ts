@@ -8,7 +8,6 @@
 
 import { Context, Effect, Layer } from 'effect'
 import { WebHarness, BrowserProvider, type WebHarnessOptions } from '@magnitudedev/browser-harness'
-import { ProviderState } from '@magnitudedev/providers'
 
 export interface BrowserServiceShape {
   readonly get: (forkId: string) => Effect.Effect<WebHarness>
@@ -23,7 +22,6 @@ export class BrowserService extends Context.Tag('BrowserService')<
 export const BrowserServiceLive = Layer.scoped(
   BrowserService,
   Effect.gen(function* () {
-    const providerState = yield* ProviderState
     const harnesses = new Map<string, WebHarness>()
 
     yield* Effect.addFinalizer(() =>

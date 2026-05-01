@@ -236,7 +236,7 @@ function getEventSummary(event: AppEvent): string {
   switch (event.type) {
     case 'user_message': return truncate(textOf(event.content), 40)
     case 'turn_started': return `turn=${event.turnId.slice(0, 8)}`
-    case 'turn_completed': return event.result.success ? 'success' : `error: ${event.result.error}`
+    case 'turn_outcome': return `outcome`
     case 'tool_event': return `${event.toolKey} ${event.event._tag}`
     case 'agent_created': return event.name
     case 'message_end': return ''

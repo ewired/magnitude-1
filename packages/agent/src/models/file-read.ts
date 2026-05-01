@@ -1,20 +1,19 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { readTool } from '../tools/fs'
 
 export interface FileReadState extends BaseState {
-  toolKey: 'fileRead'
   path?: string
   lineCount?: number
   errorDetail?: string
 }
 
-const initial: Omit<FileReadState, 'phase' | 'toolKey'> = {
+const initial: Omit<FileReadState, 'phase'> = {
   path: undefined,
   lineCount: undefined,
   errorDetail: undefined,
 }
 
-export const fileReadModel = defineStateModel('fileRead', readTool)({
+export const fileReadModel = defineStateModel(readTool)<FileReadState>({
   initial,
   reduce: (state, event): FileReadState => {
     switch (event._tag) {
@@ -25,23 +24,25 @@ export const fileReadModel = defineStateModel('fileRead', readTool)({
           ? { ...state, phase: 'streaming', path: (state.path ?? '') + event.delta }
           : state
       case 'ToolInputReady':
-        return { ...state, phase: 'streaming', path: event.input.path }
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return { ...state, phase: 'executing', path: event.input.path ?? state.path }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':
-            return { ...state, phase: 'completed', lineCount: (event.result.output as string).split('\n').length }
+            return { ...state, phase: 'completed', lineCount: event.result.output.split('\n').length }
           case 'Error':
-            return { ...state, phase: 'error', errorDetail: event.result.error }
+            return { ...state, phase: 'error', errorDetail: event.result.error.message }
           case 'Rejected':
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error', errorDetail: event.error }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorDetail: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

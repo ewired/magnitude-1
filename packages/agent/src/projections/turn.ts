@@ -12,8 +12,8 @@ import { Data } from 'effect'
 import { logger } from '@magnitudedev/logger'
 import { outcomeWillChainContinue } from '../events'
 import type { AppEvent, TurnOutcomeEvent } from '../events'
-import type { ToolKey } from '../catalog'
-import type { ToolResult } from '@magnitudedev/xml-act'
+import type { ToolKey } from '../tools/toolkits'
+import type { ToolResult } from '@magnitudedev/harness'
 import { AgentRoutingProjection } from './agent-routing'
 import { UserMessageResolutionProjection } from './user-message-resolution'
 import { CompactionProjection } from './compaction'
@@ -38,7 +38,6 @@ export type TurnTrigger =
   | { readonly _tag: 'chain_continue'; readonly chainId: string }
   | { readonly _tag: 'subagent_completed'; readonly agentId: string; readonly turnId: string }
   | { readonly _tag: 'wake' }
-  | { readonly _tag: 'oneshot' }
   | { readonly _tag: 'agent_created'; readonly agentId: string }
 
 export interface PendingInboundCommunication {
@@ -100,9 +99,9 @@ function toPreview(text: string): string {
   return normalized.slice(0, 117) + '...'
 }
 
-function extractTextFromParts(parts: readonly { readonly type: string; readonly text?: string }[]): string {
+function extractTextFromParts(parts: readonly { readonly _tag: string; readonly text?: string }[]): string {
   return parts
-    .filter((part) => part.type === 'text')
+    .filter((part) => part._tag === 'TextPart')
     .map((part) => part.text ?? '')
     .join('')
 }
@@ -188,11 +187,6 @@ export const TurnProjection = Projection.defineForked<AppEvent, TurnLifecycleSta
       })
     },
 
-    oneshot_task: ({ fork }) => {
-      const next = enqueueTrigger(fork, { _tag: 'oneshot' })
-      return next
-    },
-
     wake: ({ fork }) => {
       const next = enqueueTrigger(fork, { _tag: 'wake' })
       return next
@@ -239,46 +233,6 @@ export const TurnProjection = Projection.defineForked<AppEvent, TurnLifecycleSta
           (message) => message.source === 'user'
         ),
       })
-    },
-
-    tool_event: ({ event, fork }) => {
-      if (fork._tag !== 'active') return fork
-      if (fork.turnId !== event.turnId) return fork
-
-      switch (event.event._tag) {
-        case 'ToolInputStarted':
-          return TurnLifecycle.hold(fork, {
-            toolCalls: [
-              ...fork.toolCalls,
-              {
-                toolCallId: event.toolCallId,
-                toolKey: event.toolKey,
-                input: undefined,
-              },
-            ],
-          })
-
-        case 'ToolInputReady': {
-          const inner = event.event
-          return TurnLifecycle.hold(fork, {
-            toolCalls: fork.toolCalls.map((tc) =>
-              tc.toolCallId === event.toolCallId ? { ...tc, input: inner.input } : tc
-            ),
-          })
-        }
-
-        case 'ToolExecutionEnded': {
-          const inner = event.event
-          return TurnLifecycle.hold(fork, {
-            toolCalls: fork.toolCalls.map((tc) =>
-              tc.toolCallId === event.toolCallId ? { ...tc, result: inner.result } : tc
-            ),
-          })
-        }
-
-        default:
-          return fork
-      }
     },
 
     turn_outcome: ({ event, fork, emit }) => {

@@ -5,7 +5,7 @@
 import { access, readFile } from 'fs/promises'
 import { join } from 'path'
 import type { StorageClient } from '@magnitudedev/storage'
-import type { MagnitudeSlot } from '../model-slots'
+import type { RoleId } from '../agents/role-validation'
 import type { SessionContext, GitContext } from '../events'
 import { loadSkills } from '@magnitudedev/skills'
 import { runGitCommand } from './git-command'
@@ -168,10 +168,7 @@ async function readAgentsFile(cwd: string): Promise<{ filename: string; content:
 
 export interface CollectSessionContextOptions {
   cwd?: string
-  storage?: StorageClient<MagnitudeSlot>
-  oneshot?: {
-    prompt: string
-  }
+  storage?: StorageClient<RoleId>
 }
 
 export async function collectSessionContext(opts?: CollectSessionContextOptions): Promise<Omit<SessionContext, 'workspacePath'>> {
@@ -201,6 +198,5 @@ export async function collectSessionContext(opts?: CollectSessionContextOptions)
     folderStructure,
     agentsFile,
     skills,
-    oneshot: opts?.oneshot,
   }
 }

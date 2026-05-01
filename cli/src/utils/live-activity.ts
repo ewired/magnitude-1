@@ -17,7 +17,7 @@ function joinLabelDetail(label: string, detail: string): string {
 function getToolLiveText(step: ThinkBlockStep): string | null {
   if (step.type !== 'tool') return null
   if (step.state) {
-    const value = summarizeToolStep(step.state)
+    const value = summarizeToolStep(step.toolKey, step.state)
     if (typeof value === 'string') {
       const normalized = normalize(value)
       if (normalized.length > 0) return normalized

@@ -14,7 +14,7 @@ describe('turn-control/concurrent-signal-race', () => {
         messageId: 'race-msg',
         forkId: null,
         timestamp: Date.now(),
-        content: [{ type: 'text', text: 'hello' }],
+        content: [{ _tag: 'TextPart', text: 'hello' }],
         attachments: [],
         mode: 'text',
         synthetic: false,
@@ -41,9 +41,9 @@ describe('turn-control/concurrent-signal-race', () => {
         turnId: firstTurn.turnId,
         chainId: 'race-chain',
         strategyId: 'xml-act',
-        result: {
+        outcome: {
           _tag: 'Completed',
-          completion: { yieldTarget: 'invoke', feedback: [] },
+          completion: { toolCallsCount: 1, finishReason: 'tool_calls', feedback: [] },
         },
         inputTokens: null,
         outputTokens: null,

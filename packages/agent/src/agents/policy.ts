@@ -1,7 +1,11 @@
 import { Effect } from 'effect'
-import type { Decision, Policy, PolicyHandler } from '@magnitudedev/roles'
-import type { ToolCatalog } from '@magnitudedev/tools'
-import type { Schema } from '@effect/schema'
+
+import type { Schema } from 'effect'
+
+// Policy types — local definitions until harness integration (Phase 3)
+export type Decision = { decision: 'allow' } | { decision: 'deny'; reason: string }
+export type PolicyHandler<I = unknown, C = unknown> = (input: I, ctx: C) => Effect.Effect<Decision | null>
+export type Policy<_T = unknown, C = unknown> = Array<Record<string, PolicyHandler<unknown, C> | undefined>>
 import {
   classifyShellCommand,
   isGitAllowed,
@@ -15,16 +19,16 @@ import { editTool, writeTool } from '../tools/fs'
 import { shellTool } from '../tools/shell'
 import { expandWorkspacePath } from '../workspace/workspace-path'
 
-type ShellInput = Schema.Schema.Type<typeof shellTool.inputSchema>
-type FileWriteInput = Schema.Schema.Type<typeof writeTool.inputSchema>
-type FileEditInput = Schema.Schema.Type<typeof editTool.inputSchema>
+type ShellInput = Schema.Schema.Type<typeof shellTool.definition.inputSchema>
+type FileWriteInput = Schema.Schema.Type<typeof writeTool.definition.inputSchema>
+type FileEditInput = Schema.Schema.Type<typeof editTool.definition.inputSchema>
 
 const NO_MATCHING_POLICY_RULE = 'No matching policy rule'
 const deny = (reason: string): Decision => ({ decision: 'deny', reason })
 const allow: Decision = { decision: 'allow' }
 
 export function evaluate(
-  policy: Policy<ToolCatalog, unknown>,
+  policy: Policy<unknown, unknown>,
   tool: string,
   input: unknown,
   ctx: unknown,

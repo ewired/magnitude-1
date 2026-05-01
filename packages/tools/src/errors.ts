@@ -2,7 +2,7 @@
  * @magnitudedev/tools — Error Helpers
  */
 
-import { Schema } from "@effect/schema"
+import { Schema } from "effect"
 
 /**
  * Base interface for tool errors.

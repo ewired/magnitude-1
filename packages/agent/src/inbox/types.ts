@@ -1,9 +1,8 @@
-import type { ContentPart } from '../content'
+import type { UserPart, AssistantMessage, ToolResultMessage, ImagePart } from '@magnitudedev/ai'
 import type {
   ResolvedMention,
-  ToolResultStatus,
 } from '../events'
-import type { StructuralParseErrorEvent, ToolParseErrorEvent } from '@magnitudedev/xml-act'
+
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -24,7 +23,7 @@ export type LifecycleReminderFormatterMap = Record<string, LifecycleReminderForm
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-type ImagePart = Extract<ContentPart, { readonly type: 'image' }>
+// ImagePart imported directly from @magnitudedev/ai
 
 type Timestamped<K extends string> = {
   readonly kind: K
@@ -43,7 +42,7 @@ export type AgentAtom =
   | (Timestamped<'thought'> & { readonly text: string })
   | (Timestamped<'tool_call'> & {
       readonly toolCallId: string
-      readonly tagName: string
+      readonly toolName: string
       readonly attributes: Readonly<Record<string, string>>
       readonly body?: string
       readonly status: 'success' | 'error' | 'interrupted'
@@ -75,62 +74,6 @@ type PhaseCriteriaBase<S extends string> = {
   readonly status: 'passed' | 'failed' | 'pending'
   readonly reason?: string
 }
-
-// ---------------------------------------------------------------------------
-// TurnResultItem / ResultEntry
-// ---------------------------------------------------------------------------
-
-export type ToolErrorResultItem = {
-  readonly kind: 'tool_error'
-  readonly tagName: string
-  readonly status: Exclude<ToolResultStatus, 'success'>
-  readonly message?: string
-}
-
-export type ToolParseErrorResultItem = {
-  readonly kind: 'tool_parse_error'
-  readonly event: ToolParseErrorEvent
-  readonly rawResponse: string
-}
-
-export type StructuralParseErrorResultItem = {
-  readonly kind: 'structural_parse_error'
-  readonly event: StructuralParseErrorEvent
-  readonly rawResponse: string
-}
-
-export type ToolObservationResultItem = {
-  readonly kind: 'tool_observation'
-  readonly tagName: string
-  readonly query: string | null
-  readonly content: readonly ContentPart[]
-}
-
-export type MessageAckResultItem = {
-  readonly kind: 'message_ack'
-  readonly destination: 'parent'
-  readonly chars: number
-}
-
-export type NoToolsOrMessagesResultItem = {
-  readonly kind: 'no_tools_or_messages'
-}
-
-export type TurnResultItem =
-  | ToolErrorResultItem
-  | ToolParseErrorResultItem
-  | StructuralParseErrorResultItem
-  | ToolObservationResultItem
-  | MessageAckResultItem
-  | NoToolsOrMessagesResultItem
-
-export type ResultEntry =
-  | { readonly kind: 'turn_results'; readonly items: readonly TurnResultItem[] }
-  | { readonly kind: 'interrupted' }
-  | { readonly kind: 'error'; readonly message: string }
-  | { readonly kind: 'noop' }
-  | { readonly kind: 'oneshot_liveness' }
-  | { readonly kind: 'yield_worker_retrigger' }
 
 // ---------------------------------------------------------------------------
 // TimelineEntry
@@ -176,12 +119,30 @@ export type TimelineEntry =
       readonly nextStatus?: string
       readonly cancelledCount?: number
     })
-  | (Timestamped<'observation'> & { readonly parts: readonly ContentPart[] })
+  | (Timestamped<'observation'> & { readonly parts: readonly UserPart[] })
+
+// ---------------------------------------------------------------------------
+// CompletedTurn / ToolResult / TurnFeedback
+// ---------------------------------------------------------------------------
+
+export type TurnFeedback =
+  | { readonly kind: 'message_ack'; readonly destination: 'parent'; readonly chars: number }
+  | { readonly kind: 'no_tools_or_messages' }
+  | { readonly kind: 'error'; readonly message: string }
+  | { readonly kind: 'interrupted' }
+  | { readonly kind: 'yield_worker_retrigger' }
+
+export interface CompletedTurn {
+  readonly turnId: string
+  readonly assistant: AssistantMessage
+  readonly toolResults: readonly ToolResultMessage[]
+  readonly feedback: readonly TurnFeedback[]
+  readonly clean: boolean
+}
 
 // ---------------------------------------------------------------------------
 // QueuedEntry
 // ---------------------------------------------------------------------------
 
 export type QueuedEntry =
-  | { readonly lane: 'result'; readonly timestamp: number; readonly seq: number; readonly entry: ResultEntry; readonly coalesceKey?: string }
   | { readonly lane: 'timeline'; readonly timestamp: number; readonly seq: number; readonly entry: TimelineEntry; readonly coalesceKey?: string }

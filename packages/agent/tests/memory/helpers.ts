@@ -1,11 +1,12 @@
 import { Effect } from 'effect'
 import { SessionContextProjection } from '../../src/projections/session-context'
-import { getView, MemoryProjection, type ForkMemoryState, type Message } from '../../src/projections/memory'
+import { WindowProjection, type ForkWindowState, type WindowEntry } from '../../src/projections/window'
+import { windowToPrompt } from '../../src/prompts/window-to-prompt'
 import { TestHarness } from '../../src/test-harness/harness'
 import { createId } from '../../src/util/id'
 
 export function getRootMemory(h: Effect.Effect.Success<typeof TestHarness>) {
-  return h.projectionFork(MemoryProjection.Tag, null)
+  return h.projectionFork(WindowProjection.Tag, null)
 }
 
 export function sendUserMessage(h: Effect.Effect.Success<typeof TestHarness>, options: {
@@ -23,7 +24,7 @@ export function sendUserMessage(h: Effect.Effect.Success<typeof TestHarness>, op
       messageId,
       forkId,
       timestamp,
-      content: [{ type: 'text', text: options.text }],
+      content: [{ _tag: 'TextPart', text: options.text }],
       attachments: options.attachments ?? [],
       mode: 'text',
       synthetic: false,
@@ -33,18 +34,18 @@ export function sendUserMessage(h: Effect.Effect.Success<typeof TestHarness>, op
   })
 }
 
-export function lastInboxMessage(memory: ForkMemoryState): Message | undefined {
+export function lastInboxMessage(memory: ForkWindowState): WindowEntry | undefined {
   for (let i = memory.messages.length - 1; i >= 0; i--) {
-    if (memory.messages[i].type === 'inbox') return memory.messages[i]
+    if (memory.messages[i].type === 'context') return memory.messages[i]
   }
   return undefined
 }
 
-export function inboxMessages(memory: ForkMemoryState): Message[] {
-  return memory.messages.filter(m => m.type === 'inbox')
+export function inboxMessages(memory: ForkWindowState): WindowEntry[] {
+  return memory.messages.filter(m => m.type === 'context')
 }
 
-export function snapshotMessageRefs(memory: ForkMemoryState): { refs: readonly Message[], json: string } {
+export function snapshotMessageRefs(memory: ForkWindowState): { refs: readonly WindowEntry[], json: string } {
   return {
     refs: memory.messages,
     json: JSON.stringify(memory.messages),
@@ -52,8 +53,8 @@ export function snapshotMessageRefs(memory: ForkMemoryState): { refs: readonly M
 }
 
 export function assertPrefixUnchanged(
-  before: { refs: readonly Message[], json: string },
-  after: ForkMemoryState,
+  before: { refs: readonly WindowEntry[], json: string },
+  after: ForkWindowState,
 ) {
   const beforeCount = before.refs.length
   for (let i = 0; i < beforeCount; i++) {
@@ -69,13 +70,13 @@ export function assertPrefixUnchanged(
 
 export function getRenderedUserText(h: Effect.Effect.Success<typeof TestHarness>) {
   return Effect.gen(function* () {
-    const memory = yield* h.projectionFork(MemoryProjection.Tag, null)
+    const memory = yield* h.projectionFork(WindowProjection.Tag, null)
     const session = yield* h.runEffect(Effect.flatMap(SessionContextProjection.Tag, p => p.get))
     const timezone = session.context?.timezone ?? null
-    const rendered = getView(memory.messages, timezone, 'agent', true)
-    return rendered
-      .filter(m => m.role === 'user')
-      .map(m => m.content.map(part => part.type === 'text' ? part.text : '[image]').join(''))
+    const prompt = windowToPrompt(memory, '', timezone, true)
+    return prompt.messages
+      .filter(m => m._tag === 'UserMessage')
+      .map(m => m.parts.map(part => part._tag === 'TextPart' ? part.text : '[image]').join(''))
       .join('\n')
   })
 }

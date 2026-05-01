@@ -1,12 +1,12 @@
 import { Projection, Signal } from '@magnitudedev/event-core'
 import type { AppEvent, Attachment, ResolvedMention } from '../events'
-import type { ContentPart } from '../content'
+import type { UserPart } from '@magnitudedev/ai'
 
 export interface StoredUserMessageRaw {
   readonly messageId: string
   readonly forkId: string | null
   readonly timestamp: number
-  readonly content: readonly ContentPart[]
+  readonly content: readonly UserPart[]
   readonly attachments: readonly Attachment[]
   readonly mode: 'text' | 'audio'
   readonly synthetic: boolean
@@ -17,7 +17,7 @@ export interface UserMessageResolvedSignal {
   readonly messageId: string
   readonly forkId: string | null
   readonly timestamp: number
-  readonly content: readonly ContentPart[]
+  readonly content: readonly UserPart[]
   readonly attachments: readonly Attachment[]
   readonly mode: 'text' | 'audio'
   readonly synthetic: boolean

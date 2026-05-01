@@ -1,10 +1,12 @@
 import { describe, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { expect } from 'vitest'
-import { CHARS_PER_TOKEN_XML } from '../../src/constants'
-import { getAgentDefinition, getAgentSlot } from '../../src/agents'
-import { renderSystemPrompt } from '../../src/prompts/system-prompt'
+import { CHARS_PER_TOKEN_LOWER } from '../../src/constants'
+import { getAgentDefinition, ROLE_IDS, type RoleId } from '../../src/agents'
+import { buildSystemPrompt } from '../../src/prompts/system-prompt-builder'
 import { buildResolvedToolSet } from '../../src/tools/resolved-toolset'
+import { getToolkitForRole } from '../../src/tools/toolkits'
+import { renderToolDocs } from '../../src/prompts/render-tool-docs'
 import type { ConfigState } from '../../src/ambient/config-ambient'
 import { TestHarness, TestHarnessLive } from '../../src/test-harness/harness'
 import {
@@ -22,16 +24,20 @@ import {
 } from './helpers'
 
 // Create a mock config state for testing
+const defaultRoleConfig = { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 }
 const mockConfigState: ConfigState = {
-  bySlot: {
-    lead: { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 },
-    worker: { providerId: 'openai', modelId: 'gpt-4', hardCap: 100000, softCap: 80000 },
-  },
+  byRole: Object.fromEntries(ROLE_IDS.map(s => [s, defaultRoleConfig])) as Record<RoleId, typeof defaultRoleConfig>,
 }
 
-const leadDef = getAgentDefinition('lead')
-const leadToolSet = buildResolvedToolSet(leadDef, mockConfigState, getAgentSlot('lead'))
-const leadSystemPromptTokens = Math.ceil(renderSystemPrompt(leadDef, new Map(), leadToolSet).length / CHARS_PER_TOKEN_XML)
+const leadDef = getAgentDefinition('leader')
+const leadToolSet = buildResolvedToolSet(leadDef, mockConfigState, 'leader')
+const leadToolkit = getToolkitForRole('leader')
+const leadToolDefs = [...leadToolSet.availableKeys]
+  .map(key => leadToolkit.entries[key]?.tool)
+  .filter(Boolean)
+  .map(t => t.definition)
+const leadToolDocs = leadToolDefs.length > 0 ? renderToolDocs(leadToolDefs) : ''
+const leadSystemPromptTokens = Math.ceil(buildSystemPrompt({ roleDef: leadDef, skills: new Map(), lenses: [], toolDocs: leadToolDocs }).length / CHARS_PER_TOKEN_LOWER)
 
 describe('compaction/projection-transitions', () => {
   it.effect('initial token estimate includes system prompt tokens', () =>

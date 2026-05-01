@@ -1,61 +1,96 @@
 /**
  * Agent Registry
  *
- * All agent definitions, accessible by variant.
+ * All agent definitions, accessible by RoleId.
  */
 
-import type { RoleDefinition } from '@magnitudedev/roles'
+import { createRoles, isRoleId, type RoleId, type RoleDefinition } from '@magnitudedev/roles'
 
-import type { MagnitudeSlot } from '../model-slots'
+import type { Effect, Layer } from 'effect'
 import type { AgentStatusState } from '../projections/agent-status'
-import type { AgentVariant } from './variants'
+import type { ToolKey } from '../tools/toolkits'
+import type { ObservableConfig, ForkSetupContext } from '../observables/types'
 
-import { leadRole } from './lead'
-import { leadOneshotRole } from './lead-oneshot'
-import { workerRole } from './worker'
+// Agent-package-level role definition.
+// Extends the roles-package RoleDefinition with agent-level concerns:
+// tool keys, observables, and fork lifecycle hooks.
+export interface AgentRoleDefinition extends RoleDefinition {
+  readonly toolKeys: readonly ToolKey[]
 
-type MagnitudeRoleDef = RoleDefinition
+  /** Observable state feeds scoped to this role's fork. */
+  readonly observables?: readonly ObservableConfig<never>[]
 
-const AGENTS: Record<AgentVariant, MagnitudeRoleDef> = {
-  lead: leadRole,
-  'lead-oneshot': leadOneshotRole,
-  worker: workerRole,
+  /** Called during fork setup to provide additional layers. */
+  readonly setup?: (ctx: ForkSetupContext) => Effect.Effect<Layer.Layer<unknown>>
+
+  /** Called during fork disposal for cleanup. */
+  readonly teardown?: (ctx: ForkSetupContext) => Effect.Effect<void>
 }
 
-const _overrides = new Map<string, MagnitudeRoleDef>()
+const LEAD_TOOLS: readonly ToolKey[] = [
+  'fileRead', 'fileWrite', 'fileEdit', 'fileTree', 'fileSearch', 'fileView',
+  'shell', 'webFetch', 'webSearch',
+  'createTask', 'updateTask', 'spawnWorker', 'killWorker',
+  'skill', 'messageWorker',
+] as const
 
-export function registerAgentDefinition(name: string, def: MagnitudeRoleDef): void {
-  _overrides.set(name, def)
+const WORKER_TOOLS: readonly ToolKey[] = [
+  'fileRead', 'fileWrite', 'fileEdit', 'fileTree', 'fileSearch', 'fileView',
+  'shell', 'webFetch', 'webSearch',
+  'skill',
+] as const
+
+const ROLE_TOOL_KEYS: Record<RoleId, readonly ToolKey[]> = {
+  leader: LEAD_TOOLS,
+  scout: WORKER_TOOLS,
+  architect: WORKER_TOOLS,
+  engineer: WORKER_TOOLS,
+  critic: WORKER_TOOLS,
+  scientist: WORKER_TOOLS,
+  artisan: WORKER_TOOLS,
+  advisor: WORKER_TOOLS,
+}
+
+const BASE_ROLES = createRoles()
+const ROLES: Record<RoleId, AgentRoleDefinition> = Object.fromEntries(
+  Object.entries(BASE_ROLES).map(([id, def]) => [
+    id,
+    { ...def, toolKeys: ROLE_TOOL_KEYS[id as RoleId] },
+  ])
+) as Record<RoleId, AgentRoleDefinition>
+
+const _overrides = new Map<string, AgentRoleDefinition>()
+
+export function registerAgentDefinition(roleId: string, def: AgentRoleDefinition): void {
+  _overrides.set(roleId, def)
 }
 
 export function clearAgentOverrides(): void {
   _overrides.clear()
 }
 
-export function getAgentDefinition(variant: AgentVariant): MagnitudeRoleDef {
-  const override = _overrides.get(variant)
+export function getAgentDefinition(roleId: RoleId): AgentRoleDefinition {
+  const override = _overrides.get(roleId)
   if (override) return override
-  return AGENTS[variant]
-}
-
-export function getAgentSlot(variant: AgentVariant): MagnitudeSlot {
-  return getAgentDefinition(variant).slot as MagnitudeSlot
+  return ROLES[roleId]
 }
 
 /**
- * Resolve variant and slot for a fork.
+ * Resolve role for a fork.
  * Returns null when the agent is missing (e.g. already killed).
  * Callers must bail out when null is returned.
  */
 export function getForkInfo(
   agentStatus: AgentStatusState,
   forkId: string | null
-): { variant: AgentVariant; slot: MagnitudeSlot } | null {
+): { roleId: RoleId } | null {
   if (forkId === null) {
-    return { variant: 'lead', slot: getAgentSlot('lead') }
+    return { roleId: 'leader' }
   }
   const agentId = agentStatus.agentByForkId.get(forkId)
   const agent = agentId ? agentStatus.agents.get(agentId) : undefined
   if (!agent) return null
-  return { variant: agent.role, slot: getAgentSlot(agent.role) }
+  const role = agent.role
+  if (!isRoleId(role)) return null
+  return { roleId: role as RoleId }
 }

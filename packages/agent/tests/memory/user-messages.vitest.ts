@@ -1,31 +1,27 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { TestHarness, TestHarnessLive } from '../../src/test-harness/harness'
-import { textOf } from '../../src/content'
-import { MemoryProjection, getView } from '../../src/projections/memory'
+import { WindowProjection } from '../../src/projections/window'
 import { SessionContextProjection } from '../../src/projections/session-context'
+import { windowToPrompt } from '../../src/prompts/window-to-prompt'
 import { getRootMemory, inboxMessages, lastInboxMessage, snapshotMessageRefs, assertPrefixUnchanged, sendUserMessage } from './helpers'
-
-function userContextText(ctx: readonly { role: 'user' | 'assistant'; content: readonly unknown[] }[]): string {
-  return ctx
-    .filter(m => m.role === 'user')
-    .map(m => textOf(m.content as any))
-    .join('\n\n')
-}
 
 function renderedUserText(
   h: Effect.Effect.Success<typeof TestHarness>,
   forkId: string | null,
 ): Effect.Effect<string> {
   return Effect.gen(function* () {
-    const memory = yield* h.projectionFork(MemoryProjection.Tag, forkId)
+    const memory = yield* h.projectionFork(WindowProjection.Tag, forkId)
     const timezone = yield* h.runEffect(
       Effect.flatMap(SessionContextProjection.Tag, p =>
         Effect.map(p.get, s => s.context?.timezone ?? null),
       ),
     )
-    const view = getView(memory.messages, timezone, 'agent', true)
-    return userContextText(view as any)
+    const prompt = windowToPrompt(memory, '', timezone, true)
+    return prompt.messages
+      .filter(m => m._tag === 'UserMessage')
+      .map(m => m.parts.map(p => p._tag === 'TextPart' ? p.text : '').join('\n'))
+      .join('\n\n')
   })
 }
 
@@ -41,7 +37,7 @@ describe('memory/user-messages', () => {
       })
 
       const memory = yield* getRootMemory(h)
-      expect(memory.queuedEntries.some(q => q.lane === 'timeline' && q.entry.kind === 'user_message')).toBe(true)
+      expect(memory.queuedTimeline.some(q => q.entry.kind === 'user_message')).toBe(true)
 
       yield* h.send({ type: 'turn_started', forkId: null, turnId: 't-user-simple-flush', chainId: 'c-user-simple-flush' })
 
@@ -65,9 +61,9 @@ describe('memory/user-messages', () => {
       })
 
       const memory = yield* getRootMemory(h)
-      const queuedUser = memory.queuedEntries.find(q => q.lane === 'timeline' && q.entry.kind === 'user_message')
+      const queuedUser = memory.queuedTimeline.find(q => q.entry.kind === 'user_message')
       expect(queuedUser).toBeDefined()
-      if (!queuedUser || queuedUser.lane !== 'timeline' || queuedUser.entry.kind !== 'user_message') return
+      if (!queuedUser || queuedUser.entry.kind !== 'user_message') return
 
       expect(queuedUser.entry.attachments).toHaveLength(2)
       const mentions = queuedUser.entry.attachments.filter(
@@ -125,15 +121,15 @@ describe('memory/user-messages', () => {
 
       const queued = yield* getRootMemory(h)
       expect(queued.messages.length).toBe(beforeCount)
-      expect(queued.queuedEntries.length).toBeGreaterThan(0)
-      expect(queued.queuedEntries.some(q => q.lane === 'timeline' && q.entry.kind === 'user_message')).toBe(true)
+      expect(queued.queuedTimeline.length).toBeGreaterThan(0)
+      expect(queued.queuedTimeline.some(q => q.entry.kind === 'user_message')).toBe(true)
 
       yield* h.send({ type: 'turn_started', forkId: null, turnId: 't2', chainId: 'c1' })
       const flushed = yield* getRootMemory(h)
-      expect(flushed.queuedEntries).toHaveLength(0)
+      expect(flushed.queuedTimeline).toHaveLength(0)
       const last = lastInboxMessage(flushed)
-      expect(last?.type).toBe('inbox')
-      if (last?.type === 'inbox') {
+      expect(last?.type).toBe('context')
+      if (last?.type === 'context') {
         expect(last.timeline.some(t => t.kind === 'user_message')).toBe(true)
       }
 
@@ -153,7 +149,7 @@ describe('memory/user-messages', () => {
         parentForkId: null,
         agentId: 'builder-auth',
         name: 'builder-auth',
-        role: 'builder',
+        role: 'engineer',
         context: '',
         mode: 'spawn',
         taskId: 'task-1',
@@ -168,10 +164,10 @@ describe('memory/user-messages', () => {
 
       yield* h.send({ type: 'turn_started', forkId: subforkId, turnId: 'sub-t1', chainId: 'sub-c1' })
 
-      const memory = yield* h.projectionFork(MemoryProjection.Tag, subforkId)
+      const memory = yield* h.projectionFork(WindowProjection.Tag, subforkId)
       const last = lastInboxMessage(memory)
-      expect(last?.type).toBe('inbox')
-      if (last?.type === 'inbox') {
+      expect(last?.type).toBe('context')
+      if (last?.type === 'context') {
         expect(last.timeline.some(t => t.kind === 'user_message')).toBe(true)
         expect(last.timeline.some(t => t.kind === 'user_to_agent')).toBe(true)
       }
@@ -205,7 +201,7 @@ describe('memory/user-messages', () => {
 
       const memory = yield* getRootMemory(h)
       const texts = inboxMessages(memory)
-        .flatMap(m => m.type === 'inbox' ? m.timeline : [])
+        .flatMap(m => m.type === 'context' ? m.timeline : [])
         .filter(t => t.kind === 'user_message')
         .map(t => t.text)
 

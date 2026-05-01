@@ -5,8 +5,6 @@
  * buildRegisteredTools and generateToolGrammar live in ./tool-registry.
  */
 
-export { buildResolvedToolSet, type ResolvedToolSet } from './resolved-toolset'
-
 // =============================================================================
 // Re-exports
 // =============================================================================

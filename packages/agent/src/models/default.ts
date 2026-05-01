@@ -1,1 +1,1 @@
-export type { Phase, BaseState } from '@magnitudedev/tools'
+export type { Phase, BaseState } from '@magnitudedev/harness'

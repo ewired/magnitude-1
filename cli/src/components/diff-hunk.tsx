@@ -4,10 +4,10 @@ import { useTheme } from '../hooks/use-theme'
 import { BOX_CHARS } from '../utils/ui-constants'
 
 export type DiffHunkProps = {
-  contextBefore?: string[]
-  removedLines: string[]
-  addedLines: string[]
-  contextAfter?: string[]
+  contextBefore?: readonly string[]
+  removedLines: readonly string[]
+  addedLines: readonly string[]
+  contextAfter?: readonly string[]
   streamingCursor?: boolean
   maxHeight?: number
 }

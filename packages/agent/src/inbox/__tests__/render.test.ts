@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import { YIELD_USER } from '@magnitudedev/xml-act'
-import type { ContentPart } from '../../content'
-import type { ResultEntry, TimelineEntry } from '../types'
-import { formatInbox } from '../render'
-import { formatInterrupted, formatNoop } from '../render-results'
+import type { UserPart } from '@magnitudedev/ai'
+import type { TimelineEntry } from '../types'
+import { renderTimeline } from '../render'
 import {
   WORKER_PROGRESS_USER_MESSAGE_REMINDER,
 } from '../../prompts/lead-communication-reminders'
@@ -13,32 +12,18 @@ const TS1 = TS0 + 30_000
 const TS2 = TS0 + 60_000
 const TS3 = TS0 + 120_000
 
-describe('formatInbox', () => {
+describe('renderTimeline', () => {
   test('returns empty array for empty input', () => {
-    expect(formatInbox({ results: [], timeline: [], timezone: 'UTC', supportsVision: true })).toEqual([])
-  })
-
-  test('renders results-only entries (turn_results, interrupted, error, noop)', () => {
-    const results: readonly ResultEntry[] = [
-      { kind: 'turn_results', items: [] },
-      { kind: 'interrupted' },
-      { kind: 'error', message: 'boom' },
-      { kind: 'noop' },
-    ]
-
-    const out = formatInbox({ results, timeline: [], timezone: 'UTC', supportsVision: true })
-    expect(out).toEqual([
-      { type: 'text', text: '<turn_result>' + formatInterrupted() + '<error>boom</error>' + formatNoop() + '\n</turn_result>\n' },
-    ])
+    expect(renderTimeline({ timeline: [], timezone: 'UTC', supportsVision: true })).toEqual([])
   })
 
   test('timeline-only single user message includes marker and user reply reminder', () => {
     const timeline: readonly TimelineEntry[] = [
       { kind: 'user_message', timestamp: TS0, text: 'hello', attachments: [] },
     ]
-    expect(formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })).toEqual([
+    expect(renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>`,
       },
@@ -60,17 +45,17 @@ describe('formatInbox', () => {
             truncated: true,
             originalBytes: 42,
           },
-          { kind: 'image', image: { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 } },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } } },
         ],
       },
     ]
 
-    expect(formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })).toEqual([
+    expect(renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: '--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n<mention path="src/a.ts" type="text" truncated="true" original_bytes="42">export const a = 1</mention>',
       },
-      { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 },
+      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } },
     ])
   })
 
@@ -79,10 +64,10 @@ describe('formatInbox', () => {
       { kind: 'user_message', timestamp: TS0, text: 'a', attachments: [] },
       { kind: 'user_message', timestamp: TS2, text: 'b', attachments: [] },
     ]
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">a</magnitude:message>\n\n--- 16:01 ---\n<magnitude:message from="user">b</magnitude:message>`,
       },
@@ -94,9 +79,9 @@ describe('formatInbox', () => {
       { kind: 'user_message', timestamp: TS2, text: 'second', attachments: [] },
       { kind: 'user_message', timestamp: TS0, text: 'first', attachments: [] },
     ]
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out[0]).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
         `--- 2024-03-28 16:01 ---\n<magnitude:message from="user">second</magnitude:message>\n\n--- 16:00 ---\n<magnitude:message from="user">first</magnitude:message>`,
     })
@@ -116,20 +101,20 @@ describe('formatInbox', () => {
             content: 'const x = 1', truncated: true, originalBytes: 123,
           },
           { kind: 'mention', path: 'c.ts', contentType: 'text', error: 'not found' },
-          { kind: 'image', image: { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 } },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } } },
         ],
       },
-      { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'builder', hookType: 'spawn' },
+      { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '--- 2024-03-28 16:00 ---\n<magnitude:message from="user">see this</magnitude:message>\n<mention path="b.ts" type="text" truncated="true" original_bytes="123">const x = 1</mention>\n<mention path="c.ts" type="text" error="not found"/>',
       },
-      { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 },
+      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } },
     ])
   })
 
@@ -145,7 +130,7 @@ describe('formatInbox', () => {
         taskTitle: 'Investigate the crash',
       },
     ]
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([])
   })
 
@@ -154,9 +139,9 @@ describe('formatInbox', () => {
       { kind: 'user_message', timestamp: TS0, text: 'first-input', attachments: [] },
       { kind: 'user_message', timestamp: TS0, text: 'second-input', attachments: [] },
     ]
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out[0]).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
         `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">first-input</magnitude:message>\n<magnitude:message from="user">second-input</magnitude:message>`,
     })
@@ -171,54 +156,38 @@ describe('formatInbox', () => {
         firstAtomTimestamp: TS1,
         lastAtomTimestamp: TS1,
         agentId: 'builder-a',
-        role: 'builder',
+        role: 'engineer',
         atoms: [{ kind: 'idle', timestamp: TS1 }],
       },
-      { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'builder', hookType: 'idle' },
+      { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'engineer', hookType: 'idle' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out[0]).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
-        `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hi</magnitude:message>\n<agent id="builder-a" role="builder" status="idle">\n${YIELD_USER}\n</agent>\n\n<attention>\n- user message at 16:00\n- builder-a went idle at 16:00\n</attention>`,
+        `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hi</magnitude:message>\n<agent id="builder-a" role="engineer" status="idle">\n${YIELD_USER}\n</agent>\n\n<attention>\n- user message at 16:00\n- builder-a went idle at 16:00\n</attention>`,
     })
   })
 
-  test('passes through observation image ContentParts', () => {
-    const img: ContentPart = { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1, height: 1 }
+  test('passes through observation image UserParts', () => {
+    const img: UserPart = { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' }
     const timeline: readonly TimelineEntry[] = [
       {
         kind: 'observation',
         timestamp: TS0,
-        parts: [{ type: 'text', text: 'seen' }, img],
+        parts: [{ _tag: 'TextPart', text: 'seen' }, img],
       },
-      { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'builder', hookType: 'spawn' },
+      { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: '--- 2024-03-28 16:00 ---\nseen',
       },
       img,
-    ])
-  })
-
-  test('renders mixed results and timeline', () => {
-    const out = formatInbox({
-      results: [{ kind: 'error', message: 'failed' }],
-      timeline: [{ kind: 'lifecycle_hook', timestamp: TS0, agentId: 'builder-a', role: 'builder', hookType: 'idle' }],
-      timezone: 'UTC',
-      supportsVision: true,
-    })
-
-    expect(out).toEqual([
-      {
-        type: 'text',
-        text: '<turn_result><error>failed</error>\n</turn_result>\n',
-      },
     ])
   })
 
@@ -230,10 +199,10 @@ describe('formatInbox', () => {
       { kind: 'task_update', timestamp: TS3 + 1, action: 'cancelled', taskId: 't2', cancelledCount: 3 },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '<task_updates>\n- Task t1 created: "Title"\n- Task t1 status changed: pending -> working\n- Task t1 completed\n- Task t2 cancelled (3 tasks removed)\n</task_updates>',
       },
@@ -246,10 +215,10 @@ describe('formatInbox', () => {
       { kind: 'task_tree_view', timestamp: TS1, renderedTree: '- [ ] t3 next' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '<task_updates>\n- Task t1 cancelled (2 tasks removed)\n</task_updates>\n\n<task_tree>\n- [ ] t3 next\n</task_tree>',
       },
@@ -262,10 +231,10 @@ describe('formatInbox', () => {
       { kind: 'user_message', timestamp: TS1, text: 'hello', attachments: [] },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n\n<task_updates>\n- Task t1 created: "Title"\n</task_updates>`,
       },
@@ -280,14 +249,14 @@ describe('formatInbox', () => {
         firstAtomTimestamp: TS0,
         lastAtomTimestamp: TS3,
         agentId: 'builder-x',
-        role: 'builder',
+        role: 'engineer',
         atoms: [
           { kind: 'thought', timestamp: TS0, text: 'thinking' },
           {
             kind: 'tool_call',
             timestamp: TS1,
             toolCallId: 'tc1',
-            tagName: 'read',
+            toolName: 'read',
             attributes: { path: 'src/a.ts' },
             status: 'success',
           },
@@ -296,14 +265,14 @@ describe('formatInbox', () => {
           { kind: 'idle', timestamp: TS3, reason: 'error' },
         ],
       },
-      { kind: 'lifecycle_hook', timestamp: TS3 + 1, agentId: 'builder-x', role: 'builder', hookType: 'idle' },
+      { kind: 'lifecycle_hook', timestamp: TS3 + 1, agentId: 'builder-x', role: 'engineer', hookType: 'idle' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out[0]).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
-        `--- 2024-03-28 16:00 ---\n<agent id="builder-x" role="builder" status="idle">\nthinking\n<read path="src/a.ts"/>\n<magnitude:message to="lead">done?</magnitude:message>\n<error>oops</error>\n${YIELD_USER}\n</agent>\n\n<reminders>\n- ${WORKER_PROGRESS_USER_MESSAGE_REMINDER}\n</reminders>\n\n<attention>\n- builder-x errored at 16:00\n</attention>`,
+        `--- 2024-03-28 16:00 ---\n<agent id="builder-x" role="engineer" status="idle">\nthinking\n<read path="src/a.ts"/>\n<magnitude:message to="lead">done?</magnitude:message>\n<error>oops</error>\n${YIELD_USER}\n</agent>\n\n<reminders>\n- ${WORKER_PROGRESS_USER_MESSAGE_REMINDER}\n</reminders>\n\n<attention>\n- builder-x errored at 16:00\n</attention>`,
     })
   })
 
@@ -320,10 +289,10 @@ describe('formatInbox', () => {
       },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '--- 2024-03-28 16:00 ---\n<user_bash_command cwd="/tmp" exit_code="0">\n<command>ls -la</command>\n<stdout>file-a</stdout>\n<stderr></stderr>\n</user_bash_command>',
       },
@@ -342,13 +311,13 @@ describe('formatInbox', () => {
       },
       { kind: 'user_presence', timestamp: TS1, text: 'back', confirmed: true },
 
-      { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-z', role: 'builder', hookType: 'spawn' },
+      { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     const text = out[0]
     expect(text).toEqual({
-      type: 'text',
+      _tag: 'TextPart',
       text:
         `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">u</magnitude:message>\n<user-to-agent agent="a1">direct</user-to-agent>\n<subagent-user-killed agent="a2" type="builder"/>\n<user-presence confirmed="true">back</user-presence>`,
     })
@@ -357,13 +326,13 @@ describe('formatInbox', () => {
   test('does not render user reply reminder when no user_message is present', () => {
     const timeline: readonly TimelineEntry[] = [
       { kind: 'parent_message', timestamp: TS0, text: 'from parent' },
-      { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'builder', hookType: 'spawn' },
+      { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '--- 2024-03-28 16:00 ---\n<magnitude:message from="parent">from parent</magnitude:message>',
       },
@@ -378,43 +347,43 @@ describe('formatInbox', () => {
         firstAtomTimestamp: TS0,
         lastAtomTimestamp: TS2,
         agentId: 'builder-x',
-        role: 'builder',
+        role: 'engineer',
         atoms: [
           { kind: 'thought', timestamp: TS0, text: 'thinking' },
           {
             kind: 'tool_call',
             timestamp: TS1,
             toolCallId: 'tc1',
-            tagName: 'read',
+            toolName: 'read',
             attributes: { path: 'src/a.ts' },
             status: 'success',
           },
           { kind: 'error', timestamp: TS2, message: 'oops' },
         ],
       },
-      { kind: 'lifecycle_hook', timestamp: TS3, agentId: 'builder-x', role: 'builder', hookType: 'idle' },
+      { kind: 'lifecycle_hook', timestamp: TS3, agentId: 'builder-x', role: 'engineer', hookType: 'idle' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
-          '--- 2024-03-28 16:00 ---\n<agent id="builder-x" role="builder" status="working">\nthinking\n<read path="src/a.ts"/>\n<error>oops</error>\n</agent>\n\n<attention>\n- builder-x errored at 16:00\n</attention>',
+          '--- 2024-03-28 16:00 ---\n<agent id="builder-x" role="engineer" status="working">\nthinking\n<read path="src/a.ts"/>\n<error>oops</error>\n</agent>\n\n<attention>\n- builder-x errored at 16:00\n</attention>',
       },
     ])
   })
 
   test('does not render worker progress reminder for lifecycle_hook/task_idle_hook alone', () => {
     const timeline: readonly TimelineEntry[] = [
-      { kind: 'lifecycle_hook', timestamp: TS0, agentId: 'builder-z', role: 'builder', hookType: 'spawn' },
+      { kind: 'lifecycle_hook', timestamp: TS0, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
       { kind: 'task_idle_hook', timestamp: TS1, taskId: 't1', title: 'Build thing', agentId: 'builder-z' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
           '<reminders>\n- Worker builder-z for task t1 ("Build thing") has finished. Review output and either send feedback or mark complete.\n</reminders>',
       },
@@ -430,17 +399,17 @@ describe('formatInbox', () => {
         firstAtomTimestamp: TS1,
         lastAtomTimestamp: TS1,
         agentId: 'builder-x',
-        role: 'builder',
+        role: 'engineer',
         atoms: [{ kind: 'message', timestamp: TS1, direction: 'to_lead', text: 'progress update' }],
       },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text:
-          `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n<agent id="builder-x" role="builder" status="working">\n<magnitude:message to="lead">progress update</magnitude:message>\n</agent>\n\n<reminders>\n- ${WORKER_PROGRESS_USER_MESSAGE_REMINDER}\n</reminders>`,
+          `--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n<agent id="builder-x" role="engineer" status="working">\n<magnitude:message to="lead">progress update</magnitude:message>\n</agent>\n\n<reminders>\n- ${WORKER_PROGRESS_USER_MESSAGE_REMINDER}\n</reminders>`,
       },
     ])
   })
@@ -453,17 +422,17 @@ describe('formatInbox', () => {
         timestamp: TS0,
         text: 'look at this',
         attachments: [
-          { kind: 'image', image: { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1920, height: 1080 }, filename: 'screenshot.png' },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } }, filename: 'screenshot.png' },
         ],
       },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: false })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: false })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: `--- 2024-03-28 16:00 ---
-<magnitude\u003amessage from="user">look at this</magnitude\u003amessage>[Image placeholder: current model does not support images — screenshot.png 1920x1080]`,
+<magnitude\u003amessage from="user">look at this</magnitude\u003amessage>[Image placeholder: current model does not support images — screenshot.png 100x100]`,
       },
     ])
   })
@@ -475,39 +444,39 @@ describe('formatInbox', () => {
         timestamp: TS0,
         text: 'look at this',
         attachments: [
-          { kind: 'image', image: { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1920, height: 1080 }, filename: 'screenshot.png' },
+          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } }, filename: 'screenshot.png' },
         ],
       },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: `--- 2024-03-28 16:00 ---
 <magnitude\u003amessage from="user">look at this</magnitude\u003amessage>`,
       },
-      { type: 'image', base64: 'abc', mediaType: 'image/png', width: 1920, height: 1080 },
+      { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } },
     ])
   })
 
   test('replaces observation images with placeholder when supportsVision is false', () => {
-    const img: ContentPart = { type: 'image', base64: 'abc', mediaType: 'image/png', width: 100, height: 100 }
+    const img: UserPart = { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' }
     const timeline: readonly TimelineEntry[] = [
       {
         kind: 'observation',
         timestamp: TS0,
-        parts: [{ type: 'text', text: 'seen' }, img],
+        parts: [{ _tag: 'TextPart', text: 'seen' }, img],
       },
-      { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'builder', hookType: 'spawn' },
+      { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = formatInbox({ results: [], timeline, timezone: 'UTC', supportsVision: false })
+    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: false })
     expect(out).toEqual([
       {
-        type: 'text',
+        _tag: 'TextPart',
         text: `--- 2024-03-28 16:00 ---
-seen[Image placeholder: current model does not support images — 100x100]`,
+seen[Image placeholder: current model does not support images — image/png]`,
       },
     ])
   })

@@ -2,9 +2,10 @@ import { expect } from '@effect/vitest'
 import { Effect } from 'effect'
 import { createId } from '../../src/util/id'
 import type { AppEvent, SessionContext } from '../../src/events'
-import { CHARS_PER_TOKEN_XML } from '../../src/constants'
+import type { RoleId } from '../../src/agents/role-validation'
+import { CHARS_PER_TOKEN_LOWER } from '../../src/constants'
 import { CompactionProjection } from '../../src/projections/compaction'
-import { MemoryProjection } from '../../src/projections/memory'
+import { WindowProjection } from '../../src/projections/window'
 import { TurnProjection } from '../../src/projections/turn'
 import { TestHarness } from '../../src/test-harness/harness'
 
@@ -30,7 +31,7 @@ export const baseContext = (overrides: Partial<SessionContext> = {}): SessionCon
   ...overrides,
 })
 
-export const estimateTokens = (text: string) => Math.ceil(text.length / CHARS_PER_TOKEN_XML)
+export const estimateTokens = (text: string) => Math.ceil(text.length / CHARS_PER_TOKEN_LOWER)
 
 export const mkUserMessage = (options: {
   forkId?: string | null
@@ -41,7 +42,7 @@ export const mkUserMessage = (options: {
   messageId: createId(),
   forkId: options.forkId ?? ROOT_FORK_ID,
   timestamp: options.timestamp ?? now(),
-  content: [{ type: 'text', text: options.text }],
+  content: [{ _tag: 'TextPart', text: options.text }],
   attachments: [],
   mode: 'text',
   synthetic: false,
@@ -71,7 +72,7 @@ export const mkTurnOutcomeEvent = (overrides: Partial<Extract<AppEvent, { type: 
   cacheWriteTokens: null,
   providerId: null,
   modelId: null,
-  outcome: { _tag: 'Completed', completion: { yieldTarget: 'user', feedback: [] } },
+  outcome: { _tag: 'Completed', completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] } },
 
   ...overrides,
 })
@@ -129,7 +130,7 @@ export const getTurn = (h: Harness, forkId: string | null = ROOT_FORK_ID) =>
   h.projectionFork(TurnProjection.Tag, forkId)
 
 export const getMemory = (h: Harness, forkId: string | null = ROOT_FORK_ID) =>
-  h.projectionFork(MemoryProjection.Tag, forkId)
+  h.projectionFork(WindowProjection.Tag, forkId)
 
 export const expectCompactionUnblocked = (h: Harness, forkId: string | null = ROOT_FORK_ID) =>
   Effect.gen(function* () {
@@ -156,7 +157,7 @@ export const startReadyCompaction = (h: Harness, forkId: string | null = ROOT_FO
 export const completeCompaction = (h: Harness, forkId: string | null = ROOT_FORK_ID, completedOverrides: Partial<Extract<AppEvent, { type: 'compaction_completed' }>> = {}) =>
   h.send(mkCompactionCompleted({ forkId, ...completedOverrides }))
 
-export const createSubagentFork = (h: Harness, role = 'builder') =>
+export const createSubagentFork = (h: Harness, role: RoleId = 'engineer') =>
   Effect.gen(function* () {
     const agentId = createId()
     const forkId = createId()

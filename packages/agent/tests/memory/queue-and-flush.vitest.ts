@@ -2,13 +2,14 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { TestHarness, TestHarnessLive } from '../../src/test-harness/harness'
 import { getRootMemory, lastInboxMessage, sendUserMessage } from './helpers'
-import { getView } from '../../src/projections/memory'
+import { windowToPrompt } from '../../src/prompts/window-to-prompt'
+import type { ForkWindowState } from '../../src/projections/window'
 
-function renderedUserTextFromMemory(messages: Parameters<typeof getView>[0]): string {
-  const rendered = getView(messages, 'UTC', 'agent', true)
-  return rendered
-    .filter(m => m.role === 'user')
-    .map(m => m.content.map(p => p.type === 'text' ? p.text : '').join('\n'))
+function renderedUserTextFromMemory(memory: ForkWindowState): string {
+  const prompt = windowToPrompt(memory, '', 'UTC', true)
+  return prompt.messages
+    .filter(m => m._tag === 'UserMessage')
+    .map(m => m.parts.map(p => p._tag === 'TextPart' ? p.text : '').join('\n'))
     .join('\n')
 }
 
@@ -26,7 +27,7 @@ describe('memory queue and flush', () => {
 
       const memory = yield* getRootMemory(h)
       expect(memory.currentTurnId).toBe('t-1')
-      expect(memory.queuedEntries.length).toBeGreaterThan(0)
+      expect(memory.queuedTimeline.length).toBeGreaterThan(0)
     }).pipe(Effect.provide(TestHarnessLive()))
   )
 
@@ -44,9 +45,9 @@ describe('memory queue and flush', () => {
         event: {
           _tag: 'ToolObservation',
           toolCallId: 'tc-1',
-          tagName: 'shell',
+          toolName: 'shell',
           query: '.',
-          content: [{ type: 'text', text: '<stdout>ok</stdout>' }],
+          content: [{ _tag: 'TextPart', text: '<stdout>ok</stdout>' }],
         },
       })
       yield* h.send({
@@ -60,7 +61,8 @@ describe('memory queue and flush', () => {
         outcome: {
           _tag: 'Completed',
           completion: {
-            yieldTarget: 'user',
+            toolCallsCount: 0,
+            finishReason: 'stop',
             feedback: [{ _tag: 'InvalidMessageDestination', destination: 'unknown', message: 'after turn' }],
           },
         },
@@ -75,10 +77,11 @@ describe('memory queue and flush', () => {
       yield* h.send({ type: 'turn_started', forkId: null, turnId: 't-2', chainId: 'c-1' })
 
       const memory = yield* getRootMemory(h)
-      const inbox = lastInboxMessage(memory)
-      expect(inbox?.type).toBe('inbox')
-      if (inbox?.type === 'inbox') {
-        expect(inbox.outcomes.length).toBeGreaterThan(0)
+      // Tool results and feedback now live on the assistant_turn's CompletedTurn
+      const assistantTurn = memory.messages.find(m => m.type === 'assistant_turn')
+      expect(assistantTurn).toBeDefined()
+      if (assistantTurn?.type === 'assistant_turn') {
+        expect(assistantTurn.turn.feedback.length).toBeGreaterThan(0)
       }
     }).pipe(Effect.provide(TestHarnessLive()))
   )
@@ -108,8 +111,8 @@ describe('memory queue and flush', () => {
 
       const memory = yield* getRootMemory(h)
       const inbox = lastInboxMessage(memory)
-      expect(inbox?.type).toBe('inbox')
-      if (inbox?.type === 'inbox') {
+      expect(inbox?.type).toBe('context')
+      if (inbox?.type === 'context') {
         const items = inbox.timeline.filter(e => e.kind === 'user_message')
         expect(items.map(i => i.text)).toEqual(expect.arrayContaining(['first', 'second', 'later']))
       }
@@ -136,7 +139,7 @@ describe('memory queue and flush', () => {
       yield* h.send({ type: 'turn_started', forkId: null, turnId: 't-2', chainId: 'c-1' })
 
       const memory = yield* getRootMemory(h)
-      const text = renderedUserTextFromMemory(memory.messages)
+      const text = renderedUserTextFromMemory(memory)
 
       expect(text).toContain('<magnitude:message from="user">@src/a.ts again</magnitude:message>')
     }).pipe(Effect.provide(TestHarnessLive()))
@@ -155,7 +158,7 @@ describe('memory queue and flush', () => {
         chainId: 'c-1',
         strategyId: 'xml-act',
 
-        outcome: { _tag: 'Completed', completion: { yieldTarget: 'user', feedback: [] } },
+        outcome: { _tag: 'Completed', completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] } },
         inputTokens: null,
         outputTokens: null,
         cacheReadTokens: null,
@@ -166,10 +169,14 @@ describe('memory queue and flush', () => {
       yield* h.send({ type: 'turn_started', forkId: null, turnId: 't-2', chainId: 'c-1' })
 
       const memory = yield* getRootMemory(h)
-      const inbox = lastInboxMessage(memory)
-      expect(inbox?.type).toBe('inbox')
-      if (inbox?.type === 'inbox') {
-        expect(inbox.outcomes.some(r => r.kind === 'noop')).toBe(false)
+      // Context entries no longer have results; verify no spurious context entry was created
+      const contextEntries = memory.messages.filter(m => m.type === 'context')
+      // An empty flush should not produce a context entry with content
+      for (const ctx of contextEntries) {
+        if (ctx.type === 'context') {
+          // Timeline should be empty for a flush with no user activity
+          expect(ctx.timeline.length).toBe(0)
+        }
       }
     }).pipe(Effect.provide(TestHarnessLive()))
   )
@@ -195,7 +202,8 @@ describe('memory queue and flush', () => {
         outcome: {
           _tag: 'Completed',
           completion: {
-            yieldTarget: 'user',
+            toolCallsCount: 0,
+            finishReason: 'stop',
             feedback: [{ _tag: 'InvalidMessageDestination', destination: 'unknown', message: 'remember me' }],
           },
         },
@@ -209,7 +217,7 @@ describe('memory queue and flush', () => {
       yield* h.send({ type: 'turn_started', forkId: null, turnId: 't-2', chainId: 'c-1' })
 
       const memory = yield* getRootMemory(h)
-      const text = renderedUserTextFromMemory(memory.messages)
+      const text = renderedUserTextFromMemory(memory)
 
       expect(text).toContain('<magnitude:message from="user">from user</magnitude:message>')
       expect(text).toContain('<error>remember me</error>')

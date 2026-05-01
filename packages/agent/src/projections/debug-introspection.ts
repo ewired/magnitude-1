@@ -11,12 +11,12 @@ import { DisplayProjection } from './display'
 import { AgentRoutingProjection } from './agent-routing'
 import { AgentStatusProjection } from './agent-status'
 import { TurnProjection } from './turn'
-import { MemoryProjection } from './memory'
+import { WindowProjection } from './window'
 import { CompactionProjection } from './compaction'
 
 import { SessionContextProjection } from './session-context'
 import { ReplayProjection } from './replay'
-import { ConfigAmbient, getSlotConfig } from '../ambient/config-ambient'
+import { ConfigAmbient, getRoleConfig } from '../ambient/config-ambient'
 import { getForkInfo } from '../agents/registry'
 
 // =============================================================================
@@ -50,7 +50,7 @@ interface ResolvedProjections {
   routingProj: Effect.Effect.Success<typeof AgentRoutingProjection.Tag>
   statusProj: Effect.Effect.Success<typeof AgentStatusProjection.Tag>
   turnProj: Effect.Effect.Success<typeof TurnProjection.Tag>
-  memoryProj: Effect.Effect.Success<typeof MemoryProjection.Tag>
+  memoryProj: Effect.Effect.Success<typeof WindowProjection.Tag>
   compactionProj: Effect.Effect.Success<typeof CompactionProjection.Tag>
 
   sessionProj: Effect.Effect.Success<typeof SessionContextProjection.Tag>
@@ -64,7 +64,7 @@ function resolveProjections() {
       routingProj: yield* AgentRoutingProjection.Tag,
       statusProj: yield* AgentStatusProjection.Tag,
       turnProj: yield* TurnProjection.Tag,
-      memoryProj: yield* MemoryProjection.Tag,
+      memoryProj: yield* WindowProjection.Tag,
       compactionProj: yield* CompactionProjection.Tag,
 
       sessionProj: yield* SessionContextProjection.Tag,
@@ -102,7 +102,7 @@ function buildSnapshot(
       { name: 'AgentRoutingProjection', state: routingState, timestamp },
       { name: 'AgentStatusProjection', state: statusState, timestamp },
       { name: 'TurnProjection', state: turnForkState, timestamp },
-      { name: 'MemoryProjection', state: memoryForkState, timestamp },
+      { name: 'WindowProjection', state: memoryForkState, timestamp },
       { name: 'CompactionProjection', state: compactionForkState, timestamp },
       { name: 'DisplayProjection', state: displayForkState, timestamp },
       { name: 'SessionContextProjection', state: sessionState, timestamp },
@@ -114,7 +114,7 @@ function buildSnapshot(
       const ambientService = yield* AmbientServiceTag
       const configState = ambientService.getValue(ConfigAmbient)
       const info = getForkInfo(statusState, forkId)
-      const limits = info ? getSlotConfig(configState, info.slot) : getSlotConfig(configState, 'lead')
+      const limits = info ? getRoleConfig(configState, info.roleId) : getRoleConfig(configState, 'leader')
       contextUsage = {
         currentTokens: compactionForkState.tokenEstimate,
         hardCap: limits.hardCap,

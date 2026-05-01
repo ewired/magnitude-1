@@ -7,16 +7,16 @@
  */
 
 
-import type { ContentPart } from './content'
-import type { ImageMediaType } from './content'
-import type {
-  TurnEngineEvent,
-  StructuralParseErrorEvent,
-  ToolParseErrorEvent,
-} from '@magnitudedev/xml-act'
-import type { ToolKey } from './catalog'
-import type { ObservationPart } from '@magnitudedev/roles'
+import type { UserPart } from './content'
+import type { ImageMediaType } from '@magnitudedev/ai'
+import type { ToolLifecycleEvent } from '@magnitudedev/harness'
+import type { ValidationIssue } from '@magnitudedev/ai'
+import type { ToolKey } from './tools/toolkits'
+export type ObservationPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly base64: string; readonly mediaType: string; readonly dimensions?: { readonly width: number; readonly height: number } }
 import type { Skill } from '@magnitudedev/skills'
+import type { RoleId } from '@magnitudedev/roles'
 import type { TaskAssignee } from './tasks/types'
 
 
@@ -49,7 +49,7 @@ export type ResolvedMention = {
 // Strategy & Response Types (defined here to avoid circular imports)
 // =============================================================================
 
-export type StrategyId = 'xml-act'
+export type StrategyId = 'xml-act' | 'native'
 
 // =============================================================================
 // Work Agent Types
@@ -79,9 +79,7 @@ export interface SessionContext {
   readonly folderStructure: string  // Truncated tree output
   readonly agentsFile: { readonly filename: string; readonly content: string } | null  // Agent instruction file if present
   readonly skills: readonly { readonly name: string; readonly description: string; readonly path: string }[] | null  // Available agent skills
-  readonly oneshot?: {
-    readonly prompt: string
-  }
+
 }
 
 export interface SessionInitialized {
@@ -99,7 +97,7 @@ export interface UserMessage {
   readonly messageId: string
   readonly forkId: string | null
   readonly timestamp: number
-  readonly content: ContentPart[]
+  readonly content: UserPart[]
   readonly attachments: Attachment[]
   readonly mode: 'text' | 'audio'
   readonly synthetic: boolean  // true when sent by autopilot
@@ -155,9 +153,9 @@ export interface TurnToolCall {
 
 export interface ObservedResult {
   readonly toolCallId: string
-  readonly tagName: string
+  readonly toolName: string
   readonly query: string
-  readonly content: ContentPart[]
+  readonly content: UserPart[]
 }
 
 export interface TurnOutcomeEvent {
@@ -181,10 +179,21 @@ export interface TurnOutcomeEvent {
   readonly modelId: string | null
 }
 
+/** @deprecated xml-act paradigm only — kept for orphaned xml-act code. Use toolCallsCount on native path. */
 export type TurnYieldTarget = 'user' | 'invoke' | 'worker' | 'parent'
 
+export type TurnFinishReason = 'stop' | 'tool_calls' | 'length' | 'content_filter' | 'other'
+
 export interface TurnCompletion {
-  readonly yieldTarget: TurnYieldTarget
+  /**
+   * Number of tool calls dispatched this turn.
+   * Implicit turn control: chain-continue iff toolCallsCount > 0.
+   */
+  readonly toolCallsCount: number
+  /**
+   * The model's finish reason from the wire protocol.
+   */
+  readonly finishReason: TurnFinishReason
   readonly feedback: readonly TurnFeedback[]
 }
 
@@ -193,7 +202,12 @@ export type TurnFeedback =
   | { readonly _tag: 'OneshotLivenessRetriggered' }
   | { readonly _tag: 'YieldWorkerRetriggered' }
 
-export type ParseFailureEvent = StructuralParseErrorEvent | ToolParseErrorEvent
+export interface ParseFailureEvent {
+  readonly _tag: 'ToolInputDecodeFailure'
+  readonly toolCallId: string
+  readonly toolName: string
+  readonly issue: ValidationIssue
+}
 
 export type MagnitudeBillingReason =
   | { readonly _tag: 'SubscriptionRequired'; readonly message: string }
@@ -245,7 +259,7 @@ export type TurnOutcome =
  *  Completed+invoke independently. */
 export function outcomeWillChainContinue(outcome: TurnOutcome): boolean {
   return (
-    (outcome._tag === 'Completed' && outcome.completion.yieldTarget === 'invoke')
+    (outcome._tag === 'Completed' && outcome.completion.toolCallsCount > 0)
     || outcome._tag === 'ParseFailure'
     || outcome._tag === 'ConnectionFailure'
     || outcome._tag === 'ContextWindowExceeded'
@@ -269,6 +283,12 @@ export interface MessageStart {
   readonly destination: MessageDestination
 }
 
+export interface ThinkingStart {
+  readonly type: 'thinking_start'
+  readonly forkId: string | null
+  readonly turnId: string
+}
+
 export interface ThinkingChunk {
   readonly type: 'thinking_chunk'
   readonly forkId: string | null
@@ -280,30 +300,7 @@ export interface ThinkingEnd {
   readonly type: 'thinking_end'
   readonly forkId: string | null
   readonly turnId: string
-  readonly about: string | null
 }
-
-export interface LensStart {
-  readonly type: 'lens_start'
-  readonly forkId: string | null
-  readonly turnId: string
-  readonly name: string
-}
-
-export interface LensChunk {
-  readonly type: 'lens_chunk'
-  readonly forkId: string | null
-  readonly turnId: string
-  readonly text: string
-}
-
-export interface LensEnd {
-  readonly type: 'lens_end'
-  readonly forkId: string | null
-  readonly turnId: string
-  readonly name: string
-}
-
 
 export interface MessageChunkEvent {
   readonly type: 'message_chunk'
@@ -353,7 +350,7 @@ export interface ToolEvent {
   readonly turnId: string
   readonly toolCallId: string
   readonly toolKey: ToolKey
-  readonly event: TurnEngineEvent
+  readonly event: ToolLifecycleEvent
 }
 
 export type ToolDisplay =
@@ -414,7 +411,7 @@ export interface AgentCreated {
   readonly parentForkId: string | null
   readonly agentId: string
   readonly name: string
-  readonly role: string
+  readonly role: RoleId
   readonly context: string
   readonly mode: 'clone' | 'spawn'
   readonly taskId: string
@@ -481,12 +478,12 @@ export interface TaskAssigned {
   readonly forkId: string | null
   readonly taskId: string
   readonly assignee: TaskAssignee
-  readonly workerRole?: string
+  readonly workerRole?: RoleId
   readonly message: string
   readonly workerInfo?: {
     readonly agentId: string
     readonly forkId: string
-    readonly role: string
+    readonly role: RoleId
   }
   readonly replacedWorker?: {
     readonly agentId: string
@@ -593,13 +590,6 @@ export interface UserReturnConfirmed {
 
 
 
-export interface OneshotTask {
-  readonly type: 'oneshot_task'
-  readonly forkId: null
-  readonly prompt: string
-}
-
-
 export type SkillActivated =
   | {
       readonly type: 'skill_activated'
@@ -622,7 +612,6 @@ export type SkillActivated =
 
 export type AppEvent =
   | SessionInitialized
-  | OneshotTask
   | UserMessage
   | ObservationsCaptured
   | UserBashCommand
@@ -631,11 +620,9 @@ export type AppEvent =
   | TurnOutcomeEvent
   | MessageStart
   | MessageChunkEvent
+  | ThinkingStart
   | ThinkingChunk
   | ThinkingEnd
-  | LensStart
-  | LensChunk
-  | LensEnd
   | MessageEnd
   | RawResponseChunk
   | ToolEvent

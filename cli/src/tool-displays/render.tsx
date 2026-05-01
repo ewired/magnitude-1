@@ -1,5 +1,6 @@
-import type { ToolState } from '@magnitudedev/agent'
-import type { CommonToolProps } from './types'
+import type { ToolKey } from '@magnitudedev/agent'
+import type { BaseState } from '@magnitudedev/harness'
+import type { CommonToolProps, ToolDisplay } from './types'
 import { shellDisplay } from './displays/shell'
 import { diffDisplay } from './displays/diff'
 import { contentDisplay } from './displays/content'
@@ -13,64 +14,57 @@ import { browserActionDisplay } from './displays/browser-action'
 import { defaultDisplay } from './displays/default'
 import { spawnWorkerDisplay } from './displays/spawn-worker'
 
-type RenderableToolState = ToolState
-
-export function renderToolStep(state: RenderableToolState, common: CommonToolProps) {
-  switch (state.toolKey) {
-    case 'shell': return shellDisplay.render({ state, ...common })
-    case 'fileRead': return fileReadDisplay.render({ state, ...common })
-    case 'fileWrite': return contentDisplay.render({ state, ...common })
-    case 'fileEdit': return diffDisplay.render({ state, ...common })
-    case 'fileTree': return fileTreeDisplay.render({ state, ...common })
-    case 'fileSearch': return fileSearchDisplay.render({ state, ...common })
-    case 'webSearch': return webSearchDisplay.render({ state, ...common })
-    case 'webFetch': return webFetchDisplay.render({ state, ...common })
-    case 'skill': return skillDisplay.render({ state, ...common })
-    case 'spawnWorker': return spawnWorkerDisplay.render({ state, ...common })
-    case 'click':
-    case 'doubleClick':
-    case 'rightClick':
-    case 'type':
-    case 'scroll':
-    case 'drag':
-    case 'navigate':
-    case 'goBack':
-    case 'switchTab':
-    case 'newTab':
-    case 'screenshot':
-    case 'evaluate':
-      return browserActionDisplay.render({ state, ...common })
-    default:
-      return defaultDisplay.render({ state, ...common })
+/**
+ * Erases the specific state type from a ToolDisplay, allowing it to accept BaseState.
+ * This is safe because the dispatch function (renderToolStep/summarizeToolStep) guarantees
+ * that the correct display is matched to the correct state shape via toolKey.
+ */
+/**
+ * Wraps a typed ToolDisplay to accept BaseState.
+ * Safe because the toolKey-based dispatch guarantees the correct state shape.
+ */
+function eraseStateType<T extends BaseState>(display: ToolDisplay<T>): ToolDisplay<BaseState> {
+  return {
+    render: (props) => display.render({ ...props, state: props.state as T }),
+    summary: (state) => display.summary(state as T),
   }
 }
 
-export function summarizeToolStep(state: RenderableToolState): string {
-  switch (state.toolKey) {
-    case 'shell': return shellDisplay.summary(state)
-    case 'fileRead': return fileReadDisplay.summary(state)
-    case 'fileWrite': return contentDisplay.summary(state)
-    case 'fileEdit': return diffDisplay.summary(state)
-    case 'fileTree': return fileTreeDisplay.summary(state)
-    case 'fileSearch': return fileSearchDisplay.summary(state)
-    case 'webSearch': return webSearchDisplay.summary(state)
-    case 'webFetch': return webFetchDisplay.summary(state)
-    case 'skill': return skillDisplay.summary(state)
-    case 'spawnWorker': return spawnWorkerDisplay.summary(state)
-    case 'click':
-    case 'doubleClick':
-    case 'rightClick':
-    case 'type':
-    case 'scroll':
-    case 'drag':
-    case 'navigate':
-    case 'goBack':
-    case 'switchTab':
-    case 'newTab':
-    case 'screenshot':
-    case 'evaluate':
-      return browserActionDisplay.summary(state)
-    default:
-      return defaultDisplay.summary(state)
-  }
+const displaysByToolKey: Partial<Record<string, ToolDisplay<BaseState>>> = {
+  shell: eraseStateType(shellDisplay),
+  fileRead: eraseStateType(fileReadDisplay),
+  fileWrite: eraseStateType(contentDisplay),
+  fileEdit: eraseStateType(diffDisplay),
+  fileTree: eraseStateType(fileTreeDisplay),
+  fileSearch: eraseStateType(fileSearchDisplay),
+  webSearch: eraseStateType(webSearchDisplay),
+  webFetch: eraseStateType(webFetchDisplay),
+  skill: eraseStateType(skillDisplay),
+  spawnWorker: eraseStateType(spawnWorkerDisplay),
+  click: eraseStateType(browserActionDisplay),
+  doubleClick: eraseStateType(browserActionDisplay),
+  rightClick: eraseStateType(browserActionDisplay),
+  type: eraseStateType(browserActionDisplay),
+  scroll: eraseStateType(browserActionDisplay),
+  drag: eraseStateType(browserActionDisplay),
+  navigate: eraseStateType(browserActionDisplay),
+  goBack: eraseStateType(browserActionDisplay),
+  switchTab: eraseStateType(browserActionDisplay),
+  newTab: eraseStateType(browserActionDisplay),
+  screenshot: eraseStateType(browserActionDisplay),
+  evaluate: eraseStateType(browserActionDisplay),
+}
+
+const fallback = eraseStateType(defaultDisplay)
+
+function getDisplay(toolKey: ToolKey): ToolDisplay<BaseState> {
+  return displaysByToolKey[toolKey] ?? fallback
+}
+
+export function renderToolStep(toolKey: ToolKey, state: BaseState, common: CommonToolProps) {
+  return getDisplay(toolKey).render({ state, ...common })
+}
+
+export function summarizeToolStep(toolKey: ToolKey, state: BaseState): string {
+  return getDisplay(toolKey).summary(state)
 }

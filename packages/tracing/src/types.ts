@@ -43,7 +43,7 @@ export interface TraceInput {
   timestamp: string
   model: string | null
   provider: string | null
-  slot: ModelSlot
+  slot: string
   request: { messages?: unknown[]; input?: unknown }
   response: { rawBody: unknown | null; sseEvents: unknown[] | null; rawOutput?: string; logprobs?: TokenWithLogprob[] }
   usage: CallUsage

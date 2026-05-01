@@ -1,69 +1,29 @@
 /**
  * Execution Types
  *
- * Types for the turn event stream, execution manager service interface,
+ * Types for the execution manager service interface
  * and the ExecutionManager Effect service tag.
- *
- * This is a leaf module — it uses only type imports from the rest of the agent
- * package, breaking the circular dependency:
- *   catalog → models → tools → execution-manager → catalog
  */
 
-import { Effect, Data, Context, Stream } from 'effect'
-import type { TurnEngineEvent, TurnEngineCrash, EngineState } from '@magnitudedev/xml-act'
-import type { MessageDestination, TurnOutcome } from '../events'
-import type { CallUsage, ModelError } from '@magnitudedev/providers'
-import type { Projection, WorkerBusService, AmbientService } from '@magnitudedev/event-core'
-import type { AgentVariant } from '../agents/variants'
+import { Effect, Data, Context, Layer } from 'effect'
+import type { TurnOutcome } from '../events'
+import type { ResponseUsage } from '@magnitudedev/ai'
+import type { Projection, WorkerBusService } from '@magnitudedev/event-core'
+import type { RoleId } from '../agents/role-validation'
 import type { AgentRoutingState } from '../projections/agent-routing'
 import type { AgentStatusState } from '../projections/agent-status'
 import type { TaskGraphState } from '../projections/task-graph'
 import type { ForkTurnState } from '../projections/turn'
 import type { SessionContextState } from '../projections/session-context'
 import type { ConversationState } from '../projections/conversation'
-import type { TaskGraphStateReaderTag } from '../tools/task-reader'
-import type { ConversationStateReaderTag } from '../tools/memory-reader'
 import type { ApprovalStateService } from './approval-state'
 import type { BrowserService } from '../services/browser-service'
 import type { ChatPersistence } from '../persistence/chat-persistence-service'
-import type { BoundObservable } from '@magnitudedev/roles'
+import type { BoundObservable } from '../observables/types'
 import type { JsonSchema } from '@magnitudedev/llm-core'
 import type { AppEvent } from '../events'
-import type { ResolvedToolSet } from '../tools/resolved-toolset'
+import type { ForkLayer } from './fork-layer'
 
-
-// =============================================================================
-// Turn Events
-// =============================================================================
-
-/**
- * Events yielded during turn execution.
- * Cortex maps these to AppEvents and publishes them to the event bus.
- *
- * These carry only the data the execution manager naturally has.
- * Cortex decorates with forkId, turnId, chainId when publishing.
- */
-export type TurnEvent =
-  // --- Message/thinking content ---
-  | { readonly _tag: 'MessageStart'; readonly id: string; readonly destination: MessageDestination }
-  | { readonly _tag: 'MessageChunk'; readonly id: string; readonly text: string }
-  | { readonly _tag: 'MessageEnd'; readonly id: string }
-  | { readonly _tag: 'ThinkingDelta'; readonly text: string }
-  | { readonly _tag: 'ThinkingEnd'; readonly about: string | null }
-  | { readonly _tag: 'RawResponseChunk'; readonly text: string }
-  | { readonly _tag: 'LensStarted'; readonly name: string }
-  | { readonly _tag: 'LensDelta'; readonly text: string }
-  | { readonly _tag: 'LensEnded'; readonly name: string }
-
-  // --- Tool events (forwarded xml-act TurnEngineEvent with agent metadata) ---
-  | { readonly _tag: 'ToolEvent'; readonly toolCallId: string; readonly toolKey: string; readonly event: TurnEngineEvent }
-
-  // --- Terminal (always last event in the stream) ---
-  | { readonly _tag: 'TurnResult'; readonly value: TurnStrategyResult }
-
-export interface TurnEventSink {
-  readonly emit: (event: TurnEvent) => Effect.Effect<void>
-}
 
 // =============================================================================
 // Turn Error
@@ -88,9 +48,32 @@ export const TurnError = Data.taggedEnum<TurnError>()
 // Turn Result
 // =============================================================================
 
+/**
+ * Agent-local usage type. Extends ai.ResponseUsage with optional cost fields.
+ * Cost fields are nullable until a cost computation source is available.
+ */
+export interface AgentCallUsage {
+  readonly inputTokens: number
+  readonly outputTokens: number
+  readonly cacheReadTokens: number
+  readonly cacheWriteTokens: number | null
+  readonly totalCost: number | null
+}
+
+/** Map ai.ResponseUsage to agent usage. */
+export function fromResponseUsage(usage: ResponseUsage): AgentCallUsage {
+  return {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    cacheReadTokens: usage.cacheReadTokens,
+    cacheWriteTokens: null,
+    totalCost: null,
+  }
+}
+
 export interface TurnStrategyResult {
   readonly executeResult: ExecuteResult
-  readonly usage: CallUsage
+  readonly usage: AgentCallUsage
 }
 
 // =============================================================================
@@ -99,41 +82,20 @@ export interface TurnStrategyResult {
 
 export const IDENTICAL_RESPONSE_BREAKER_THRESHOLD = 5
 
-export interface ExecuteOptions {
-  readonly forkId: string | null
-  readonly turnId: string
-  readonly chainId: string
-  readonly defaultProseDest: 'user' | 'parent'
-  readonly triggeredByUser: boolean
-  readonly toolSet: ResolvedToolSet
-}
-
 export interface ExecuteResult {
   readonly result: TurnOutcome
+  readonly usage: {
+    readonly inputTokens: number | null
+    readonly outputTokens: number | null
+    readonly cacheReadTokens: number | null
+    readonly cacheWriteTokens: number | null
+  } | null
 }
 
 export interface ExecutionManagerService {
-  readonly execute: (
-    xmlStream: Stream.Stream<string, ModelError>,
-    options: ExecuteOptions,
-    sink: TurnEventSink,
-  ) => Effect.Effect<
-    ExecuteResult,
-    TurnEngineCrash,
-    Projection.ProjectionInstance<AgentRoutingState>
-    | Projection.ProjectionInstance<AgentStatusState>
-    | Projection.ProjectionInstance<TaskGraphState>
-    | Projection.ForkedProjectionInstance<EngineState>
-    | Projection.ForkedProjectionInstance<ForkTurnState>
-    | WorkerBusService<AppEvent>
-    | TaskGraphStateReaderTag
-    | ConversationStateReaderTag
-    | AmbientService
-  >
-
   readonly initFork: (
     forkId: string | null,
-    variant: AgentVariant
+    variant: RoleId
   ) => Effect.Effect<
     void,
     never,
@@ -144,6 +106,14 @@ export interface ExecutionManagerService {
 
   readonly getObservables: (forkId: string | null) => BoundObservable[]
 
+  /**
+   * Returns the cached fork-scoped Layer (built by initFork). Includes
+   * WorkingDirectory, ApprovalState, EphemeralSessionContext, all reader
+   * services, ToolInterceptor, etc. Used by Cortex to provide tool-execution
+   * context for the native paradigm.
+   */
+  readonly getForkLayer: (forkId: string | null) => ForkLayer | undefined
+
   readonly fork: (params: {
     parentForkId: string | null
     name: string
@@ -152,7 +122,7 @@ export interface ExecutionManagerService {
     message: string
     outputSchema?: JsonSchema | undefined
     mode: 'clone' | 'spawn'
-    role: AgentVariant
+    role: RoleId
     taskId: string
   }) => Effect.Effect<
     string,

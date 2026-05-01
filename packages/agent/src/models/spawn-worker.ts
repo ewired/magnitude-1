@@ -1,20 +1,21 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { spawnWorkerTool } from '../tools/task-tools'
 
 export interface SpawnWorkerState extends BaseState {
-  toolKey: 'spawnWorker'
   id?: string
   message?: string
+  role?: string
   title?: string
 }
 
-const initial: Omit<SpawnWorkerState, 'phase' | 'toolKey'> = {
+const initial: Omit<SpawnWorkerState, 'phase'> = {
   id: undefined,
   message: undefined,
+  role: undefined,
   title: undefined,
 }
 
-export const spawnWorkerModel = defineStateModel('spawnWorker', spawnWorkerTool)({
+export const spawnWorkerModel = defineStateModel(spawnWorkerTool)<SpawnWorkerState>({
   initial,
   reduce: (state, event): SpawnWorkerState => {
     switch (event._tag) {
@@ -23,16 +24,18 @@ export const spawnWorkerModel = defineStateModel('spawnWorker', spawnWorkerTool)
       case 'ToolInputFieldChunk':
         if (event.field === 'id') return { ...state, phase: 'streaming', id: (state.id ?? '') + event.delta }
         if (event.field === 'message') return { ...state, phase: 'streaming', message: (state.message ?? '') + event.delta }
+        if (event.field === 'role') return { ...state, phase: 'streaming', role: (state.role ?? '') + event.delta }
         return state
       case 'ToolInputReady':
+        return state
+      case 'ToolExecutionStarted':
         return {
           ...state,
-          phase: 'streaming',
+          phase: 'executing',
           id: event.input.id ?? state.id,
           message: event.input.message ?? state.message,
+          role: event.input.role ?? state.role,
         }
-      case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':
@@ -43,10 +46,12 @@ export const spawnWorkerModel = defineStateModel('spawnWorker', spawnWorkerTool)
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error' }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorMessage: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

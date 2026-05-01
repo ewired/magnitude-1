@@ -5,8 +5,7 @@
  * All tools are in the 'browser' group and access the harness via BrowserHarnessTag.
  */
 
-import { Context, Effect } from 'effect'
-import { Schema } from '@effect/schema'
+import { Context, Effect, Schema } from 'effect'
 import { defineTool, ToolErrorSchema } from '@magnitudedev/tools'
 import type { WebHarness } from '@magnitudedev/browser-harness'
 import { getBrowserActionBaseLabel } from './browser-action-visuals'
@@ -19,6 +18,21 @@ export class BrowserHarnessTag extends Context.Tag('BrowserHarness')<
   BrowserHarnessTag,
   BrowserHarnessAccessor
 >() {}
+
+/** All browser tool key literals */
+export const BROWSER_TOOL_KEYS = [
+  'click', 'doubleClick', 'rightClick', 'type', 'scroll',
+  'drag', 'navigate', 'goBack', 'switchTab', 'newTab',
+  'screenshot', 'evaluate',
+] as const
+
+export type BrowserToolKey = typeof BROWSER_TOOL_KEYS[number]
+
+const _browserToolKeySet: ReadonlySet<string> = new Set(BROWSER_TOOL_KEYS)
+
+export function isBrowserToolKey(value: string): value is BrowserToolKey {
+  return _browserToolKeySet.has(value)
+}
 
 const BrowserError = ToolErrorSchema('BrowserError', {})
 type BrowserError = { readonly _tag: 'BrowserError'; readonly message: string }

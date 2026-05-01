@@ -2,15 +2,21 @@
  * Filesystem Tools
  */
 
-import { Effect } from 'effect'
-import { Schema } from '@effect/schema'
-import { defineTool, ToolErrorSchema, ToolImageSchema } from '@magnitudedev/tools'
+import { Effect, Schema } from 'effect'
+import { defineHarnessTool } from '@magnitudedev/harness'
 import { resolve } from 'path'
 import { validateAndApply } from '../util/edit'
 import { WorkingDirectoryTag } from '../execution/working-directory'
 import { readImageFileForModel } from '../util/read-image-file'
 import { expandWorkspacePath } from '../workspace'
 import { Fs, resolveFsPath } from '../services/fs'
+import { ToolErrorSchema } from './errors'
+const ToolImageSchema = Schema.Struct({
+  base64: Schema.String,
+  mediaType: Schema.Literal('image/png', 'image/jpeg', 'image/webp', 'image/gif'),
+  width: Schema.Number,
+  height: Schema.Number,
+}).annotations({ identifier: 'ToolImage' })
 
 // =============================================================================
 // Errors
@@ -28,24 +34,24 @@ const FsErrorSchema = ToolErrorSchema('FsError', {})
 // fs.read()
 // =============================================================================
 
-export const readTool = defineTool({
-  name: 'read',
-  group: 'fs',
-  description: 'Read file content as string. Supports line-range reads via optional offset (1-indexed start line) and limit (max lines, default 2000). Use this instead of running cat, head, tail, or less in the shell.',
-  inputSchema: Schema.Struct({
-    path: Schema.String.annotations({
-      description: 'Relative path to a file from cwd. Use tree instead for directories'
+export const readTool = defineHarnessTool({
+  definition: {
+    name: 'read',
+    description: 'Read file content as string. Supports line-range reads via optional offset (1-indexed start line) and limit (max lines, default 2000). Use this instead of running cat, head, tail, or less in the shell.',
+    inputSchema: Schema.Struct({
+      path: Schema.String.annotations({
+        description: 'Relative path to a file from cwd. Use tree instead for directories'
+      }),
+      offset: Schema.optional(Schema.Number).annotations({
+        description: '1-indexed start line (default: 1)'
+      }),
+      limit: Schema.optional(Schema.Number).annotations({
+        description: 'Max lines to return (default: 2000)'
+      }),
     }),
-    offset: Schema.optional(Schema.Number).annotations({
-      description: '1-indexed start line (default: 1)'
-    }),
-    limit: Schema.optional(Schema.Number).annotations({
-      description: 'Max lines to return (default: 2000)'
-    }),
-  }),
-  outputSchema: Schema.String,
+    outputSchema: Schema.String,
+  },
   errorSchema: FsErrorSchema,
-  label: (input) => input.path ? `Reading ${input.path}` : 'Reading file...',
   execute: ({ path, offset, limit }, _ctx) => Effect.gen(function* () {
     const { cwd, workspacePath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
@@ -79,33 +85,33 @@ export const readTool = defineTool({
     }
 
     return result
-  })
+  }),
 })
 
 // =============================================================================
 // fs.write()
 // =============================================================================
 
-export const writeTool = defineTool({
-  name: 'write',
-  group: 'fs',
-  description: 'Write content to file. Use this instead of running echo, tee, or heredocs in the shell.',
-  inputSchema: Schema.Struct({
-    path: Schema.String.annotations({
-      description: 'Relative path from cwd'
+export const writeTool = defineHarnessTool({
+  definition: {
+    name: 'write',
+    description: 'Write content to file. Use this instead of running echo, tee, or heredocs in the shell.',
+    inputSchema: Schema.Struct({
+      path: Schema.String.annotations({
+        description: 'Relative path from cwd'
+      }),
+      content: Schema.String.annotations({
+        description: 'File content to write'
+      })
     }),
-    content: Schema.String.annotations({
-      description: 'File content to write'
-    })
-  }),
-  outputSchema: Schema.Void,
+    outputSchema: Schema.Void,
+  },
   errorSchema: FsErrorSchema,
   emissionSchema: Schema.Struct({
     type: Schema.Literal('write_stats'),
     path: Schema.String,
     linesWritten: Schema.Number,
   }),
-  label: (input) => input.path ? `Writing ${input.path}` : 'Writing file...',
   execute: ({ path, content }, ctx) => Effect.gen(function* () {
     const { cwd, workspacePath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
@@ -116,31 +122,33 @@ export const writeTool = defineTool({
     )
     const linesWritten = content.split('\n').length
     yield* ctx.emit({ type: 'write_stats', path, linesWritten })
-  })
+  }),
 })
 
 // =============================================================================
 // edit() — string find-replace
 // =============================================================================
 
-export const editTool = defineTool({
-  name: 'edit',
-  description: 'Edit a file by replacing exact text. The "old" parameter content must match the file exactly. Read the file first. Use this instead of running sed, perl, or awk in the shell.',
-  inputSchema: Schema.Struct({
-    path: Schema.String.annotations({
-      description: 'Relative path from cwd'
+export const editTool = defineHarnessTool({
+  definition: {
+    name: 'edit',
+    description: 'Edit a file by replacing exact text. The "old" parameter content must match the file exactly. Read the file first. Use this instead of running sed, perl, or awk in the shell.',
+    inputSchema: Schema.Struct({
+      path: Schema.String.annotations({
+        description: 'Relative path from cwd'
+      }),
+      old: Schema.String.annotations({
+        description: 'Exact text to find in the file'
+      }),
+      new: Schema.String.annotations({
+        description: 'Replacement text'
+      }),
+      replaceAll: Schema.optional(Schema.Boolean.annotations({
+        description: 'Replace all occurrences instead of requiring uniqueness'
+      })),
     }),
-    old: Schema.String.annotations({
-      description: 'Exact text to find in the file'
-    }),
-    new: Schema.String.annotations({
-      description: 'Replacement text'
-    }),
-    replaceAll: Schema.optional(Schema.Boolean.annotations({
-      description: 'Replace all occurrences instead of requiring uniqueness'
-    })),
-  }),
-  outputSchema: Schema.String,
+    outputSchema: Schema.String,
+  },
   errorSchema: FsErrorSchema,
   emissionSchema: Schema.Struct({
     type: Schema.Literal('file_edit_base_content'),
@@ -149,7 +157,7 @@ export const editTool = defineTool({
   }),
   stream: {
     initial: { emitted: false },
-    onInput: (input, state, ctx) => Effect.gen(function* () {
+    onInput: (input, state: { emitted: boolean }, ctx) => Effect.gen(function* () {
       if (state.emitted) return state
       const path = input.path
       if (!path || !path.isFinal) return state
@@ -163,7 +171,6 @@ export const editTool = defineTool({
       return { emitted: true }
     }),
   },
-  label: (input) => input.path ? `Editing ${input.path}` : 'Editing file...',
   execute: ({ path, old: oldStr, new: newStr, replaceAll }, _ctx) => Effect.gen(function* () {
     const { cwd, workspacePath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
@@ -208,27 +215,27 @@ const TreeEntry = Schema.Struct({
 
 type TreeEntry = Schema.Schema.Type<typeof TreeEntry>
 
-export const treeTool = defineTool({
-  name: 'tree',
-  group: 'fs',
-  description: 'List directory structure with optional gitignore filtering. Use this instead of running ls, find, or tree in the shell.',
-  inputSchema: Schema.Struct({
-    path: Schema.String.annotations({
-      description: 'Relative path from cwd'
+export const treeTool = defineHarnessTool({
+  definition: {
+    name: 'tree',
+    description: 'List directory structure with optional gitignore filtering. Use this instead of running ls, find, or tree in the shell.',
+    inputSchema: Schema.Struct({
+      path: Schema.String.annotations({
+        description: 'Relative path from cwd'
+      }),
+      recursive: Schema.optional(Schema.Boolean.annotations({
+        description: 'Include subdirectories (default: true)'
+      })),
+      maxDepth: Schema.optional(Schema.Number.annotations({
+        description: 'Maximum depth to traverse'
+      })),
+      gitignore: Schema.optional(Schema.Boolean.annotations({
+        description: 'Respect .gitignore patterns (default: true)'
+      })),
     }),
-    recursive: Schema.optional(Schema.Boolean.annotations({
-      description: 'Include subdirectories (default: true)'
-    })),
-    maxDepth: Schema.optional(Schema.Number.annotations({
-      description: 'Maximum depth to traverse'
-    })),
-    gitignore: Schema.optional(Schema.Boolean.annotations({
-      description: 'Respect .gitignore patterns (default: true)'
-    })),
-  }),
-  outputSchema: Schema.Array(TreeEntry),
+    outputSchema: Schema.Array(TreeEntry),
+  },
   errorSchema: FsErrorSchema,
-  label: (input) => input.path ? `Listing ${input.path}` : 'Listing directory...',
   execute: ({ path, gitignore, maxDepth }, _ctx) => Effect.gen(function* () {
     const { cwd, workspacePath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
@@ -246,7 +253,7 @@ export const treeTool = defineTool({
       type: entry.type,
       depth: entry.depth
     }))
-  })
+  }),
 })
 
 // =============================================================================
@@ -260,27 +267,27 @@ const SearchMatch = Schema.Struct({
 
 type SearchMatch = Schema.Schema.Type<typeof SearchMatch>
 
-export const grepTool = defineTool({
-  name: 'grep',
-  group: 'fs',
-  description: 'Search file contents with regex. Use this instead of running grep, rg, or ag in the shell — it uses ripgrep under the hood.',
-  inputSchema: Schema.Struct({
-    pattern: Schema.String.annotations({
-      description: 'Regex pattern to search for'
+export const grepTool = defineHarnessTool({
+  definition: {
+    name: 'grep',
+    description: 'Search file contents with regex. Use this instead of running grep, rg, or ag in the shell — it uses ripgrep under the hood.',
+    inputSchema: Schema.Struct({
+      pattern: Schema.String.annotations({
+        description: 'Regex pattern to search for'
+      }),
+      path: Schema.optional(Schema.String.annotations({
+        description: 'Directory to search in (default: cwd)'
+      })),
+      glob: Schema.optional(Schema.String.annotations({
+        description: 'Glob pattern to filter files (e.g., "*.ts")'
+      })),
+      limit: Schema.optional(Schema.Number.annotations({
+        description: 'Maximum number of matches to return (default: 50)'
+      })),
     }),
-    path: Schema.optional(Schema.String.annotations({
-      description: 'Directory to search in (default: cwd)'
-    })),
-    glob: Schema.optional(Schema.String.annotations({
-      description: 'Glob pattern to filter files (e.g., "*.ts")'
-    })),
-    limit: Schema.optional(Schema.Number.annotations({
-      description: 'Maximum number of matches to return (default: 50)'
-    })),
-  }),
-  outputSchema: Schema.Array(SearchMatch),
+    outputSchema: Schema.Array(SearchMatch),
+  },
   errorSchema: FsErrorSchema,
-  label: (input) => input.pattern ? `Searching for ${input.pattern}` : 'Searching files...',
   execute: ({ pattern, path, glob, limit }, _ctx) => Effect.gen(function* () {
     const { cwd, workspacePath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
@@ -295,25 +302,25 @@ export const grepTool = defineTool({
     return yield* fs.search({ pattern, searchPath, glob: resolvedGlob, limit: resolvedLimit }).pipe(
       Effect.catchAll(() => Effect.fail(fsError(`Search failed for ${pattern}`)))
     )
-  })
+  }),
 })
 
 // =============================================================================
 // fs.view()
 // =============================================================================
 
-export const viewTool = defineTool({
-  name: 'view',
-  group: 'fs',
-  description: 'Read an image file and return it as image output for visual inspection. Supports PNG, JPEG, WebP, GIF, and SVG files.',
-  inputSchema: Schema.Struct({
-    path: Schema.String.annotations({
-      description: 'Relative path to an image file from cwd'
+export const viewTool = defineHarnessTool({
+  definition: {
+    name: 'view',
+    description: 'Read an image file and return it as image output for visual inspection. Supports PNG, JPEG, WebP, GIF, and SVG files.',
+    inputSchema: Schema.Struct({
+      path: Schema.String.annotations({
+        description: 'Relative path to an image file from cwd'
+      }),
     }),
-  }),
-  outputSchema: ToolImageSchema,
+    outputSchema: ToolImageSchema,
+  },
   errorSchema: FsErrorSchema,
-  label: (input) => input.path ? `Viewing ${input.path}` : 'Viewing image...',
   execute: ({ path: filePath }, _ctx) => Effect.gen(function* () {
     const { cwd, workspacePath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
@@ -327,7 +334,7 @@ export const viewTool = defineTool({
       try: () => readImageFileForModel(fullPath),
       catch: (e) => fsError(e instanceof Error ? e.message : `Failed to read image: ${filePath}`),
     })
-  })
+  }),
 })
 
 // =============================================================================

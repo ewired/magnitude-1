@@ -31,8 +31,8 @@ describe('compaction/memory-rewrite', () => {
       const memory = yield* getMemory(h)
       expect(memory.messages[1]?.type).toBe('compacted')
       if (memory.messages[1]?.type === 'compacted') {
-        const text = memory.messages[1].content.map((p) => (p.type === 'text' ? p.text : '')).join('')
-        expect(text).toBe(summary)
+        const text = memory.messages[1].content.map((p) => (p._tag === 'TextPart' ? p.text : '')).join('')
+        expect(text).toBe(`<compaction_summary>\n${summary}\n</compaction_summary>`)
       }
     }).pipe(Effect.provide(TestHarnessLive())))
 
@@ -67,7 +67,7 @@ describe('compaction/memory-rewrite', () => {
       const memory = yield* getMemory(h)
       expect(memory.messages[0]?.type).toBe('session_context')
       if (memory.messages[0]?.type === 'session_context') {
-        const text = memory.messages[0].content.map((p) => (p.type === 'text' ? p.text : '')).join('')
+        const text = memory.messages[0].content.map((p) => (p._tag === 'TextPart' ? p.text : '')).join('')
         expect(text.includes('/tmp/new-cwd')).toBe(true)
       }
     }).pipe(Effect.provide(TestHarnessLive())))

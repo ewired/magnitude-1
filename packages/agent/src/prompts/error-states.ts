@@ -1,10 +1,6 @@
-import { YIELD_USER } from '@magnitudedev/xml-act'
-
 export const UNCLOSED_THINK_REMINDER = 'Your response had an unclosed thinking block. Be careful to use structural tags correctly and avoid referencing them in your thinking or prose.'
 
 export const UNCLOSED_TASK_REMINDER = 'Your response had an unclosed task block. Be careful to use structural tags correctly and avoid referencing them in your thinking or prose.'
-
-export const ONESHOT_LIVENESS_REMINDER = 'You idled but no subagents are active and there is no user to respond. Continue working toward the task or call <finish/> when complete.'
 
 export function formatSpawnNoMessageReminder(taskId: string, taskTitle: string, role: string): string {
   return `Worker \`${role}\` was spawned on task ${taskId} ("${taskTitle}") but has no instructions yet — it is idle until it receives a message. Send a \`<magnitude:message to="${taskId}">\` to assign it work.`
@@ -48,4 +44,4 @@ export function formatMissingAssignmentRoleError(taskId: string): string {
   return `Task assignment rejected: role is required when task "${taskId}" has no active worker.`
 }
 
-export const EMPTY_RESPONSE_ERROR = `Your response was empty. You must respond with lenses/messages/tool calls. Use \`${YIELD_USER}\` if done taking turns.`
+export const EMPTY_RESPONSE_ERROR = `Your response was empty. You must respond with lenses/messages/tool calls. Use \`${'<' + 'magnitude:yield_user/>'}\` if done taking turns.`

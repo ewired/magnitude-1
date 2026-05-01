@@ -9,7 +9,7 @@ describe('subagent timer semantics', () => {
       forkId: 'fork-sub',
       parentForkId: null,
       agentId: 'agent-sub',
-      role: 'builder',
+      role: 'engineer',
       name: 'Builder',
       context: 'ctx',
       mode: 'spawn',

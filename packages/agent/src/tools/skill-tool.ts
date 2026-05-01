@@ -2,22 +2,16 @@
  * Skill Tool
  *
  * Activates a skill by name, returning its full content for context.
- * Skills provide detailed methodologies for specific types of work.
  */
 
-import { Effect } from 'effect'
-import { Schema } from '@effect/schema'
-import { defineTool, ToolErrorSchema } from '@magnitudedev/tools'
+import { Effect, Schema } from 'effect'
+import { defineHarnessTool } from '@magnitudedev/harness'
 import { AmbientServiceTag } from '@magnitudedev/event-core'
 import { SkillsAmbient } from '../ambient/skills-ambient'
+import { ToolErrorSchema } from './errors'
 
 const SkillErrorSchema = ToolErrorSchema('SkillError', {})
 
-// =============================================================================
-// Skill Tool
-// =============================================================================
-
-/** Execute logic for skill tool */
 function executeSkill({ name }: { name: string }) {
   return Effect.gen(function* () {
     const ambientService = yield* AmbientServiceTag
@@ -32,7 +26,6 @@ function executeSkill({ name }: { name: string }) {
       })
     }
 
-    // Format skill content with all sections
     const sections = skill.sections
     const parts = [
       `# Skill: ${skill.name}`,
@@ -58,17 +51,18 @@ function executeSkill({ name }: { name: string }) {
   })
 }
 
-export const skillTool = defineTool({
-  name: 'skill' as const,
-  description: 'Activate a skill by name to load its full methodology into context. Returns the skill content — observe the result before acting on the skill\'s guidance. Skills provide detailed methodologies for specific types of work (e.g., "research", "plan", "implement").',
-  inputSchema: Schema.Struct({
-    name: Schema.String.annotations({ description: 'Skill name to activate (e.g., "research", "plan", "implement")' }),
-  }),
-  outputSchema: Schema.Struct({
-    content: Schema.String.annotations({ description: 'Full skill content with all sections (shared, lead, worker, handoff)' }),
-    skillPath: Schema.String.annotations({ description: 'Resolved file path of the skill' }),
-  }),
+export const skillTool = defineHarnessTool({
+  definition: {
+    name: 'skill',
+    description: 'Activate a skill by name to load its full methodology into context. Returns the skill content — observe the result before acting on the skill\'s guidance. Skills provide detailed methodologies for specific types of work (e.g., "research", "plan", "implement").',
+    inputSchema: Schema.Struct({
+      name: Schema.String.annotations({ description: 'Skill name to activate (e.g., "research", "plan", "implement")' }),
+    }),
+    outputSchema: Schema.Struct({
+      content: Schema.String.annotations({ description: 'Full skill content with all sections (shared, lead, worker, handoff)' }),
+      skillPath: Schema.String.annotations({ description: 'Resolved file path of the skill' }),
+    }),
+  },
   errorSchema: SkillErrorSchema,
   execute: (input, _ctx) => executeSkill(input),
-  label: (input) => input.name ? `Activating skill: ${input.name}` : 'Activating skill…',
 })

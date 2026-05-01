@@ -86,7 +86,7 @@ const subagentScenario = (outcome: TurnOutcome): AppEvent[] => [
     forkId: 'fork-sub',
     parentForkId: null,
     agentId: 'agent-sub',
-    role: 'builder',
+    role: 'engineer',
     name: 'Builder',
     context: 'ctx',
     mode: 'spawn',
@@ -101,12 +101,12 @@ const subagentScenario = (outcome: TurnOutcome): AppEvent[] => [
     forkId: null,
     taskId: 'task-1',
     assignee: 'worker',
-    workerRole: 'builder',
+    workerRole: 'engineer',
     message: '',
     workerInfo: {
       agentId: 'agent-sub',
       forkId: 'fork-sub',
-      role: 'builder',
+      role: 'engineer',
     },
   } as any,
 
@@ -190,7 +190,7 @@ describe('chain-continue false-idle bug', () => {
   it('Completed + invoke stays working (regression)', async () => {
     const snapshot = await makeSnapshot(subagentScenario({
       _tag: 'Completed',
-      completion: { yieldTarget: 'invoke', feedback: [] },
+      completion: { toolCallsCount: 1, finishReason: 'tool_calls', feedback: [] },
     }))
 
     expect(getSubagentStatus(snapshot.agentStatus)).toBe('working')
@@ -201,7 +201,7 @@ describe('chain-continue false-idle bug', () => {
   it('Completed + user goes idle with subagent_finished step (regression)', async () => {
     const events = subagentScenario({
       _tag: 'Completed',
-      completion: { yieldTarget: 'user', feedback: [] },
+      completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] },
     })
     // Add a follow-up task_updated to force TaskWorkerProjection to rebuild with fresh reads
     events.push({

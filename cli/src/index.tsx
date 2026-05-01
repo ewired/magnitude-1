@@ -4,18 +4,13 @@ import fs from 'fs'
 import { createCliRenderer } from '@opentui/core'
 import { createRoot } from '@opentui/react'
 import { Command } from '@commander-js/extra-typings'
-import { createProviderClient } from '@magnitudedev/providers'
 import { createStorageClient } from '@magnitudedev/storage'
-import { MAGNITUDE_SLOTS, type MagnitudeSlot } from '@magnitudedev/agent'
 import { App, type SessionStart } from './app'
 import { initThemeStore, useThemeStateStore } from './hooks/use-theme'
 import { CLI_VERSION } from './version'
-import { ProviderRuntimeProvider } from './providers/provider-runtime'
 import { StorageProvider } from './providers/storage-provider'
 import { isLightBackground } from './utils/theme'
 import { installGracefulShutdownHandlers } from './utils/graceful-shutdown'
-
-import { runOneshot } from './oneshot'
 
 async function main() {
   // Initialize theme store before rendering (defaults to dark)
@@ -27,29 +22,8 @@ async function main() {
     .option('--resume [id]', 'Resume the most recent chat session or a specific session by ID')
     .option('--debug', 'Enable debug mode with debug panel')
 
-    .option('--oneshot [prompt]', 'Run autonomous oneshot task and exit on completion')
-    .option('--provider <id>', 'Provider ID for oneshot mode (e.g. anthropic, openai)')
-    .option('--model <id>', 'Model ID for oneshot mode')
-    .option('--disable-shell-safeguards', 'Disable shell command classification safeguards for this oneshot run')
-    .option('--disable-cwd-safeguards', 'Disable working-directory boundary safeguards for this oneshot run')
     .argument('[prompt]')
     .action(async (promptArg, opts) => {
-      if (opts.oneshot !== undefined) {
-        if (opts.resume !== undefined) {
-          console.error('--resume and --oneshot cannot be used together')
-          process.exit(1)
-        }
-        const prompt = typeof opts.oneshot === 'string' ? opts.oneshot : promptArg
-        await runOneshot({
-          prompt,
-          providerId: opts.provider,
-          modelId: opts.model,
-          debug: opts.debug ?? false,
-          disableShellSafeguards: opts.disableShellSafeguards ?? false,
-          disableCwdSafeguards: opts.disableCwdSafeguards ?? false,
-        })
-        return
-      }
 
       const renderer = await createCliRenderer({
         exitOnCtrlC: false, // We handle Ctrl+C manually for two-tap exit
@@ -82,7 +56,6 @@ async function main() {
       )
 
       const storage = await createStorageClient({ cwd: process.cwd(), currentVersion: CLI_VERSION })
-      const providerRuntime = await createProviderClient<MagnitudeSlot>({ slots: MAGNITUDE_SLOTS })
       const sessionStart: SessionStart = opts.resume === undefined
         ? { _tag: 'new' }
         : opts.resume === true
@@ -91,18 +64,16 @@ async function main() {
 
       createRoot(renderer).render(
         <StorageProvider client={storage}>
-          <ProviderRuntimeProvider runtime={providerRuntime}>
-            <App
-              sessionStart={sessionStart}
-              debug={opts.debug ?? false}
-              onClientReady={(client) => {
-                clientRef = client
-              }}
-              onSessionId={(id) => {
-                activeSessionId = id
-              }}
-            />
-          </ProviderRuntimeProvider>
+          <App
+            sessionStart={sessionStart}
+            debug={opts.debug ?? false}
+            onClientReady={(client) => {
+              clientRef = client
+            }}
+            onSessionId={(id) => {
+              activeSessionId = id
+            }}
+          />
         </StorageProvider>
       )
     })

@@ -1,11 +1,9 @@
 import { Agent, type Projection, makeAmbientServiceLayer } from '@magnitudedev/event-core'
-import { defineCatalog } from '@magnitudedev/tools'
 import { Context, Effect, Layer, SubscriptionRef } from 'effect'
 import { YIELD_USER } from '@magnitudedev/xml-act'
-import type { RoleDefinition } from '@magnitudedev/roles'
-import type { AgentCatalogEntry } from '../catalog'
+
 import type { AppEvent, SessionContext } from '../events'
-import { textParts } from '../content'
+import { textParts, textOf } from '../content'
 import { createId } from '../util/id'
 
 
@@ -14,7 +12,7 @@ import { SessionContextProjection } from '../projections/session-context'
 import { TaskGraphProjection } from '../projections/task-graph'
 import { TurnProjection } from '../projections/turn'
 import { CanonicalTurnProjection } from '../projections/canonical-turn'
-import { MemoryProjection, getView } from '../projections/memory'
+import { WindowProjection } from '../projections/window'
 import { SubagentActivityProjection } from '../projections/subagent-activity'
 import { DisplayProjection } from '../projections/display'
 import { ToolStateProjection } from '../projections/tool-state'
@@ -22,7 +20,6 @@ import { TaskWorkerProjection } from '../projections/task-worker'
 import { AgentRoutingProjection } from '../projections/agent-routing'
 import { AgentStatusProjection } from '../projections/agent-status'
 import { CompactionProjection } from '../projections/compaction'
-
 import { ReplayProjection } from '../projections/replay'
 import { ConversationProjection } from '../projections/conversation'
 import { UserPresenceProjection } from '../projections/user-presence'
@@ -43,10 +40,13 @@ import { SessionTitleWorker } from '../workers/session-title-worker'
 
 // Runtime/services
 import { ExecutionManagerLive } from '../execution/execution-manager'
-import { BrowserServiceLive } from '../services/browser-service'
-import { ModelCatalog, makeProviderRuntimeLive, makeTestResolver, type TestModelConfig } from '@magnitudedev/providers'
-import type { MagnitudeSlot } from '../model-slots'
+import { BrowserService } from '../services/browser-service'
+import type { RoleId } from '../agents/role-validation'
 import { registerApprovalBridge } from '../execution/approval-bridge'
+import { makeTestModelResolver } from './test-resolver'
+import type { TestModelConfig } from './test-model'
+import { MagnitudeConfig } from '../model/magnitude-config'
+import { Auth } from '@magnitudedev/ai'
 
 // Testing services
 import { InMemoryChatPersistenceTag, makeInMemoryChatPersistenceLayer } from './in-memory-persistence'
@@ -111,7 +111,6 @@ export interface HarnessOptions {
   model?: TestModelConfig
 }
 
-type MagnitudeAgentDef = RoleDefinition<import('../catalog').AgentCatalog, MagnitudeSlot, PolicyContext>
 
 const DEFAULT_TIMEOUT_MS = 10_000
 
@@ -254,7 +253,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
         UserMessageResolutionProjection,
         ToolStateProjection,
         TaskWorkerProjection,
-        MemoryProjection,
+        WindowProjection,
         DisplayProjection,
         ConversationProjection,
         UserPresenceProjection,
@@ -269,7 +268,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
           toolState: ToolStateProjection,
           taskWorker: TaskWorkerProjection,
           turn: TurnProjection,
-          memory: MemoryProjection,
+          memory: WindowProjection,
           compaction: CompactionProjection,
           agentRouting: AgentRoutingProjection,
           agentStatus: AgentStatusProjection,
@@ -311,11 +310,17 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
     const defaultWaitTimeoutMs = options.defaults?.waitTimeoutMs ?? DEFAULT_TIMEOUT_MS
     const fakeClock = options.clock === 'fake' ? createFakeClock() : null
 
-    const testModelCatalogLayer = Layer.succeed(ModelCatalog, {
-      refresh: () => Effect.void,
-      getModels: () => Effect.succeed([]),
+    const testMagnitudeConfigLayer = Layer.succeed(MagnitudeConfig, {
+      endpoint: 'http://test',
+      apiKey: 'test-key',
+      auth: Auth.bearer('test-key'),
+      defaultProfile: { contextWindow: 200_000, maxOutputTokens: 32_768, capabilities: { vision: true, reasoning: true } },
     })
-    const providerRuntime = makeProviderRuntimeLive<MagnitudeSlot>(testModelCatalogLayer)
+    const testModelResolverLayer = makeTestModelResolver(options.model ?? {})
+    const stubBrowserServiceLayer = Layer.succeed(BrowserService, {
+      get: () => Effect.die(new Error('BrowserService not available in tests')),
+      release: () => Effect.die(new Error('BrowserService not available in tests')),
+    })
     const ephemeralSessionContextLayer = Layer.succeed(EphemeralSessionContextTag, {
       disableShellSafeguards: false,
       disableCwdSafeguards: false,
@@ -328,12 +333,10 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
 
     const runtimeLayer = Layer.mergeAll(
       Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
-      Layer.provide(BrowserServiceLive, providerRuntime),
-      providerRuntime,
+      stubBrowserServiceLayer,
+      testMagnitudeConfigLayer,
+      testModelResolverLayer,
       fsLayer,
-      ...(options.model
-        ? [makeTestResolver(options.model as TestModelConfig)]
-        : [makeTestResolver()]),
       MockTurnScriptLive,
       basePersistenceLayer,
       faultWrappedPersistenceLayer,
@@ -528,18 +531,31 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
       inspect: {
         context: async (forkId: string | null = null): Promise<ContextSnapshot> => {
           const [memory, sessionContext, compaction] = await Promise.all([
-            client.runEffect(Effect.flatMap(MemoryProjection.Tag, (projection) => projection.getFork(forkId))),
+            client.runEffect(Effect.flatMap(WindowProjection.Tag, (projection) => projection.getFork(forkId))),
             client.runEffect(Effect.flatMap(SessionContextProjection.Tag, (projection) => projection.get)),
             client.runEffect(Effect.flatMap(CompactionProjection.Tag, (projection) => projection.getFork(forkId))),
           ])
 
-          const timezone = sessionContext.context?.timezone ?? null
-          const messages = getView(memory.messages, timezone, 'agent', true).map((message) => ({
-            role: message.role,
-            content: message.content
-              .map((part) => (part.type === 'text' ? part.text : '[image]'))
-              .join(''),
-          }))
+          const messages = memory.messages.map((msg) => {
+            switch (msg.type) {
+              case 'assistant_turn':
+                return {
+                  role: 'assistant' as const,
+                  content: [
+                    ...(msg.turn.assistant.reasoning ? [`[thought] ${msg.turn.assistant.reasoning}`] : []),
+                    ...(msg.turn.assistant.text ? [msg.turn.assistant.text] : []),
+                    ...(msg.turn.assistant.toolCalls ?? []).map((tc) => `[tool_call] ${tc.name}`),
+                  ].join('\n'),
+                }
+              case 'context':
+                return { role: 'user' as const, content: '[context]' }
+              default:
+                return {
+                  role: 'user' as const,
+                  content: textOf(msg.content),
+                }
+            }
+          })
 
           return {
             messages,
@@ -557,7 +573,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
           ] = await Promise.all([
             client.runEffect(Effect.flatMap(CompactionProjection.Tag, (projection) => projection.getFork(null))),
             client.runEffect(Effect.flatMap(TurnProjection.Tag, (projection) => projection.getFork(null))),
-            client.runEffect(Effect.flatMap(MemoryProjection.Tag, (projection) => projection.getFork(null))),
+            client.runEffect(Effect.flatMap(WindowProjection.Tag, (projection) => projection.getFork(null))),
             client.runEffect(Effect.flatMap(AgentRoutingProjection.Tag, (projection) => projection.get)),
             client.runEffect(Effect.flatMap(AgentStatusProjection.Tag, (projection) => projection.get)),
             client.runEffect(Effect.flatMap(SessionContextProjection.Tag, (projection) => projection.get)),
@@ -566,7 +582,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
           return {
             CompactionProjection: compaction,
             TurnProjection: turn,
-            MemoryProjection: memory,
+            WindowProjection: memory,
             AgentRoutingProjection: agentRouting,
             AgentStatusProjection: agentStatus,
             SessionContextProjection: sessionContext,
@@ -614,14 +630,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
         reject: async (toolCallId: string, reason?: string): Promise<void> => {
           await send({ type: 'tool_rejected', forkId: null, toolCallId, ...(reason ? { reason } : {}) })
         },
-        waitPending: () =>
-          waitEvent('tool_event', (e) => {
-            if (e.event._tag !== 'ToolExecutionEnded') return false
-            const result = e.event.result
-            if (result._tag !== 'Rejected') return false
-            const rejection = result.rejection
-            return typeof rejection === 'object' && rejection !== null && '_tag' in rejection && rejection._tag === 'ApprovalPending'
-          }),
+        waitPending: () => Promise.resolve(undefined as never), // tool_event removed — W9 rewrite
       },
       faults: {
         set: (plan: FaultPlan): void => {

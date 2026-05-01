@@ -6,8 +6,8 @@
  */
 
 import ts from "typescript"
-import { Schema } from "@effect/schema"
-import { AST } from "@effect/schema"
+import { Schema } from "effect"
+import { SchemaAST as AST } from "effect"
 import { Option } from "effect"
 
 // =============================================================================

@@ -1,5 +1,4 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
-import type { ToolKey } from '../catalog'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import {
   clickTool,
   doubleClickTool,
@@ -16,13 +15,7 @@ import {
 } from '../tools/browser-tools'
 import { formatBrowserActionVisualFromStreaming } from '../tools/browser-action-visuals'
 
-type BrowserToolKey = Extract<
-  ToolKey,
-  'click' | 'doubleClick' | 'rightClick' | 'type' | 'scroll' | 'drag' | 'navigate' | 'goBack' | 'switchTab' | 'newTab' | 'screenshot' | 'evaluate'
->
-
 export interface BrowserActionState extends BaseState {
-  toolKey: BrowserToolKey
   label?: string
   detail?: string
   errorDetail?: string
@@ -30,7 +23,7 @@ export interface BrowserActionState extends BaseState {
   _fields: Record<string, string>
 }
 
-const initial: Omit<BrowserActionState, 'phase' | 'toolKey'> = {
+const initial: Omit<BrowserActionState, 'phase'> = {
   label: undefined,
   detail: undefined,
   errorDetail: undefined,
@@ -43,11 +36,11 @@ export function createBrowserActionModel<
   TOutput,
   TEmission,
 >(
-  config: { readonly toolKey: K; readonly tool: { inputSchema: { Type: TInput }; outputSchema: { Type: TOutput }; emissionSchema?: { Type: TEmission } } },
+  config: { readonly toolKey: K; readonly tool: { inputSchema: { Type: TInput }; outputSchema: { Type: TOutput } } },
 ) {
-  return defineStateModel(config.toolKey, config.tool)({
+  return defineStateModel(config.tool)<BrowserActionState>({
     initial,
-    reduce: (state, event) => {
+    reduce: (state, event): BrowserActionState => {
       switch (event._tag) {
         case 'ToolInputStarted':
           return { ...state, phase: 'streaming', errorDetail: undefined }
@@ -56,17 +49,17 @@ export function createBrowserActionModel<
           const visual = formatBrowserActionVisualFromStreaming(config.toolKey, fields)
           return { ...state, phase: 'streaming', _fields: fields, label: visual.label, detail: visual.detail }
         }
-        case 'ToolInputReady': {
+        case 'ToolInputReady':
+          return state
+        case 'ToolExecutionStarted': {
           const input = event.input as Record<string, unknown>
           const fields: Record<string, string> = {}
-          for (const [k, v] of Object.entries(input)) {
+          for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
             if (v !== null && v !== undefined) fields[k] = String(v)
           }
           const visual = formatBrowserActionVisualFromStreaming(config.toolKey, fields)
-          return { ...state, phase: 'streaming', _fields: fields, label: visual.label, detail: visual.detail }
+          return { ...state, phase: 'executing', _fields: fields, label: visual.label, detail: visual.detail }
         }
-        case 'ToolExecutionStarted':
-          return { ...state, phase: 'executing' }
         case 'ToolExecutionEnded': {
           switch (event.result._tag) {
             case 'Success':
@@ -77,10 +70,12 @@ export function createBrowserActionModel<
               return { ...state, phase: 'rejected' }
             case 'Interrupted':
               return { ...state, phase: 'interrupted' }
+            default:
+              return state
           }
         }
-        case 'ToolParseError':
-          return { ...state, phase: 'error', errorDetail: event.error }
+        case 'ToolInputDecodeFailed':
+          return { ...state, phase: 'error', errorDetail: event.message }
         case 'ToolEmission':
         case 'ToolInputFieldComplete':
         default:

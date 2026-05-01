@@ -29,7 +29,7 @@ export const shellDisplay = createToolDisplay<ShellState>({
     const isSuccess = isCompleted;
 
     const isFailed = isError || (isSuccess && state.exitCode !== undefined && state.exitCode !== 0);
-    const rejectionReason = isRejected ? state.rejectionReason : undefined;
+    const rejectionReason = isRejected ? state.errorMessage : undefined;
 
     const resultPreview = isSuccess
       ? (isFailed ? (state.stderr || state.stdout) : (state.stdout || state.stderr))

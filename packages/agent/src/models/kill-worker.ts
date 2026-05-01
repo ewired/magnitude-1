@@ -1,16 +1,15 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { killWorkerTool } from '../tools/task-tools'
 
 export interface KillWorkerState extends BaseState {
-  toolKey: 'killWorker'
   id?: string
 }
 
-const initial: Omit<KillWorkerState, 'phase' | 'toolKey'> = {
+const initial: Omit<KillWorkerState, 'phase'> = {
   id: undefined,
 }
 
-export const killWorkerModel = defineStateModel('killWorker', killWorkerTool)({
+export const killWorkerModel = defineStateModel(killWorkerTool)<KillWorkerState>({
   initial,
   reduce: (state, event): KillWorkerState => {
     switch (event._tag) {
@@ -21,9 +20,9 @@ export const killWorkerModel = defineStateModel('killWorker', killWorkerTool)({
           ? { ...state, phase: 'streaming', id: (state.id ?? '') + event.delta }
           : state
       case 'ToolInputReady':
-        return { ...state, phase: 'streaming', id: event.input.id }
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return { ...state, phase: 'executing', id: event.input.id ?? state.id }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':
@@ -34,10 +33,12 @@ export const killWorkerModel = defineStateModel('killWorker', killWorkerTool)({
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error' }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorMessage: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

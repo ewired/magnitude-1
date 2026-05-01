@@ -225,14 +225,17 @@ function TaskRow({
   const theme = useTheme()
   const workerPresentation = getWorkerPresentation(task.assignee, now, theme, hovered)
   const workerLabel = getAssigneeLabel(task.assignee)
-  const workerTimerSnapshot = task.assignee.kind === 'worker' && 'workerState' in task.assignee
-    ? {
-        state: task.assignee.workerState.status,
-        activeSince: task.assignee.workerState.status === 'working' ? task.assignee.workerState.activeSince : null,
-        accumulatedActiveMs: task.assignee.workerState.accumulatedMs,
-        resumeCount: task.assignee.workerState.resumeCount ?? 0,
-      }
-    : null
+  const workerTimerSnapshot = (() => {
+    if (task.assignee.kind !== 'worker' || !('workerState' in task.assignee)) return null
+    const ws = task.assignee.workerState
+    if (ws.status === 'unassigned' || ws.status === 'spawning' || ws.status === 'killing') return null
+    return {
+      state: ws.status,
+      activeSince: ws.status === 'working' ? ws.activeSince : null,
+      accumulatedActiveMs: ws.accumulatedMs,
+      resumeCount: ws.resumeCount,
+    }
+  })()
   const workerTimer = workerTimerSnapshot && workerPresentation?.showTimer
     ? formatWorkerTimer(computeWorkerElapsedMs(workerTimerSnapshot, now))
     : null

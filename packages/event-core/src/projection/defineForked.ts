@@ -288,12 +288,12 @@ export interface ForkedProjectionResult<
  *
  * @example
  * ```typescript
- * interface ForkMemoryState {
+ * interface ForkWindowState {
  *   messages: Message[]
  * }
  *
- * const MemoryProjection = Projection.defineForked<MyEvent, ForkMemoryState>()({
- *   name: 'Memory',
+ * const WindowProjection = Projection.defineForked<MyEvent, ForkWindowState>()({
+ *   name: 'Window',
  *   initialFork: { messages: [] },
  *   reads: [SessionContextProjection],
  *

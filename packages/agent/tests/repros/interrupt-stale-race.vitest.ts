@@ -32,7 +32,7 @@ describe('interrupt stale turn race (mnb0dvn5 reproduction)', () => {
     messageId: id,
     forkId: null,
     timestamp: Date.now(),
-    content: [{ type: 'text' as const, text }],
+    content: [{ _tag: 'TextPart' as const, text }],
     attachments: [] as never[],
     mode: 'text' as const,
     synthetic: false,

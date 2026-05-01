@@ -1,97 +1,104 @@
 /**
- * Cortex Worker (Forked)
+ * Cortex Worker (Forked) — Harness Paradigm
  *
- * Handles LLM streaming and xml-act execution coordination.
- * Uses Worker.defineForked for per-fork concurrent execution:
- * - Each fork gets its own fiber (parallel LLM calls)
- * - Fork completion automatically interrupts that fork's fiber
- * - Root fork (null) always runs
+ * Thin orchestrator: resolve model → build harness → run turn → publish events → publish outcome.
  *
- * Responds to turn_started events by:
- * 1. Getting memory context for the fork
- * 2. Building system prompt (XML_ACT_PROTOCOL + role + tool docs)
- * 3. Streaming LLM response
- * 4. Executing via xml-act runtime (execution manager)
- * 5. Publishing turn_outcome
+ * Uses:
+ *  - AgentModelResolver to resolve a model for the role
+ *  - createHarness to stream model responses and dispatch tool execution
+ *  - createHarnessAdapter to translate HarnessEvent → AppEvent
  */
 
-import { Effect, Stream, Either } from 'effect'
+import { Effect, Stream, Layer } from 'effect'
 import { Worker, AmbientServiceTag } from '@magnitudedev/event-core'
-
-import { LEAD_YIELD_TAGS, SUBAGENT_YIELD_TAGS, type GrammarBuildOptions, type TurnEngineCrash } from '@magnitudedev/xml-act'
 import { logger } from '@magnitudedev/logger'
+import { createHarness, type ExecuteHookContext, type InterceptorDecision } from '@magnitudedev/harness'
+import type { MagnitudeConnectionError, MagnitudeStreamError } from '@magnitudedev/magnitude-client'
+import { renderToolDocs } from '../prompts/render-tool-docs'
 
-import type { ModelError } from '@magnitudedev/providers'
-import { ModelResolver, CodingAgentChat, ContextLimitExceeded } from '@magnitudedev/providers'
-import { drainTurnEventStream } from './turn-event-drain'
-import type { ChatMessage } from '@magnitudedev/llm-core'
-import { Image as BamlImage } from '@boundaryml/baml'
-import type { ObservationPart } from '@magnitudedev/roles'
-import { buildAckTurns } from '../prompts/protocol'
-import { renderSystemPrompt } from '../prompts/system-prompt'
-import { ContentPart } from '../content'
 import type { AppEvent, TurnOutcome } from '../events'
+import type { TurnOutcome as HarnessTurnOutcome } from '@magnitudedev/harness'
 
-import { createTurnStream } from '../execution/turn-stream'
-import { TurnError as TurnErrorCtor } from '../execution/types'
-import type { TurnError } from '../execution/types'
-import { MemoryProjection, getView, LLMMessage } from '../projections/memory'
-
-import { CompactionProjection } from '../projections/compaction'
+import { WindowProjection } from '../projections/window'
 import { SessionContextProjection } from '../projections/session-context'
-import { AgentStatusProjection, getAgentByForkId } from '../projections/agent-status'
+import { AgentStatusProjection } from '../projections/agent-status'
 
-import { TurnProjection } from '../projections/turn'
-import { ExecutionManager } from '../execution/types'
+import { AgentModelResolver } from '../model/model-resolver'
 import { getAgentDefinition, getForkInfo } from '../agents/registry'
-import { generateToolGrammar } from '../tools/tool-registry'
-import { buildResolvedToolSet } from '../tools/resolved-toolset'
+import { getToolkitForRole } from '../tools/toolkits'
+import { createHarnessAdapter } from '../execution/harness-adapter'
+import { buildSystemPrompt } from '../prompts/system-prompt-builder'
+import { windowToPrompt } from '../prompts/window-to-prompt'
 
-import { withTraceScope } from '../tracing/scoped-tracer'
-import { buildInterruptedTurnOutcome } from '../util/interrupt-utils'
-import { ConfigAmbient, getSlotConfig } from '../ambient/config-ambient'
+import { ExecutionManager } from '../execution/types'
 import { SkillsAmbient } from '../ambient/skills-ambient'
-import {
-  classifyModelError,
-  classifyRetryability,
-} from './cortex-auth'
+import { buildInterruptedTurnOutcome } from '../util/interrupt-utils'
+import type { ObservationPart } from '../events'
+import type { ObservablePart } from '../observables/types'
 
-type TaggedCause = {
-  readonly _tag: string
-  readonly message?: string
+function toObservationPart(part: ObservablePart): ObservationPart {
+  switch (part._tag) {
+    case 'TextPart':
+      return { type: 'text', text: part.text }
+    case 'ImagePart':
+      return { type: 'image', base64: part.data, mediaType: part.mediaType, dimensions: part.dimensions }
+  }
 }
+import { isToolKey, type ToolKey } from '../tools/toolkits'
+import { persistResult } from '../runtime/result-persistence'
+import { PolicyContextProviderTag } from '../agents/types'
+import { handleMessageDirective } from '../tasks/operations/message'
+import { Fork } from '@magnitudedev/event-core'
 
-function isTaggedCause(cause: unknown): cause is TaggedCause {
-  return typeof cause === 'object' && cause !== null && '_tag' in cause
-}
+import * as path from 'path'
 
-function classifyUnknownTurnFailure(message: string): TurnOutcome {
-  return {
-    _tag: 'UnexpectedError',
-    message: truncateUnexpectedError(`Unexpected error while executing turn: ${message}`),
-    detail: { _tag: 'CortexDefect' },
+const { ForkContext } = Fork
+
+// =============================================================================
+// Error Mapping
+// =============================================================================
+
+function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): TurnOutcome {
+  switch (err._tag) {
+    case 'SubscriptionRequired':
+      return {
+        _tag: 'ProviderNotReady',
+        detail: { _tag: 'MagnitudeBilling', reason: { _tag: 'SubscriptionRequired', message: err.message } },
+      }
+    case 'TrialExpired':
+      return {
+        _tag: 'ProviderNotReady',
+        detail: { _tag: 'MagnitudeBilling', reason: { _tag: 'TrialExpired', message: err.message } },
+      }
+    case 'MagnitudeUsageLimitExceeded':
+      return {
+        _tag: 'ProviderNotReady',
+        detail: { _tag: 'MagnitudeBilling', reason: { _tag: 'UsageLimitExceeded', message: err.message } },
+      }
+    case 'ModelNotGrammarCompatible':
+      return { _tag: 'UnexpectedError', message: err.message, detail: { _tag: 'ProviderDefect' } }
+    case 'RoleNotFound':
+      return { _tag: 'UnexpectedError', message: err.message, detail: { _tag: 'ProviderDefect' } }
+    case 'AuthFailed':
+      return {
+        _tag: 'ProviderNotReady',
+        detail: { _tag: 'AuthFailed', providerId: 'magnitude', providerName: 'Magnitude' },
+      }
+    case 'RateLimited':
+      return { _tag: 'ConnectionFailure', detail: { _tag: 'TransportError', httpStatus: err.status } }
+    case 'UsageLimitExceeded':
+      return { _tag: 'ConnectionFailure', detail: { _tag: 'ProviderError', httpStatus: err.status } }
+    case 'ContextLimitExceeded':
+      return { _tag: 'ContextWindowExceeded' }
+    case 'InvalidRequest':
+      return { _tag: 'UnexpectedError', message: err.message, detail: { _tag: 'ProviderDefect' } }
+    case 'TransportError':
+      return { _tag: 'ConnectionFailure', detail: { _tag: 'TransportError', httpStatus: err.status ?? undefined } }
   }
 }
 
-function truncateUnexpectedError(message: string): string {
-  const maxLen = 500
-  return message.length > maxLen ? `${message.slice(0, maxLen)}...` : message
-}
-
-function toLLMContent(parts: ContentPart[]): (BamlImage | string)[] {
-  return parts.map(part => {
-    switch (part.type) {
-      case 'text': return part.text
-      case 'image': return BamlImage.fromBase64(part.mediaType, part.base64)
-    }
-  })
-}
-
-function toBamlMessages(messages: LLMMessage[]): ChatMessage[] {
-  return messages.map(m => ({
-    role: m.role,
-    content: toLLMContent(m.content)
-  }))
+function mapStreamErrorToOutcome(err: MagnitudeStreamError): HarnessTurnOutcome {
+  return { _tag: 'EngineDefect', message: `Stream error: ${err.message ?? 'unknown'}` }
 }
 
 // =============================================================================
@@ -111,316 +118,246 @@ export const Cortex = Worker.defineForked<AppEvent>()({
       if (event.forkId === null) return
       return yield* Effect.interrupt
     }),
+
     subagent_idle_closed: (event) => Effect.gen(function* () {
       if (event.forkId === null) return
       return yield* Effect.interrupt
     }),
+
     turn_started: (event, publish, read) => {
       const { forkId, turnId, chainId } = event
 
-      let resolvedProviderId: string | null = null
-      let resolvedProviderName: string | null = null
-      let resolvedModelId: string | null = null
-
       return Effect.gen(function* () {
-        const sessionCtx = yield* read(SessionContextProjection)
-        const agentState = yield* read(AgentStatusProjection)
-        const turnState = yield* read(TurnProjection, forkId)
-        const triggeredByUser =
-          (turnState._tag === 'active' || turnState._tag === 'interrupting')
-            ? turnState.triggeredByUser
-            : false
+        // ──────────────────────────────────────────────────────────────────────
+        // 1. Read projections
+        // ──────────────────────────────────────────────────────────────────────
+        const sessionCtx   = yield* read(SessionContextProjection)
+        const agentState   = yield* read(AgentStatusProjection)
+        const windowState  = yield* read(WindowProjection, forkId)
+        // TODO(Phase 3E): Pass replay state to harness for crash recovery.
+        // ReplayProjection uses turn-engine EngineState; harness uses its own EngineState.
+        // Needs type migration before it can be wired through.
+        // const replayState = yield* read(ReplayProjection, forkId)
+
         const forkInfo = getForkInfo(agentState, forkId)
         if (!forkInfo) return
-        const { variant, slot: modelSlot } = forkInfo
-        const agentDef = getAgentDefinition(variant)
-        const agentInstance = forkId ? getAgentByForkId(agentState, forkId) : null
-        const timezone = sessionCtx.context?.timezone ?? null
 
-        const runtime = yield* ModelResolver
+        const { roleId } = forkInfo
+        const agentDef = getAgentDefinition(roleId)
 
-        // Step 1: Ensure model ready and capture vision support
-        const resolveResult = yield* runtime.resolve(modelSlot).pipe(Effect.either)
-        if (Either.isLeft(resolveResult)) {
-          const outcome = classifyModelError(resolveResult.left)
-          yield* publish({
-            type: 'turn_outcome',
-            forkId,
-            turnId,
-            chainId,
-            strategyId: 'xml-act',
-            outcome,
-            inputTokens: null,
-            outputTokens: null,
-            cacheReadTokens: null,
-            cacheWriteTokens: null,
-            providerId: null,
-            modelId: null,
-          })
-          return
-        }
-        const boundModel = resolveResult.right
-        resolvedProviderId = boundModel.model.providerId
-        resolvedProviderName = boundModel.model.providerName
-        resolvedModelId = boundModel.model.id
+        // ──────────────────────────────────────────────────────────────────────
+        // 2. Resolve model
+        // ──────────────────────────────────────────────────────────────────────
+        const modelResolver = yield* AgentModelResolver
+        const agentModel = yield* modelResolver.resolve(roleId)
 
-        // Run agent observables
+        // ──────────────────────────────────────────────────────────────────────
+        // 3. Observations
+        // ──────────────────────────────────────────────────────────────────────
         const execManager = yield* ExecutionManager
         const observations: ObservationPart[] = []
         const boundObs = execManager.getObservables(forkId)
         for (const obs of boundObs) {
           const parts = yield* obs.observe()
-          observations.push(...parts)
+          observations.push(...parts.map(toObservationPart))
         }
-
-        // Publish observations so memory projection includes them
         if (observations.length > 0) {
-          yield* publish({
-            type: 'observations_captured',
-            forkId,
-            turnId,
-            parts: observations,
-          })
+          yield* publish({ type: 'observations_captured', forkId, turnId, parts: observations })
         }
 
-        // 2. Build system prompt with runtime protocol/tool-doc substitution
+        // ──────────────────────────────────────────────────────────────────────
+        // 4. Get toolkit and fork layer
+        // ──────────────────────────────────────────────────────────────────────
+        const toolkit = getToolkitForRole(roleId)
+        const forkLayer = execManager.getForkLayer(forkId)
+        if (!forkLayer) {
+          logger.error({ forkId, turnId }, '[Cortex] Fork layer not initialized — aborting turn')
+          yield* publish({
+            type: 'turn_outcome', forkId, turnId, chainId,
+            strategyId: 'native',
+            outcome: { _tag: 'UnexpectedError', message: 'Fork layer not initialized', detail: { _tag: 'CortexDefect' } },
+            inputTokens: null, outputTokens: null,
+            cacheReadTokens: null, cacheWriteTokens: null,
+            providerId: 'magnitude', modelId: agentModel.modelId,
+          })
+          return
+        }
+
+        // ──────────────────────────────────────────────────────────────────────
+        // 5. Build system prompt
+        // ──────────────────────────────────────────────────────────────────────
         const ambientService = yield* AmbientServiceTag
         const skills = ambientService.getValue(SkillsAmbient)
 
-        // Build ResolvedToolSet for this slot — single decision site for tool availability
-        const configState = ambientService.getValue(ConfigAmbient)
-        const toolSet = buildResolvedToolSet(agentDef, configState, modelSlot)
+        const workspacePath = sessionCtx.context?.workspacePath ?? process.cwd()
 
-        // Build messages array (now includes observations in system inbox)
-        const forkMemory = yield* read(MemoryProjection)
-        const chatMessages: ChatMessage[] = toBamlMessages(getView(forkMemory.messages, timezone, 'agent', boundModel.model.supportsVision))
-        const systemPrompt = renderSystemPrompt(agentDef, skills, toolSet)
+        const harness = createHarness({
+          model: agentModel.model,
+          toolkit,
+          mapStreamError: mapStreamErrorToOutcome,
+          layer: forkLayer,
+          hooks: buildHarnessHooks({
+            forkId,
+            turnId,
+            agentDef,
+            workspacePath,
+          }),
+        })
 
-        logger.info({ variant, forkId, turnId }, '[Cortex] Executing turn via xml-act')
+        const toolDefs = harness.getToolDefinitions()
+        const toolDocs = toolDefs.length > 0
+          ? renderToolDocs(toolDefs)
+          : ''
 
-        // 2b. Provide input token estimate so provider can clamp max_tokens
-        const compactionState = yield* read(CompactionProjection, forkId)
+        const systemPrompt = buildSystemPrompt({
+          roleDef: agentDef,
+          skills,
+          lenses: [],
+          toolDocs,
+        })
 
-        // 3. Build and consume the turn event stream
-        // Check if grammar is disabled via env var (MAGNITUDE_ENABLE_GRAMMAR)
-        const grammarEnabled = ((): boolean => {
-          const envValue = process.env.MAGNITUDE_ENABLE_GRAMMAR
-          if (envValue === undefined) return true // Default: enabled
-          const normalized = envValue.toLowerCase().trim()
-          return normalized !== '0' && normalized !== 'false' && normalized !== ''
-        })()
-        const grammarSafe = boundModel.model.supportsGrammar !== false
-        const isSubagent = agentDef.protocolRole === 'subagent'
-        const yieldTags = isSubagent ? [...SUBAGENT_YIELD_TAGS] : [...LEAD_YIELD_TAGS]
+        // ──────────────────────────────────────────────────────────────────────
+        // 6. Build prompt from memory
+        // ──────────────────────────────────────────────────────────────────────
+        const timezone = sessionCtx.context?.timezone ?? null
+        const supportsVision = agentModel.profile.capabilities.vision
+        const prompt = windowToPrompt(windowState, systemPrompt, timezone, supportsVision)
 
-        const grammarOptions: GrammarBuildOptions = {
-          yieldTags,
+        // ──────────────────────────────────────────────────────────────────────
+        // 7. Build adapter
+        // ──────────────────────────────────────────────────────────────────────
+        const agentKind = agentDef.agentKind
+        const defaultProseDest = agentKind === 'worker'
+          ? { kind: 'parent' as const }
+          : { kind: 'user' as const }
+
+        // Build toolName → ToolKey map from toolkit
+        const toolNameToKey = new Map<string, ToolKey>()
+        for (const key of toolkit.keys) {
+          if (isToolKey(key)) {
+            const entry = toolkit.entries[key]
+            const toolName = entry.tool.definition.name
+            toolNameToKey.set(toolName, key as ToolKey)
+          }
         }
 
-        const toolGrammar = grammarEnabled && grammarSafe
-          ? generateToolGrammar(toolSet, grammarOptions)
-          : undefined
-        const turnStream = createTurnStream((sink) => Effect.gen(function* () {
-          const ackTurns = buildAckTurns(agentDef.lenses, agentDef.defaultRecipient)
-          const cs = yield* withTraceScope(
-            {
-              metadata: { callType: 'chat', forkId, forkName: agentInstance?.name ?? 'root', turnId, chainId },
-              strategyId: 'xml-act',
-              systemPrompt,
-            },
-            boundModel.invoke(
-              CodingAgentChat,
-              {
-                systemPrompt,
-                messages: chatMessages,
-                options: { grammar: toolGrammar },
-                ackTurns,
-              },
-              { inputTokenEstimate: compactionState.tokenEstimate },
-            ),
-          ).pipe(
-            Effect.mapError((e) => TurnErrorCtor.LLMFailed({ message: e.message, cause: e })),
-          )
-
-          // Collect raw chunks and execute via xml-act runtime
-          const xmlStream = cs.stream.pipe(
-            Stream.tap(chunk => sink.emit({ _tag: 'RawResponseChunk', text: chunk })),
-          )
-
-          const executeResult = yield* execManager.execute(
-            xmlStream,
-            {
-              forkId,
-              turnId,
-              chainId,
-              defaultProseDest: agentDef.defaultRecipient,
-              triggeredByUser,
-              toolSet,
-            },
-            sink,
-          )
-
-          // Extract usage — tag as partial if execution failed
-          const usage = cs.getUsage()
-          const usageWithStatus = { ...usage, partial: executeResult.result._tag !== 'Completed' }
-
-          // Offer final result
-          yield* sink.emit({ _tag: 'TurnResult', value: { executeResult, usage: usageWithStatus } })
-        }))
-
-        // 3a. Drain turn stream, publishing events and collecting the final result
-        const drained = yield* drainTurnEventStream(turnStream, forkId, turnId, publish)
-
-        const { executeResult, usage } = drained.finalResult
-
-        const inputTokens = usage.inputTokens
-        if (inputTokens !== null) {
-          logger.info({ inputTokens, usage, forkId, turnId }, '[Cortex] Captured usage from LLM response')
-        }
-
-        // 4. Detect output truncation — if output tokens hit the model limit,
-        // the response was cut short (incomplete XML, broken tool calls, etc.)
-        const outputTruncated = usage.outputTokens !== null
-          && boundModel.model.maxOutputTokens !== null
-          && usage.outputTokens >= boundModel.model.maxOutputTokens
-
-        const turnResult: TurnOutcome = outputTruncated
-          ? { _tag: 'OutputTruncated' }
-          : executeResult.result
-
-        yield* publish({
-          type: 'turn_outcome',
+        const adapter = createHarnessAdapter({
           forkId,
           turnId,
           chainId,
-          strategyId: 'xml-act',
-          outcome: turnResult,
-          inputTokens,
-          outputTokens: usage.outputTokens,
-          cacheReadTokens: usage.cacheReadTokens,
-          cacheWriteTokens: usage.cacheWriteTokens,
-          providerId: boundModel.model.providerId,
-          modelId: boundModel.model.id,
+          roleId,
+          defaultProseDest,
+          triggeredByUser: chainId === turnId,
+          publish,
+          handleTaskDirective: (directive) =>
+            handleMessageDirective(directive, {
+              forkId,
+              timestamp: Date.now(),
+              graph: { tasks: new Map() },
+              skills,
+            }),
+          identicalResponseTracker: null,
+          resolveToolKey: (toolName: string) => toolNameToKey.get(toolName),
+        })
+
+        // ──────────────────────────────────────────────────────────────────────
+        // 8. Run turn
+        // ──────────────────────────────────────────────────────────────────────
+        const liveTurn = yield* harness.runTurn(prompt).pipe(
+          Effect.catchAll((err: MagnitudeConnectionError) => Effect.gen(function* () {
+            logger.error({ forkId, turnId, err }, '[Cortex] Pre-stream connection error')
+            yield* publish({
+              type: 'turn_outcome', forkId, turnId, chainId,
+              strategyId: 'native',
+              outcome: mapConnectionErrorToOutcome(err),
+              inputTokens: null, outputTokens: null,
+              cacheReadTokens: null, cacheWriteTokens: null,
+              providerId: 'magnitude', modelId: agentModel.modelId,
+            })
+            return null
+          })),
+        )
+
+        if (liveTurn === null) return
+
+        // ──────────────────────────────────────────────────────────────────────
+        // 9. Consume events via adapter
+        // ──────────────────────────────────────────────────────────────────────
+        yield* Stream.runForEach(liveTurn.events, (event) => adapter.processEvent(event))
+
+        // ──────────────────────────────────────────────────────────────────────
+        // 10. Publish turn_outcome
+        // ──────────────────────────────────────────────────────────────────────
+        const executeResult = adapter.getResult()
+
+        yield* publish({
+          type: 'turn_outcome', forkId, turnId, chainId,
+          strategyId: 'native',
+          outcome: executeResult.result,
+          inputTokens:      executeResult.usage?.inputTokens ?? null,
+          outputTokens:     executeResult.usage?.outputTokens ?? null,
+          cacheReadTokens:  executeResult.usage?.cacheReadTokens ?? null,
+          cacheWriteTokens: executeResult.usage?.cacheWriteTokens ?? null,
+          providerId: 'magnitude',
+          modelId:    agentModel.modelId,
         })
       }).pipe(
         Effect.onInterrupt(() => Effect.gen(function* () {
           const turnOutcome = yield* buildInterruptedTurnOutcome({ forkId, turnId, chainId })
           yield* publish(turnOutcome)
         }).pipe(Effect.orDie)),
-        Effect.catchAll((error: TurnEngineCrash | TurnError) => Effect.gen(function* () {
-          if (error._tag === 'TurnEngineCrash') {
-            const cause = error.cause
-            if (isTaggedCause(cause)) {
-              const errorType = cause._tag
-              const errorMessage = cause.message ?? error.message
-              logger.error({ context: 'Cortex', forkId, turnId, errorType }, `Cortex: Mid-stream ModelError (${errorType}): ${errorMessage}`)
-
-              const outcome = errorType === 'ChannelException' || errorType === 'StreamError'
-                ? { _tag: 'ConnectionFailure', detail: { _tag: 'StreamError' } } satisfies TurnOutcome
-                : classifyModelError(cause as ModelError)
-
-              yield* publish({
-                type: 'turn_outcome',
-                forkId,
-                turnId,
-                chainId,
-                strategyId: 'xml-act',
-                outcome,
-                inputTokens: null,
-                outputTokens: null,
-                cacheReadTokens: null,
-                cacheWriteTokens: null,
-                providerId: resolvedProviderId,
-                modelId: resolvedModelId,
-              })
-              return
-            }
-            return yield* Effect.die(error)
-          }
-
-          const errorMessage = error.message
-          const errorCause = error.cause
-          const definiteContextLimit = classifyRetryability(errorCause) === 'context-limit'
-
-          let probableContextLimit = false
-          if (!definiteContextLimit) {
-            const compactionState = yield* read(CompactionProjection, forkId)
-            const ambientService = yield* AmbientServiceTag
-            const configState = ambientService.getValue(ConfigAmbient)
-            const heuristicAgentStatus = yield* read(AgentStatusProjection)
-            const heuristicForkInfo = getForkInfo(heuristicAgentStatus, forkId)
-            if (heuristicForkInfo) {
-              const { softCap } = getSlotConfig(configState, heuristicForkInfo.slot)
-              probableContextLimit = compactionState.tokenEstimate >= softCap && compactionState._tag !== 'idle'
-            }
-          }
-
-          if (definiteContextLimit || probableContextLimit) {
-            logger.warn({
-              context: 'Cortex',
-              forkId,
-              turnId,
-              chainId,
-              definite: definiteContextLimit,
-              probable: probableContextLimit,
-              error: errorMessage
-            }, 'Cortex: Context limit hit, blocking until compaction completes')
-
-            yield* publish({
-              type: 'context_limit_hit',
-              forkId,
-              error: errorMessage,
-            })
-
-            const outcome = errorCause instanceof ContextLimitExceeded
-              ? classifyModelError(errorCause)
-              : { _tag: 'ContextWindowExceeded' } satisfies TurnOutcome
-
-            yield* publish({
-              type: 'turn_outcome',
-              forkId,
-              turnId,
-              chainId,
-              strategyId: 'xml-act',
-              outcome,
-              inputTokens: null,
-              outputTokens: null,
-              cacheReadTokens: null,
-              cacheWriteTokens: null,
-              providerId: resolvedProviderId,
-              modelId: resolvedModelId,
-            })
-            return
-          }
-
-          logger.error({
-            context: 'Cortex',
-            forkId,
-            turnId,
-            chainId,
-            error: errorMessage
-          }, 'Cortex: LLM stream failed after all retries')
-
-          const outcome = errorCause !== null && typeof errorCause === 'object' && '_tag' in errorCause
-            ? classifyModelError(errorCause as ModelError)
-            : classifyUnknownTurnFailure(errorMessage)
-
+        Effect.catchAll((error: unknown) => Effect.gen(function* () {
+          const message = error instanceof Error ? error.message : String(error)
+          logger.error({ context: 'Cortex', forkId, turnId, error: message }, '[Cortex] Unexpected error in turn_started')
           yield* publish({
-            type: 'turn_outcome',
-            forkId,
-            turnId,
-            chainId,
-            strategyId: 'xml-act',
-            outcome,
-            inputTokens: null,
-            outputTokens: null,
-            cacheReadTokens: null,
-            cacheWriteTokens: null,
-            providerId: resolvedProviderId,
-            modelId: resolvedModelId,
+            type: 'turn_outcome', forkId, turnId, chainId,
+            strategyId: 'native',
+            outcome: { _tag: 'UnexpectedError', message, detail: { _tag: 'CortexDefect' } },
+            inputTokens: null, outputTokens: null,
+            cacheReadTokens: null, cacheWriteTokens: null,
+            providerId: null, modelId: null,
           })
-        }))
+        })),
       )
-    }
-  }
+    },
+  },
 })
+
+// =============================================================================
+// Harness Hooks
+// =============================================================================
+
+function buildHarnessHooks(ctx: {
+  readonly forkId: string | null
+  readonly turnId: string
+  readonly agentDef: ReturnType<typeof getAgentDefinition>
+  readonly workspacePath: string
+}): import('@magnitudedev/harness').HarnessHooks<PolicyContextProviderTag> {
+  const { forkId, turnId, agentDef, workspacePath } = ctx
+  const resultsDir = path.join(workspacePath, 'results')
+
+  return {
+    beforeExecute: (hookCtx: ExecuteHookContext) =>
+      Effect.gen(function* () {
+        const policyCtxProvider = yield* PolicyContextProviderTag
+        const policyContext = yield* policyCtxProvider.get
+
+        for (const rule of agentDef.policy) {
+          const decision = yield* rule({ ...hookCtx, policyContext })
+          if (decision !== null) return decision
+        }
+        return { _tag: 'Proceed' as const } satisfies InterceptorDecision
+      }),
+
+    afterExecute: (hookCtx: ExecuteHookContext & { readonly result: import('@magnitudedev/harness').ToolResult }) =>
+      Effect.gen(function* () {
+        if (hookCtx.result._tag === 'Success') {
+          yield* persistResult(hookCtx.result.output, turnId, hookCtx.toolCallId, resultsDir).pipe(
+            Effect.catchAll((e) => Effect.gen(function* () {
+              logger.warn({ forkId, turnId, toolCallId: hookCtx.toolCallId, e }, '[Cortex] persistResult failed')
+            })),
+          )
+        }
+      }),
+  }
+}

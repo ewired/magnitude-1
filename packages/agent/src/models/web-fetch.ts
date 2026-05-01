@@ -1,18 +1,17 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { webFetchTool } from '../tools/web-fetch-tool'
 
 export interface WebFetchState extends BaseState {
-  toolKey: 'webFetch'
   url?: string
   errorDetail?: string
 }
 
-const initial: Omit<WebFetchState, 'phase' | 'toolKey'> = {
+const initial: Omit<WebFetchState, 'phase'> = {
   url: undefined,
   errorDetail: undefined,
 }
 
-export const webFetchModel = defineStateModel('webFetch', webFetchTool)({
+export const webFetchModel = defineStateModel(webFetchTool)<WebFetchState>({
   initial,
   reduce: (state, event): WebFetchState => {
     switch (event._tag) {
@@ -23,23 +22,25 @@ export const webFetchModel = defineStateModel('webFetch', webFetchTool)({
           ? { ...state, phase: 'streaming', url: (state.url ?? '') + event.delta }
           : state
       case 'ToolInputReady':
-        return { ...state, phase: 'streaming', url: event.input.url }
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return { ...state, phase: 'executing', url: event.input.url ?? state.url }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':
-            return { ...state, phase: 'completed', url: (event.result.output as { url: string }).url }
+            return { ...state, phase: 'completed', url: event.result.output.url }
           case 'Error':
-            return { ...state, phase: 'error', errorDetail: event.result.error }
+            return { ...state, phase: 'error', errorDetail: event.result.error.message }
           case 'Rejected':
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error', errorDetail: event.error }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorDetail: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

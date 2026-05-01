@@ -208,7 +208,7 @@ const ToolStepView = memo(function ToolStepView({
 }) {
   const theme = useTheme()
   if (step.state) {
-    return <>{renderToolStep(step.state, {
+    return <>{renderToolStep(step.toolKey, step.state, {
       isExpanded,
       onToggle,
       onFileClick: onFileClick ?? (() => {}),

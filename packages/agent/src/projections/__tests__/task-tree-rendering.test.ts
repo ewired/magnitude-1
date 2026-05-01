@@ -9,14 +9,13 @@ import {
 } from '@magnitudedev/event-core'
 import type { AppEvent } from '../../events'
 import { AgentStatusProjection } from '../agent-status'
-import { MemoryProjection, type ForkMemoryState } from '../memory'
+import { WindowProjection, type ForkWindowState } from '../window'
 import { SubagentActivityProjection } from '../subagent-activity'
-import { CanonicalTurnProjection } from '../canonical-turn'
 import { UserPresenceProjection } from '../user-presence'
 import { OutboundMessagesProjection } from '../outbound-messages'
 import { UserMessageResolutionProjection } from '../user-message-resolution'
 import { TaskGraphProjection } from '../task-graph'
-import { formatInbox } from '../../inbox/render'
+import { renderTimeline } from '../../inbox/render'
 
 const ts = (n: number) => 1_700_200_000_000 + n
 
@@ -32,12 +31,11 @@ const makeRuntimeLayer = () => {
     projectionBusLayer,
     Layer.provide(AgentStatusProjection.Layer, projectionBusLayer),
     Layer.provide(SubagentActivityProjection.Layer, projectionBusLayer),
-    Layer.provide(CanonicalTurnProjection.Layer, projectionBusLayer),
     Layer.provide(UserPresenceProjection.Layer, projectionBusLayer),
     Layer.provide(OutboundMessagesProjection.Layer, projectionBusLayer),
     Layer.provide(UserMessageResolutionProjection.Layer, projectionBusLayer),
     Layer.provide(TaskGraphProjection.Layer, projectionBusLayer),
-    Layer.provide(MemoryProjection.Layer, projectionBusLayer),
+    Layer.provide(WindowProjection.Layer, projectionBusLayer),
   )
 }
 
@@ -46,7 +44,7 @@ const runEvents = async (events: AppEvent[]) => {
 
   const program = Effect.gen(function* () {
     const bus = yield* ProjectionBusTag<AppEvent>()
-    const projection = yield* MemoryProjection.Tag
+    const projection = yield* WindowProjection.Tag
 
     for (const event of events) {
       yield* bus.processEvent(event as any)
@@ -55,23 +53,22 @@ const runEvents = async (events: AppEvent[]) => {
     return yield* projection.getFork(null)
   })
 
-  return Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)) as any) as Promise<ForkMemoryState>
+  return Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)) as any) as Promise<ForkWindowState>
 }
 
-const getLastInbox = (fork: ForkMemoryState) => {
-  const inbox = [...fork.messages].reverse().find(m => m.type === 'inbox')
-  expect(inbox).toBeTruthy()
-  return inbox as Extract<ForkMemoryState['messages'][number], { type: 'inbox' }>
+const getLastContext = (fork: ForkWindowState) => {
+  const ctx = [...fork.messages].reverse().find(m => m.type === 'context')
+  expect(ctx).toBeTruthy()
+  return ctx as Extract<ForkWindowState['messages'][number], { type: 'context' }>
 }
 
-const inboxText = (inbox: Extract<ForkMemoryState['messages'][number], { type: 'inbox' }>) =>
-  formatInbox({
-    results: inbox.outcomes,
-    timeline: inbox.timeline,
+const contextText = (ctx: Extract<ForkWindowState['messages'][number], { type: 'context' }>) =>
+  renderTimeline({
+    timeline: ctx.timeline,
     timezone: null,
     supportsVision: true,
   })
-    .filter((p): p is { type: 'text', text: string } => p.type === 'text')
+    .filter((p): p is { _tag: 'TextPart', text: string } => p._tag === 'TextPart')
     .map(p => p.text)
     .join('')
 
@@ -106,11 +103,11 @@ describe('task tree rendering mechanics', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    const taskUpdates = inbox.timeline.filter(e => e.kind === 'task_update')
+    const ctx = getLastContext(rootFork)
+    const taskUpdates = ctx.timeline.filter(e => e.kind === 'task_update')
     expect(taskUpdates.some((e: any) => e.action === 'created' && e.taskId === 'root-1')).toBe(true)
 
-    const treeViews = inbox.timeline.filter(e => e.kind === 'task_tree_view')
+    const treeViews = ctx.timeline.filter(e => e.kind === 'task_tree_view')
     expect(treeViews.length).toBe(1)
     expect((treeViews[0] as any).renderedTree).toContain('[pending] implement: Root 1 (root-1)')
   })
@@ -163,8 +160,8 @@ describe('task tree rendering mechanics', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    const treeViews = inbox.timeline.filter(e => e.kind === 'task_tree_view')
+    const ctx = getLastContext(rootFork)
+    const treeViews = ctx.timeline.filter(e => e.kind === 'task_tree_view')
     expect(treeViews.length).toBe(1)
     const rendered = (treeViews[0] as any).renderedTree as string
     expect(rendered.match(/\[pending\] feature: Root 1 \(root-1\)/g)?.length ?? 0).toBe(1)
@@ -229,15 +226,15 @@ describe('task tree rendering mechanics', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    const treeViews = inbox.timeline.filter(e => e.kind === 'task_tree_view')
+    const ctx = getLastContext(rootFork)
+    const treeViews = ctx.timeline.filter(e => e.kind === 'task_tree_view')
     expect(treeViews.length).toBe(1)
     const rendered = (treeViews[0] as any).renderedTree as string
     expect(rendered).toContain('[pending] feature: Root A (root-a)')
     expect(rendered).toContain('[pending] bug: Root B (root-b)')
   })
 
-  it('no task signals: no task_tree_view and no <task_tree> in formatted inbox', async () => {
+  it('no task signals: no task_tree_view and no <task_tree> in formatted context', async () => {
     const rootFork = await runEvents([
       {
         type: 'session_initialized',
@@ -258,14 +255,14 @@ describe('task tree rendering mechanics', () => {
       } as any,
     ])
 
-    const inbox = [...rootFork.messages].reverse().find(m => m.type === 'inbox')
-    if (!inbox) {
-      expect(inbox).toBeUndefined()
+    const ctx = [...rootFork.messages].reverse().find(m => m.type === 'context')
+    if (!ctx) {
+      expect(ctx).toBeUndefined()
       return
     }
 
-    expect(inbox.timeline.some(e => e.kind === 'task_tree_view')).toBe(false)
-    expect(inboxText(inbox as any)).not.toContain('<task_tree>')
+    expect(ctx.timeline.some(e => e.kind === 'task_tree_view')).toBe(false)
+    expect(contextText(ctx as any)).not.toContain('<task_tree>')
   })
 
   it('duplicate dirty markers for same task: deduplicates and renders once', async () => {
@@ -305,8 +302,8 @@ describe('task tree rendering mechanics', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    const treeViews = inbox.timeline.filter(e => e.kind === 'task_tree_view')
+    const ctx = getLastContext(rootFork)
+    const treeViews = ctx.timeline.filter(e => e.kind === 'task_tree_view')
     expect(treeViews.length).toBe(1)
     const rendered = (treeViews[0] as any).renderedTree as string
     expect(rendered.match(/\(task-dup\)/g)?.length ?? 0).toBe(1)
@@ -349,8 +346,8 @@ describe('task tree rendering mechanics', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    const treeViews = inbox.timeline.filter(e => e.kind === 'task_tree_view')
+    const ctx = getLastContext(rootFork)
+    const treeViews = ctx.timeline.filter(e => e.kind === 'task_tree_view')
     expect(treeViews.length).toBe(1)
     expect((treeViews[0] as any).renderedTree).toContain('[done] implement: Task Final (task-final)')
   })
@@ -393,8 +390,8 @@ describe('task tree rendering mechanics', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    const treeViews = inbox.timeline.filter(e => e.kind === 'task_tree_view')
+    const ctx = getLastContext(rootFork)
+    const treeViews = ctx.timeline.filter(e => e.kind === 'task_tree_view')
     expect(treeViews.length).toBe(1)
     expect((treeViews[0] as any).renderedTree).toContain(
       '[pending] diagnose: Root cause analysis (diag-1, assigned: debugger)',
@@ -431,9 +428,9 @@ describe('task tree rendering mechanics', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    expect(inbox.timeline.some(e => e.kind === 'task_tree_dirty')).toBe(false)
-    const rendered = inboxText(inbox)
+    const ctx = getLastContext(rootFork)
+    expect(ctx.timeline.some(e => e.kind === 'task_tree_dirty')).toBe(false)
+    const rendered = contextText(ctx)
     expect(rendered).toContain('<task_tree>')
     expect(rendered).not.toContain('task_tree_dirty')
   })
@@ -483,12 +480,12 @@ describe('task tree rendering mechanics', () => {
       } as any,
     ])
 
-    const inbox = getLastInbox(rootFork)
-    expect(inbox.timeline.some((e: any) => e.kind === 'task_update' && e.action === 'cancelled' && e.taskId === 'task-cancel')).toBe(true)
-    expect(inbox.timeline.some(e => e.kind === 'task_tree_view')).toBe(false)
+    const ctx = getLastContext(rootFork)
+    expect(ctx.timeline.some((e: any) => e.kind === 'task_update' && e.action === 'cancelled' && e.taskId === 'task-cancel')).toBe(true)
+    expect(ctx.timeline.some(e => e.kind === 'task_tree_view')).toBe(false)
   })
 
-  it('cancel-only after assistant turn still appends inbox on next turn_started', async () => {
+  it('cancel-only after assistant turn still appends context on next turn_started', async () => {
     const rootFork = await runEvents([
       {
         type: 'session_initialized',
@@ -525,7 +522,7 @@ describe('task tree rendering mechanics', () => {
         result: {
           _tag: 'Completed',
           completion: {
-            yieldTarget: 'user',
+            toolCallsCount: 0, finishReason: 'stop' as const,
             feedback: [],
           },
         },
@@ -548,8 +545,8 @@ describe('task tree rendering mechanics', () => {
     ])
 
     const lastMessage = rootFork.messages[rootFork.messages.length - 1]
-    expect(lastMessage?.type).toBe('inbox')
-    const inbox = lastMessage as Extract<ForkMemoryState['messages'][number], { type: 'inbox' }>
-    expect(inbox.timeline.some((e: any) => e.kind === 'task_update' && e.action === 'cancelled')).toBe(true)
+    expect(lastMessage?.type).toBe('context')
+    const ctx = lastMessage as Extract<ForkWindowState['messages'][number], { type: 'context' }>
+    expect(ctx.timeline.some((e: any) => e.kind === 'task_update' && e.action === 'cancelled')).toBe(true)
   })
 })

@@ -22,6 +22,10 @@ export type {
 
 export type { FaultPlan, FaultScope, FaultRegistry } from './faults'
 
+export type { TestModelConfig } from './test-model'
+export { createTestBoundModel } from './test-model'
+export { makeTestModelResolver } from './test-resolver'
+
 export { withAgentOverrides } from './agent-overrides'
 export { runWithGlobalAgentTestGuard } from './global-test-guard'
 export { createVirtualFs, createVirtualFsLayer } from './virtual-fs'

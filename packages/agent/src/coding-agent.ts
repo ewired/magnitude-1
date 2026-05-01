@@ -3,7 +3,7 @@
  *
  * A minimal coding agent that:
  * - Uses event-core architecture (projections, workers, signals)
- * - Uses js-act for sandbox execution with tool calling
+ * - Uses native tool calling via TurnEngine
  * - Has a shell command tool for executing commands
  * - Supports session persistence and hydration
  */
@@ -18,7 +18,7 @@ import type { DebugSnapshot } from './projections/debug-introspection'
 import { SessionContextProjection } from './projections/session-context'
 import { TurnProjection } from './projections/turn'
 import { CanonicalTurnProjection } from './projections/canonical-turn'
-import { MemoryProjection } from './projections/memory'
+import { WindowProjection } from './projections/window'
 import { SubagentActivityProjection } from './projections/subagent-activity'
 import { DisplayProjection } from './projections/display'
 import { ToolStateProjection } from './projections/tool-state'
@@ -43,7 +43,7 @@ import { LifecycleCoordinator } from './workers/lifecycle-coordinator'
 import { Autopilot } from './workers/autopilot'
 import { CompactionWorker } from './workers/compaction-worker'
 import { ApprovalWorker } from './workers/approval-worker'
-import { isValidVariant, type AgentVariant } from './agents/variants'
+import { isRoleId, type RoleId } from './agents/role-validation'
 import { UserPresenceWorker } from './workers/user-presence-worker'
 import { FileMentionResolver } from './workers/file-mention-resolver'
 import { SessionTitleWorker } from './workers/session-title-worker'
@@ -53,7 +53,7 @@ import { FsLive } from './services/fs'
 import { ExecutionManager } from './execution/types'
 import { ExecutionManagerLive } from './execution/execution-manager'
 import { BrowserServiceLive } from './services/browser-service'
-import { WebSearchServiceLive } from './services/web-search-service'
+
 import { FetchHttpClient } from '@effect/platform'
 import { registerApprovalBridge } from './execution/approval-bridge'
 
@@ -63,18 +63,26 @@ import { ChatPersistence } from './persistence/chat-persistence-service'
 // Utils
 import { collectSessionContext } from './util/collect-session-context'
 
-// Providers
-import { bootstrapProviderRuntime, makeModelResolver, makeNoopTracer, makeProviderRuntimeLive, makeTracePersister, type ProviderRuntime } from '@magnitudedev/providers'
-import { MAGNITUDE_SLOTS, type MagnitudeSlot } from './model-slots'
+// Engine layers
+
+import { AgentModelResolverLive } from './model/model-resolver'
+
+// Config & Auth
+import { Auth } from '@magnitudedev/ai'
+import { MagnitudeConfig } from './model/magnitude-config'
+import { MagnitudeClient, createMagnitudeClient } from '@magnitudedev/magnitude-client'
+import type { ModelOverrides } from '@magnitudedev/roles'
+import { makeNoopTracer, makeTracePersister } from './tracing/tracing'
 import type { StorageClient } from '@magnitudedev/storage'
 import { initLogger, logger } from '@magnitudedev/logger'
 import { writeTrace, initTraceSession } from '@magnitudedev/tracing'
 
 import { EphemeralSessionContextTag } from './agents/types'
-import { publishConfigFromProviders } from './ambient/config-ambient'
+import { publishConfigFromMagnitude } from './ambient/config-ambient'
 import { loadSkills } from '@magnitudedev/skills'
 import { SkillsAmbient, publishSkills } from './ambient/skills-ambient'
-
+import { publishToolkit } from './ambient/toolkit-ambient'
+import { leaderToolkit } from './tools/toolkits'
 
 // =============================================================================
 // Agent
@@ -97,7 +105,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
     OutboundMessagesProjection,
     UserMessageResolutionProjection,
     ToolStateProjection,
-    MemoryProjection,
+    WindowProjection,
     TaskWorkerProjection,
     DisplayProjection,
     ConversationProjection,
@@ -132,7 +140,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
       display: DisplayProjection,
       toolState: ToolStateProjection,
       turn: TurnProjection,
-      memory: MemoryProjection,
+      memory: WindowProjection,
       compaction: CompactionProjection,
       agentRouting: AgentRoutingProjection,
       agentStatus: AgentStatusProjection,
@@ -155,7 +163,7 @@ export interface CreateClientOptions {
   /**
    * Storage client for config, sessions, memory, and memory jobs.
    */
-  storage: StorageClient<MagnitudeSlot>
+  storage: StorageClient<RoleId>
 
   /**
    * Enable LLM call tracing to ~/.magnitude/traces/
@@ -169,11 +177,20 @@ export interface CreateClientOptions {
   sessionContext?: Omit<SessionContext, 'workspacePath'>
 
   /**
-   * Optional pre-configured provider runtime.
-   * When provided, provider bootstrap is skipped and the caller is responsible
-   * for initializing model selections/auth inside the runtime.
+   * Magnitude API key. Falls back to MAGNITUDE_API_KEY env var.
    */
-  providerRuntime?: ProviderRuntime<MagnitudeSlot>
+  magnitudeApiKey?: string
+
+  /**
+   * Magnitude API endpoint. Falls back to MAGNITUDE_ENDPOINT env var,
+   * then to 'https://app.magnitude.dev/api/v1'.
+   */
+  magnitudeEndpoint?: string
+
+  /**
+   * Optional model overrides for development/testing.
+   */
+  modelOverrides?: ModelOverrides
 
   /**
    * Disable shell command classification safeguards for this runtime only.
@@ -196,17 +213,34 @@ export interface CreateClientOptions {
  * Create a CodingAgent client with persistence.
  *
  * Loads events from persistence on startup:
- * - If events exist: hydrates projections and sandbox from persisted state
+ * - If events exist: hydrates projections from persisted state
  * - If no events: initializes a new session
  */
 export async function createCodingAgentClient(options: CreateClientOptions) {
 
-  // Bootstrap provider runtime from stored config / env vars unless the caller
-  // supplied a pre-configured runtime (e.g. headless oneshot mode).
-  const providerRuntime = options.providerRuntime ?? makeProviderRuntimeLive<MagnitudeSlot>()
-  if (!options.providerRuntime) {
-    await Effect.runPromise(bootstrapProviderRuntime<MagnitudeSlot>({ slots: MAGNITUDE_SLOTS }).pipe(Effect.provide(providerRuntime)))
-  }
+  // Construct Magnitude config from options / env vars
+  const useLocal = !!process.env.MAGNITUDE_USE_LOCAL
+  const apiKey = options.magnitudeApiKey ?? (useLocal ? process.env.MAGNITUDE_LOCAL_API_KEY : undefined) ?? process.env.MAGNITUDE_API_KEY
+  if (!apiKey) throw new Error(
+    useLocal
+      ? 'MAGNITUDE_LOCAL_API_KEY (or MAGNITUDE_API_KEY) is required when MAGNITUDE_USE_LOCAL is set'
+      : 'MAGNITUDE_API_KEY is required — set it via env var or pass magnitudeApiKey option'
+  )
+
+  const magnitudeEndpoint = options.magnitudeEndpoint ?? process.env.MAGNITUDE_ENDPOINT ?? (useLocal ? 'http://localhost:3000/api/v1' : 'https://app.magnitude.dev/api/v1')
+
+  const magnitudeConfigLayer = Layer.succeed(MagnitudeConfig, {
+    endpoint: magnitudeEndpoint,
+    apiKey,
+    auth: Auth.bearer(apiKey),
+    overrides: options.modelOverrides,
+    defaultProfile: { contextWindow: 200_000, maxOutputTokens: 32_768, capabilities: { vision: true, grammar: false, reasoning: { type: 'always', effort: ['low', 'medium', 'high'] } } },
+  })
+
+  const magnitudeClientLayer = Layer.succeed(
+    MagnitudeClient,
+    createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey }),
+  )
 
   // Enable tracing in debug mode
   if (options.debug) {
@@ -214,17 +248,20 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     initTraceSession(traceSessionId, { cwd: process.cwd(), platform: process.platform, gitBranch: null })
   }
 
-  const tracerLayer = options.debug ? makeTracePersister((trace) => writeTrace(trace as any)) : makeNoopTracer()
+  const tracerLayer = options.debug ? makeTracePersister((trace) => writeTrace(trace)) : makeNoopTracer()
   const ephemeralSessionContextLayer = Layer.succeed(EphemeralSessionContextTag, {
     disableShellSafeguards: options.disableShellSafeguards ?? false,
     disableCwdSafeguards: options.disableCwdSafeguards ?? false,
   })
   const layer = Layer.mergeAll(
     Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
-    Layer.provide(BrowserServiceLive, providerRuntime),
-    Layer.provide(WebSearchServiceLive, FetchHttpClient.layer),
-    Layer.provide(makeModelResolver<MagnitudeSlot>(), providerRuntime),
-    providerRuntime,
+    BrowserServiceLive,
+
+    Layer.provide(AgentModelResolverLive, magnitudeConfigLayer),
+    magnitudeConfigLayer,
+    magnitudeClientLayer,
+
+    FetchHttpClient.layer,
     FsLive,
     tracerLayer,
     options.persistence,
@@ -303,6 +340,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
       // Load skills from standard directories
       const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
       yield* publishSkills(skills)
+      yield* publishToolkit(leaderToolkit)
 
       // Persist the initial event immediately
       const pending = yield* eventSink.drainPending()
@@ -333,13 +371,13 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
       // Create root sandbox (hydration happens lazily in execute())
       const sessionContextState = yield* (yield* SessionContextProjection.Tag).get
-      const rootVariant = sessionContextState.context?.oneshot ? 'lead-oneshot' : 'lead'
+      const rootVariant: RoleId = 'leader'
       yield* executionManager.initFork(null, rootVariant)
 
       // Create execution resources for all known agents.
       const agentState = yield* agentStatusProjection.get
       for (const [, agent] of agentState.agents) {
-        if (!isValidVariant(agent.role)) {
+        if (!isRoleId(agent.role)) {
           continue
         }
         yield* executionManager.initFork(agent.forkId, agent.role)
@@ -356,7 +394,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
             forkId: agent.forkId,
             turnId: forkTurnState.turnId,
             chainId: forkTurnState.chainId,
-            strategyId: 'xml-act',
+            strategyId: 'native',
 
             outcome: { _tag: 'Cancelled', reason: { _tag: 'WorkerKilled' } },
             inputTokens: null,
@@ -377,7 +415,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
           forkId: null,
           turnId: rootTurnState.turnId,
           chainId: rootTurnState.chainId,
-          strategyId: 'xml-act',
+          strategyId: 'native',
           outcome: { _tag: 'Cancelled', reason: { _tag: 'WorkerKilled' } },
           inputTokens: null,
           outputTokens: null,
@@ -394,6 +432,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
       // Load skills from standard directories
       const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
       yield* publishSkills(skills)
+      yield* publishToolkit(leaderToolkit)
 
       // Persist all recovery events immediately so reopening the same session
       // again won't re-run recovery for already-terminated forks.
@@ -443,7 +482,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     await originalDispose()
   }
 
-  const refreshConfig = () => client.runEffect(publishConfigFromProviders)
+  const refreshConfig = () => client.runEffect(publishConfigFromMagnitude)
 
   return {
     ...client,

@@ -2,15 +2,12 @@
  * Web Fetch Tool
  *
  * Fetches content from a URL and returns it as cleaned markdown.
- * Uses dom-extract to convert HTML into agent-readable markdown.
- * Bun's fetch uses BoringSSL with a Chrome-like TLS fingerprint,
- * so no need for curl to avoid bot detection.
  */
 
-import { Effect, Schedule } from 'effect'
-import { Schema } from '@effect/schema'
-import { defineTool, ToolErrorSchema } from '@magnitudedev/tools'
+import { Effect, Schedule, Schema } from 'effect'
+import { defineHarnessTool } from '@magnitudedev/harness'
 import { extractHtml } from '@magnitudedev/dom-extract'
+import { ToolErrorSchema } from './errors'
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const TIMEOUT_MS = 30_000
@@ -18,8 +15,6 @@ const TIMEOUT_MS = 30_000
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
 const ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
 const ACCEPT_LANG = 'en-US,en;q=0.9'
-
-
 
 const retryPolicy = Schedule.exponential('500 millis').pipe(
   Schedule.compose(Schedule.recurs(2)),
@@ -68,25 +63,19 @@ const fetchPage = (url: string) =>
     }),
   })
 
-// =============================================================================
-// Tool Definition
-// =============================================================================
-
-export const webFetchTool = defineTool({
-  name: 'web_fetch',
-  group: 'default',
-  description: 'Fetch the content of a URL. Returns the page content as cleaned markdown for you to read directly. Use this instead of running curl or wget in the shell.',
-
-  inputSchema: Schema.Struct({
-    url: Schema.String.annotations({ description: 'URL to fetch content from' }),
-  }),
-
-  outputSchema: Schema.Struct({
-    url: Schema.String,
-    content: Schema.String,
-  }),
+export const webFetchTool = defineHarnessTool({
+  definition: {
+    name: 'web_fetch',
+    description: 'Fetch the content of a URL. Returns the page content as cleaned markdown for you to read directly. Use this instead of running curl or wget in the shell.',
+    inputSchema: Schema.Struct({
+      url: Schema.String.annotations({ description: 'URL to fetch content from' }),
+    }),
+    outputSchema: Schema.Struct({
+      url: Schema.String,
+      content: Schema.String,
+    }),
+  },
   errorSchema: WebFetchErrorSchema,
-
   execute: ({ url }, _ctx) => {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       return Effect.fail({
@@ -97,5 +86,4 @@ export const webFetchTool = defineTool({
 
     return fetchPage(url).pipe(Effect.retry(retryPolicy))
   },
-  label: (input) => input.url ? `Fetching ${input.url}` : 'Fetching…',
 })

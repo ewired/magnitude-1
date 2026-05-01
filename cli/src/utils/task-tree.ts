@@ -49,26 +49,26 @@ function toTaskListItem(task: TaskRecord, depth: number): TaskListItem {
     depth,
     parentId: task.parentId,
     updatedAt: task.updatedAt,
-    workerSlot: task.worker
+    assignee: task.worker
       ? {
-          kind: 'worker',
-          variant: 'idle',
+          kind: 'worker' as const,
+          variant: 'idle' as const,
           label: task.worker.role ? `[${task.worker.role}] ${task.worker.agentId}` : task.worker.agentId,
-          icon: '●',
-          tone: 'muted',
+          icon: '●' as const,
+          tone: 'muted' as const,
           interactiveForkId: task.worker.forkId,
-          timer: { startedAt: Math.max(0, task.updatedAt - (task.completedAt ?? 0)), resumedAt: null },
+          workerState: { status: 'idle' as const, forkId: task.worker.forkId, accumulatedMs: 0, completedAt: null, resumeCount: 0 },
           resumed: false,
           continuityKey: task.worker.forkId,
-          ghostEligible: true,
+          ghostEligible: true as const,
         }
       : task.assignee === 'user'
         ? {
-            kind: 'user',
-            label: 'user',
-            tone: 'warning',
+            kind: 'user' as const,
+            label: 'user' as const,
+            tone: 'warning' as const,
           }
-        : null,
+        : { kind: 'none' as const },
   }
 }
 

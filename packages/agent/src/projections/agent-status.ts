@@ -7,7 +7,7 @@
 import { Projection, Signal } from '@magnitudedev/event-core'
 import { outcomeWillChainContinue } from '../events'
 import type { AppEvent } from '../events'
-import type { AgentVariant } from '../agents/variants'
+import type { RoleId } from '../agents/role-validation'
 
 export type AgentStatus = 'working' | 'idle' | 'killed'
 
@@ -16,7 +16,7 @@ export interface AgentInfo {
   readonly forkId: string
   readonly parentForkId: string | null
   readonly name: string
-  readonly role: AgentVariant
+  readonly role: RoleId
   readonly context: string
   readonly mode: 'clone' | 'spawn'
   readonly taskId: string
@@ -34,7 +34,7 @@ export interface AgentCreatedSignal {
   readonly parentForkId: string | null
   readonly agentId: string
   readonly name: string
-  readonly role: AgentVariant
+  readonly role: RoleId
   readonly taskId: string
   readonly mode: 'clone' | 'spawn'
   readonly context: string
@@ -44,7 +44,7 @@ export interface AgentCreatedSignal {
 export interface AgentBecameIdleSignal {
   readonly agentId: string
   readonly forkId: string
-  readonly role: AgentVariant
+  readonly role: RoleId
   readonly parentForkId: string | null
   readonly reason: 'stable' | 'interrupt' | 'error'
   readonly timestamp: number
@@ -53,7 +53,7 @@ export interface AgentBecameIdleSignal {
 export interface AgentBecameWorkingSignal {
   readonly agentId: string
   readonly forkId: string
-  readonly role: string
+  readonly role: RoleId
   readonly parentForkId: string | null
   readonly timestamp: number
 }
@@ -62,7 +62,7 @@ export interface AgentKilledSignal {
   readonly agentId: string
   readonly forkId: string
   readonly parentForkId: string | null
-  readonly role: string
+  readonly role: RoleId
   readonly title: string
   readonly reason: string
   readonly timestamp: number
@@ -72,7 +72,7 @@ export interface SubagentUserKilledSignal {
   readonly agentId: string
   readonly forkId: string
   readonly parentForkId: string | null
-  readonly role: string
+  readonly role: RoleId
   readonly title: string
   readonly source: 'tab_close_confirm'
   readonly timestamp: number
@@ -82,7 +82,7 @@ export interface SubagentIdleClosedSignal {
   readonly agentId: string
   readonly forkId: string
   readonly parentForkId: string | null
-  readonly role: string
+  readonly role: RoleId
   readonly title: string
   readonly source: 'idle_tab_close'
   readonly timestamp: number
@@ -166,7 +166,7 @@ export const AgentStatusProjection = Projection.define<AppEvent, AgentStatusStat
         parentForkId: event.parentForkId,
         agentId: event.agentId,
         name: event.name,
-        role: event.role as AgentVariant,
+        role: event.role as RoleId,
         taskId: normalizedTaskId,
         mode: normalizedMode,
         context: normalizedContext,
@@ -178,7 +178,7 @@ export const AgentStatusProjection = Projection.define<AppEvent, AgentStatusStat
         forkId: event.forkId,
         parentForkId: event.parentForkId,
         name: event.name,
-        role: event.role as AgentVariant,
+        role: event.role as RoleId,
         context: normalizedContext,
         mode: normalizedMode,
         taskId: normalizedTaskId,

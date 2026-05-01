@@ -1,16 +1,15 @@
-import { ContentPartBuilder, type ContentPart } from '../content'
+import { ContentBuilder } from '../content'
+import type { UserPart } from '@magnitudedev/ai'
 import {
   USER_MESSAGE_RESPONSE_REMINDER,
   WORKER_PROGRESS_USER_MESSAGE_REMINDER,
 } from '../prompts/lead-communication-reminders'
-import type { AgentAtom, ResultEntry, TimelineEntry } from './types'
-import { formatError, formatInterrupted, formatNoop, formatOneshotLiveness, formatResults, formatYieldWorkerRetrigger } from './render-results'
+import type { AgentAtom, TimelineEntry } from './types'
 import { renderCompactToolCall } from './render-tool-call'
-import { YIELD_USER } from '@magnitudedev/xml-act'
+
 import { taskIdleReminder, taskCompleteReminder } from '../prompts/tasks/index'
 
-export interface FormatInboxInput {
-  results: readonly ResultEntry[]
+export interface RenderTimelineInput {
   timeline: readonly TimelineEntry[]
   timezone: string | null
   supportsVision: boolean
@@ -76,7 +75,7 @@ function renderAgentAtom(atom: AgentAtom): string {
       return atom.text
     case 'tool_call':
       return renderCompactToolCall({
-        tagName: atom.tagName,
+        toolName: atom.toolName,
         attributes: { ...atom.attributes },
         body: atom.body,
       })
@@ -87,12 +86,13 @@ function renderAgentAtom(atom: AgentAtom): string {
     case 'error':
       return `<error>${atom.message}</error>`
     case 'idle':
-      return YIELD_USER
+      // xml-act yield tag — kept as literal string for history rendering
+      return '<' + 'magnitude:yield_user/>'
   }
 }
 
-function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_message' }>, supportsVision: boolean): ContentPart[] {
-  const builder = new ContentPartBuilder()
+function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_message' }>, supportsVision: boolean): UserPart[] {
+  const builder = new ContentBuilder()
   builder.pushText(`<magnitude:message from="user">${entry.text}</magnitude:message>`)
   for (const attachment of entry.attachments) {
     if (attachment.kind === 'image') {
@@ -102,8 +102,8 @@ function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_mess
         builder.pushText(imagePlaceholder({
           filename: attachment.filename,
           mediaType: attachment.image.mediaType,
-          width: attachment.image.width,
-          height: attachment.image.height,
+          width: attachment.image.dimensions?.width,
+          height: attachment.image.dimensions?.height,
         }))
       }
       continue
@@ -209,21 +209,8 @@ function renderTaskUpdateLine(entry: Extract<TimelineEntry, { kind: 'task_update
   return `- Task ${entry.taskId} status changed: ${previousStatus} -> ${nextStatus}`
 }
 
-export function formatInbox(input: FormatInboxInput): ContentPart[] {
-  const builder = new ContentPartBuilder()
-
-  if (input.results.length > 0) {
-    builder.pushText('<turn_result>')
-    for (const result of input.results) {
-      if (result.kind === 'turn_results') builder.pushParts(formatResults(result.items, input.supportsVision))
-      else if (result.kind === 'interrupted') builder.pushText(formatInterrupted())
-      else if (result.kind === 'error') builder.pushText(formatError(result.message))
-      else if (result.kind === 'oneshot_liveness') builder.pushText(formatOneshotLiveness())
-      else if (result.kind === 'yield_worker_retrigger') builder.pushText(formatYieldWorkerRetrigger())
-      else builder.pushText(formatNoop())
-    }
-    builder.pushText('\n</turn_result>\n')
-  }
+export function renderTimeline(input: RenderTimelineInput): UserPart[] {
+  const builder = new ContentBuilder()
 
   if (input.timeline.length === 0) return builder.build()
 
@@ -270,14 +257,14 @@ export function formatInbox(input: FormatInboxInput): ContentPart[] {
 
     if (entry.kind === 'observation') {
       for (const part of entry.parts) {
-        if (part.type === 'text') builder.pushText(`\n${part.text}`)
+        if (part._tag === 'TextPart') builder.pushText(`\n${part.text}`)
         else if (input.supportsVision) builder.pushPart(part)
-        else builder.pushText(imagePlaceholder({ mediaType: part.mediaType, width: part.width, height: part.height }))
+        else builder.pushText(imagePlaceholder({ mediaType: part.mediaType }))
       }
     } else if (entry.kind === 'user_message') {
       const parts = renderUserMessageParts(entry, input.supportsVision)
       for (const part of parts) {
-        if (part.type === 'text') builder.pushText(`\n${part.text}`)
+        if (part._tag === 'TextPart') builder.pushText(`\n${part.text}`)
         else builder.pushPart(part)
       }
     } else {

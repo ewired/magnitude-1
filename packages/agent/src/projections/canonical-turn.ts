@@ -1,70 +1,43 @@
 import { Projection } from '@magnitudedev/event-core'
-import type { AppEvent, MessageDestination } from '../events'
-
-import { serializeCanonicalTurn, type CanonicalTrace } from './canonical-xml'
-import { buildResolvedToolSet, type ResolvedToolSet } from '../tools/resolved-toolset'
-import { ConfigAmbient } from '../ambient/config-ambient'
-import { isValidVariant, type AgentVariant } from '../agents/variants'
-import { getAgentDefinition, getAgentSlot } from '../agents/registry'
-import { AgentStatusProjection, getAgentByForkId } from './agent-status'
-
-
-export interface ThinkBlock {
-  about: string | null
-  content: string
-}
+import type { AppEvent } from '../events'
+import type { CompletedTurn, TurnFeedback } from '../inbox/types'
+import type { AssistantMessage, ToolResultMessage, ToolCallPart, ToolCallId, JsonValue } from '@magnitudedev/ai'
+import { renderToolOutput } from '../util/render-tool-output'
 
 export interface CanonicalTurnState {
-  turnId: string | null
-  lenses: readonly { name: string; content: string }[] | null
-  thinkBlocks: ThinkBlock[]
-  messages: Array<{ id: string; destination: MessageDestination; text: string; order: number }>
-  messageMap: Map<string, number>
-  toolCalls: Array<{ toolCallId: string; tagName: string; input: unknown; query: string | null; order: number }>
-  toolCallMap: Map<string, number>
-  hasParseError: boolean
-  rawResponse: string
-  orderCounter: number
-  lastCompleted: { turnId: string; canonicalXml: string; rawResponse: string; clean: boolean } | null
-  resolvedTurnYieldTarget: 'user' | 'invoke' | 'worker' | 'parent' | null
+  readonly turnId: string | null
+
+  // Accumulate directly into AI primitive fields
+  readonly reasoning: string
+  readonly text: string
+  readonly toolCalls: readonly ToolCallPart[]
+  readonly toolResults: readonly ToolResultMessage[]
+
+  // Minimal streaming bookkeeping
+  readonly activeMessageId: string | null
+  readonly activeMessageIsParent: boolean
+  readonly parentChars: number
+
+  // Output
+  readonly lastCompleted: CompletedTurn | null
 }
 
 export const createInitialCanonicalTurnState = (): CanonicalTurnState => ({
   turnId: null,
-  lenses: null,
-  thinkBlocks: [],
-  messages: [],
-  messageMap: new Map(),
+  reasoning: '',
+  text: '',
   toolCalls: [],
-  toolCallMap: new Map(),
-  hasParseError: false,
-  rawResponse: '',
-  orderCounter: 0,
+  toolResults: [],
+  activeMessageId: null,
+  activeMessageIsParent: false,
+  parentChars: 0,
   lastCompleted: null,
-  resolvedTurnYieldTarget: null,
 })
-
-function resetActive(state: CanonicalTurnState): CanonicalTurnState {
-  return {
-    ...state,
-    turnId: null,
-    lenses: null,
-    thinkBlocks: [],
-    messages: [],
-    messageMap: new Map(),
-    toolCalls: [],
-    toolCallMap: new Map(),
-    hasParseError: false,
-    rawResponse: '',
-    orderCounter: 0,
-    resolvedTurnYieldTarget: null,
-  }
-}
 
 export const CanonicalTurnProjection = Projection.defineForked<AppEvent, CanonicalTurnState>()({
   name: 'CanonicalTurn',
-  reads: [AgentStatusProjection] as const,
-  ambients: [ConfigAmbient] as const,
+  reads: [] as const,
+  ambients: [] as const,
   initialFork: createInitialCanonicalTurnState(),
   eventHandlers: {
     turn_started: ({ event, fork }) => ({
@@ -73,190 +46,112 @@ export const CanonicalTurnProjection = Projection.defineForked<AppEvent, Canonic
       lastCompleted: fork.lastCompleted,
     }),
 
+    thinking_start: ({ fork }) => fork,
+    thinking_end: ({ fork }) => fork,
+
     thinking_chunk: ({ event, fork }) => {
       if (fork.turnId !== event.turnId) return fork
-      const blocks = [...fork.thinkBlocks]
-      if (blocks.length === 0) {
-        blocks.push({ about: null, content: event.text })
-      } else {
-        const last = blocks[blocks.length - 1]
-        blocks[blocks.length - 1] = { ...last, content: last.content + event.text }
-      }
-      return { ...fork, thinkBlocks: blocks }
-    },
-
-    thinking_end: ({ event, fork }) => {
-      if (fork.turnId !== event.turnId) return fork
-      if (fork.thinkBlocks.length === 0) return fork
-      const blocks = [...fork.thinkBlocks]
-      const last = blocks[blocks.length - 1]
-      blocks[blocks.length - 1] = { ...last, about: event.about }
-      return { ...fork, thinkBlocks: blocks }
-    },
-
-    lens_start: ({ event, fork }) => {
-      if (fork.turnId !== event.turnId) return fork
-      const nextLenses = [...(fork.lenses ?? []), { name: event.name, content: '' }]
-      return { ...fork, lenses: nextLenses }
-    },
-
-    lens_chunk: ({ event, fork }) => {
-      if (fork.turnId !== event.turnId) return fork
-      if (!fork.lenses || fork.lenses.length === 0) return fork
-      const nextLenses = [...fork.lenses]
-      const last = nextLenses[nextLenses.length - 1]
-      nextLenses[nextLenses.length - 1] = {
-        ...last,
-        content: last.content + event.text,
-      }
-      return { ...fork, lenses: nextLenses }
-    },
-
-    lens_end: ({ event, fork }) => {
-      if (fork.turnId !== event.turnId) return fork
-      if (!fork.lenses || fork.lenses.length === 0) return fork
-      const nextLenses = [...fork.lenses]
-      const last = nextLenses[nextLenses.length - 1]
-      if (last.name !== event.name) return fork
-      const trimmed = last.content.trim()
-      nextLenses[nextLenses.length - 1] = { ...last, content: trimmed }
-      return { ...fork, lenses: nextLenses }
+      return { ...fork, reasoning: fork.reasoning + event.text }
     },
 
     message_start: ({ event, fork }) => {
       if (fork.turnId !== event.turnId) return fork
-      const idx = fork.messages.length
-      const nextMessages = [...fork.messages, {
-        id: event.id,
-        destination: event.destination,
-        text: '',
-        order: fork.orderCounter,
-      }]
-      const nextMap = new Map(fork.messageMap)
-      nextMap.set(event.id, idx)
       return {
         ...fork,
-        messages: nextMessages,
-        messageMap: nextMap,
-        orderCounter: fork.orderCounter + 1,
+        activeMessageId: event.id,
+        activeMessageIsParent: event.destination.kind === 'parent',
       }
     },
 
     message_chunk: ({ event, fork }) => {
       if (fork.turnId !== event.turnId) return fork
-      const idx = fork.messageMap.get(event.id)
-      if (idx === undefined) return fork
-      const next = [...fork.messages]
-      next[idx] = { ...next[idx], text: next[idx].text + event.text }
-      return { ...fork, messages: next }
+      if (fork.activeMessageId !== event.id) return fork
+      return {
+        ...fork,
+        text: fork.text + event.text,
+        parentChars: fork.activeMessageIsParent ? fork.parentChars + event.text.length : fork.parentChars,
+      }
     },
 
-    message_end: ({ fork }) => fork,
-
-    raw_response_chunk: ({ event, fork }) => {
-      if (fork.turnId !== event.turnId) return fork
-      return { ...fork, rawResponse: fork.rawResponse + event.text }
-    },
+    message_end: ({ fork }) => ({
+      ...fork,
+      activeMessageId: null,
+      activeMessageIsParent: false,
+    }),
 
     tool_event: ({ event, fork }) => {
       if (fork.turnId !== event.turnId) return fork
 
       switch (event.event._tag) {
         case 'ToolInputStarted': {
-          const idx = fork.toolCalls.length
-          const nextToolCalls = [...fork.toolCalls, {
-            toolCallId: event.toolCallId,
-            // Canonical XML is model-facing, so preserve the parsed XML tag here
-            // instead of the internal catalog key carried alongside the app event.
-            tagName: event.event.tagName,
-            input: {},
-            query: null,
-            order: fork.orderCounter,
-          }]
-          const nextMap = new Map(fork.toolCallMap)
-          nextMap.set(event.toolCallId, idx)
           return {
             ...fork,
-            toolCalls: nextToolCalls,
-            toolCallMap: nextMap,
-            orderCounter: fork.orderCounter + 1,
+            toolCalls: [...fork.toolCalls, {
+              _tag: 'ToolCallPart' as const,
+              id: event.toolCallId as ToolCallId,
+              name: event.event.toolName,
+              input: {} as JsonValue,
+            }],
           }
         }
 
-        case 'ToolInputReady': {
-          const idx = fork.toolCallMap.get(event.toolCallId)
-          if (idx === undefined) return fork
+        case 'ToolInputReady':
+          return fork
+
+        case 'ToolExecutionStarted': {
+          const idx = fork.toolCalls.findIndex(tc => tc.id === event.toolCallId)
+          if (idx === -1) return fork
           const next = [...fork.toolCalls]
-          next[idx] = { ...next[idx], input: event.event.input }
+          next[idx] = { ...next[idx], input: event.event.input as JsonValue }
           return { ...fork, toolCalls: next }
         }
 
-        case 'ToolObservation': {
-          const idx = fork.toolCallMap.get(event.toolCallId)
-          if (idx === undefined) return fork
-          const nextToolCalls = [...fork.toolCalls]
-          nextToolCalls[idx] = { ...nextToolCalls[idx], query: event.event.query }
-          return { ...fork, toolCalls: nextToolCalls }
+        case 'ToolExecutionEnded': {
+          const { toolCallId, toolName, result } = event.event
+          return {
+            ...fork,
+            toolResults: [...fork.toolResults, {
+              _tag: 'ToolResultMessage' as const,
+              toolCallId: toolCallId as ToolCallId,
+              toolName,
+              parts: [...renderToolOutput(result)],
+            }],
+          }
         }
-
-        case 'ToolParseError':
-          return { ...fork, hasParseError: true }
 
         default:
           return fork
       }
     },
 
-    turn_outcome: ({ event, fork, read, ambient }) => {
+    turn_outcome: ({ event, fork }) => {
       if (fork.turnId !== event.turnId) return fork
 
-      const clean = !fork.hasParseError && event.outcome._tag === 'Completed'
+      const feedback: TurnFeedback[] = fork.parentChars > 0
+        ? [{ kind: 'message_ack', destination: 'parent' as const, chars: fork.parentChars }]
+        : []
 
-      let canonicalXml: string
-      if (clean) {
-        const agentState = read(AgentStatusProjection)
-        const variant: AgentVariant = event.forkId
-          ? (() => {
-              const role = getAgentByForkId(agentState, event.forkId)?.role
-              return role && isValidVariant(role) ? role : 'worker'
-            })()
-          : 'lead'
-        const agentDef = getAgentDefinition(variant)
-        const slot = getAgentSlot(variant)
-
-        const configState = ambient.get(ConfigAmbient)
-        const toolSet = buildResolvedToolSet(agentDef, configState, slot)
-
-        const trace: CanonicalTrace = {
-          lenses: fork.lenses,
-          thinkBlocks: fork.thinkBlocks,
-          messages: [...fork.messages]
-            .sort((a, b) => a.order - b.order)
-            .map(({ text, destination }) => ({ text, destination })),
-          toolCalls: [...fork.toolCalls]
-            .sort((a, b) => a.order - b.order)
-            .map(({ tagName, input, query }) => ({ tagName, input, query })),
-          yieldTarget: event.outcome._tag === 'Completed' ? event.outcome.completion.yieldTarget : 'invoke',
-        }
-        canonicalXml = serializeCanonicalTurn(trace, toolSet)
-      } else {
-        canonicalXml = fork.rawResponse
+      const assistant: AssistantMessage = {
+        _tag: 'AssistantMessage',
+        reasoning: fork.reasoning || undefined,
+        text: fork.text || undefined,
+        toolCalls: fork.toolCalls.length > 0 ? [...fork.toolCalls] : undefined,
       }
 
-      const finalized: CanonicalTurnState = {
-        ...fork,
-        lastCompleted: {
-          turnId: event.turnId,
-          canonicalXml,
-          rawResponse: fork.rawResponse,
-          clean,
-        }
+      const completed: CompletedTurn = {
+        turnId: event.turnId,
+        assistant,
+        toolResults: [...fork.toolResults],
+        feedback,
+        clean: event.outcome._tag === 'Completed',
       }
 
-      return resetActive(finalized)
+      return {
+        ...createInitialCanonicalTurnState(),
+        lastCompleted: completed,
+      }
     },
 
     interrupt: ({ fork }) => fork,
-
-  }
+  },
 })

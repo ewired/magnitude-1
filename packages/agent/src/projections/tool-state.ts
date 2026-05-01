@@ -8,8 +8,9 @@
 
 import { Projection } from '@magnitudedev/event-core'
 import type { AppEvent } from '../events'
-import { catalog, type AgentCatalogEntry } from '../catalog'
-import { createToolHandle, type ToolHandle } from '../tools/tool-handle'
+import type { ToolHandle } from '@magnitudedev/harness'
+import { ToolkitAmbient } from '../ambient/toolkit-ambient'
+import { createToolHandleFromToolkit } from '../tools/tool-handle'
 
 export interface ToolStateProjectionState {
   readonly toolHandles: { readonly [callId: string]: ToolHandle }
@@ -18,22 +19,26 @@ export interface ToolStateProjectionState {
 export const ToolStateProjection = Projection.defineForked<AppEvent, ToolStateProjectionState>()({
   name: 'ToolState',
 
+  ambients: [ToolkitAmbient],
+
   initialFork: {
     toolHandles: {},
   },
 
   eventHandlers: {
-    tool_event: ({ event, fork }) => {
+    tool_event: ({ event, fork, ambient }) => {
       const inner = event.event
+      const toolkit = ambient.get(ToolkitAmbient)
 
       if (inner._tag === 'ToolInputStarted') {
-        const entry = catalog.entries[event.toolKey] as AgentCatalogEntry
-        const handle = createToolHandle(event.toolKey, entry).process(inner)
+        const handle = createToolHandleFromToolkit(inner.toolCallId, event.toolKey, toolkit)
+        if (!handle) return fork
+        const nextHandle = handle.process(inner)
         return {
           ...fork,
           toolHandles: {
             ...fork.toolHandles,
-            [event.toolCallId]: handle,
+            [event.toolCallId]: nextHandle,
           },
         }
       }
@@ -49,6 +54,12 @@ export const ToolStateProjection = Projection.defineForked<AppEvent, ToolStatePr
           [event.toolCallId]: nextHandle,
         },
       }
+    },
+
+    turn_outcome: ({ fork }) => {
+      // Decode failures are now handled via ToolInputDecodeFailed lifecycle event
+      // which flows through tool_event → handle.process() naturally
+      return fork
     },
 
     interrupt: ({ fork }) => {

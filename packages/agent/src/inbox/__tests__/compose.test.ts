@@ -1,9 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import {
-  toResultError,
-  toResultInterrupted,
-  toResultNoop,
-  toResultTurnResults,
   toTimelineAgentBlock,
   toTimelineObservation,
   toTimelineTaskUpdate,
@@ -13,28 +9,16 @@ import {
   toTimelineUserPresence,
   toTimelineUserToAgent,
 } from '../compose'
-import type { ContentPart } from '../../content'
+import type { UserPart } from '@magnitudedev/ai'
 import type { AgentAtom, TimelineAttachment } from '../types'
 
 const TS = 1711641600000
 
 describe('inbox compose', () => {
-  test('toResult* constructors set correct kinds', () => {
-    const turnResults = toResultTurnResults({ items: [] })
-    const interrupted = toResultInterrupted()
-    const error = toResultError({ message: 'bad' })
-    const noop = toResultNoop()
-
-    expect(turnResults.kind).toBe('turn_results')
-    expect(interrupted.kind).toBe('interrupted')
-    expect(error.kind).toBe('error')
-    expect(noop.kind).toBe('noop')
-  })
-
   test('toTimeline* constructors set correct kinds', () => {
     const attachments: readonly TimelineAttachment[] = [{ kind: 'mention', path: 'a.ts', contentType: 'text' }]
     const atoms: readonly AgentAtom[] = [{ kind: 'thought', timestamp: TS, text: 'thinking' }]
-    const parts: readonly ContentPart[] = [{ type: 'text', text: 'obs' }]
+    const parts: readonly UserPart[] = [{ _tag: 'TextPart', text: 'obs' }]
 
     expect(toTimelineUserMessage({ timestamp: TS, text: 'u', attachments }).kind).toBe('user_message')
     expect(toTimelineUserToAgent({ timestamp: TS, agentId: 'a1', text: 'u2a' }).kind).toBe('user_to_agent')
@@ -43,7 +27,7 @@ describe('inbox compose', () => {
       firstAtomTimestamp: TS,
       lastAtomTimestamp: TS,
       agentId: 'a1',
-      role: 'builder',
+      role: 'engineer',
       atoms,
     }).kind).toBe('agent_block')
     expect(toTimelineSubagentUserKilled({ timestamp: TS, agentId: 'a1', agentType: 'builder' }).kind).toBe('subagent_user_killed')
@@ -52,7 +36,7 @@ describe('inbox compose', () => {
       toTimelineLifecycleHook({
         timestamp: TS,
         agentId: 'a1',
-        role: 'builder',
+        role: 'engineer',
         hookType: 'spawn',
       }).kind,
     ).toBe('lifecycle_hook')
@@ -71,12 +55,10 @@ describe('inbox compose', () => {
   test('readonly arrays are preserved by reference', () => {
     const attachments: readonly TimelineAttachment[] = [{ kind: 'mention', path: 'x', contentType: 'text' }]
     const atoms: readonly AgentAtom[] = [{ kind: 'thought', timestamp: TS, text: 't' }]
-    const parts: readonly ContentPart[] = [{
-      type: 'image',
-      base64: 'abc',
+    const parts: readonly UserPart[] = [{
+      _tag: 'ImagePart',
+      data: 'abc',
       mediaType: 'image/png',
-      width: 1,
-      height: 1,
     }]
 
     const msg = toTimelineUserMessage({ timestamp: TS, text: 'hello', attachments })
@@ -85,7 +67,7 @@ describe('inbox compose', () => {
       firstAtomTimestamp: TS,
       lastAtomTimestamp: TS,
       agentId: 'a',
-      role: 'builder',
+      role: 'engineer',
       atoms,
     })
     const obs = toTimelineObservation({ timestamp: TS, parts })
@@ -105,7 +87,7 @@ describe('inbox compose', () => {
       firstAtomTimestamp: TS,
       lastAtomTimestamp: TS,
       agentId: 'a',
-      role: 'builder',
+      role: 'engineer',
       atoms: [],
     })
     const update = toTimelineTaskUpdate({

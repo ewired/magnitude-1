@@ -30,7 +30,8 @@ describe('memory integration scenarios', () => {
         outcome: {
           _tag: 'Completed',
           completion: {
-            yieldTarget: 'user',
+            toolCallsCount: 0,
+            finishReason: 'stop',
             feedback: [{ _tag: 'InvalidMessageDestination', destination: 'unknown', message: 'follow-up reminder' }],
           },
         },
@@ -71,7 +72,7 @@ describe('memory integration scenarios', () => {
         parentForkId: null,
         agentId: 'builder-1',
         name: 'builder',
-        role: 'builder',
+        role: 'engineer',
         context: '',
         mode: 'spawn',
         taskId: 'task-1',
@@ -140,7 +141,7 @@ describe('memory integration scenarios', () => {
         turnId: 't-1',
         chainId: 'c-1',
         strategyId: 'xml-act',
-        outcome: { _tag: 'Completed', completion: { yieldTarget: 'user', feedback: [] } },
+        outcome: { _tag: 'Completed', completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] } },
         inputTokens: null,
         outputTokens: null,
         cacheReadTokens: null,
@@ -154,9 +155,9 @@ describe('memory integration scenarios', () => {
       const inbox = inboxMessages(memory)
       expect(inbox.length).toBeGreaterThan(1)
 
-      const firstUserInbox = inbox.find(m => m.type === 'inbox' && m.timeline.some(t => t.kind === 'user_message'))
-      expect(firstUserInbox?.type).toBe('inbox')
-      if (firstUserInbox?.type === 'inbox') {
+      const firstUserInbox = inbox.find(m => m.type === 'context' && m.timeline.some(t => t.kind === 'user_message'))
+      expect(firstUserInbox?.type).toBe('context')
+      if (firstUserInbox?.type === 'context') {
         const userEntry = firstUserInbox.timeline.find(t => t.kind === 'user_message')
         expect(userEntry?.kind).toBe('user_message')
         if (userEntry?.kind === 'user_message') {
@@ -232,7 +233,7 @@ describe('memory integration scenarios', () => {
         turnId: 't-1',
         chainId: 'c-1',
         strategyId: 'xml-act',
-        outcome: { _tag: 'Completed', completion: { yieldTarget: 'user', feedback: [] } },
+        outcome: { _tag: 'Completed', completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] } },
         inputTokens: null,
         outputTokens: null,
         cacheReadTokens: null,

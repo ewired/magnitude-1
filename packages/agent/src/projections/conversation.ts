@@ -12,6 +12,7 @@
 import { Projection } from '@magnitudedev/event-core'
 import type { AppEvent } from '../events'
 import { textOf } from '../content'
+// textOf already uses UserPart internally
 import { UserMessageResolutionProjection } from './user-message-resolution'
 
 // =============================================================================
@@ -47,8 +48,6 @@ export const ConversationProjection = Projection.define<AppEvent, ConversationSt
   },
 
   eventHandlers: {
-    oneshot_task: ({ state }) => state,
-
     message_start: ({ event, state }) => {
       if (event.forkId !== null) return state
       if (event.destination.kind !== 'user') return state

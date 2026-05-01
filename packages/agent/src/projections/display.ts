@@ -32,8 +32,8 @@ import { textOf } from '../content'
 import { createId } from '../util/id'
 
 import { finalizeOpenToolStepsAsInterruptedInSteps } from './display-interrupt'
-import { catalog, type ToolKey } from '../catalog'
-import type { ToolState } from '../tools/tool-handle'
+import { type ToolKey, HIDDEN_TOOLS } from '../tools/toolkits'
+import type { ToolState } from '../models/index'
 import { ToolStateProjection } from './tool-state'
 
 // =============================================================================
@@ -663,6 +663,8 @@ export function upsertStreamingCommunicationStep(
 export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>()({
   name: 'Display',
 
+  ambients: [],
+
   reads: [AgentRoutingProjection, AgentStatusProjection, UserMessageResolutionProjection, TurnProjection, ToolStateProjection] as const,
 
   initialFork: {
@@ -681,23 +683,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
   },
 
   eventHandlers: {
-    oneshot_task: ({ event, fork }) => {
-      const messageId = generateId()
-      return {
-        ...fork,
-        messages: [
-          ...fork.messages,
-          {
-            id: messageId,
-            type: 'user_message' as const,
-            content: event.prompt,
-            timestamp: event.timestamp,
-            taskMode: true,
-            attachments: [],
-          }
-        ]
-      }
-    },
+
 
     skill_activated: ({ event, fork }) => {
       // Only show as user message when activated by user slash command
@@ -869,56 +855,9 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       }
     },
 
-    lens_start: ({ event, fork }) => {
-      if (fork.currentTurnId !== event.turnId) return fork
-      const { fork: newState, thinkBlockId } = ensureThinkBlock(fork, event.timestamp)
-      const block = findThinkBlock(newState.messages, thinkBlockId)
-      // Only create a thinking step if none exists yet
-      // If one already exists, just continue appending to it (no space, no new step)
-      if (block) {
-        const lastStep = block.steps[block.steps.length - 1]
-        if (lastStep && lastStep.type === 'thinking') {
-          return newState
-        }
-      }
-      return {
-        ...newState,
-        messages: addStepToThinkBlock(newState.messages, thinkBlockId, {
-          id: generateId(),
-          type: 'thinking',
-          content: ''
-        })
-      }
-    },
-
-    lens_chunk: ({ event, fork }) => {
-      if (fork.currentTurnId !== event.turnId) return fork
-      const { fork: newState, thinkBlockId } = ensureThinkBlock(fork, event.timestamp)
-      const block = findThinkBlock(newState.messages, thinkBlockId)
-      if (!block) return newState
-      const lastStep = block.steps[block.steps.length - 1]
-      if (!lastStep || lastStep.type !== 'thinking') return newState
-      return {
-        ...newState,
-        messages: updateStepInThinkBlock(
-          newState.messages,
-          thinkBlockId,
-          lastStep.id,
-          (s) => s.type === 'thinking'
-            ? { ...s, content: s.content + event.text }
-            : s
-        )
-      }
-    },
-
-    lens_end: ({ fork }) => fork,
-
-
-
     tool_event: ({ event, fork, read, emit }) => {
       const inner = event.event
       const toolStateFork = read(ToolStateProjection) ?? { toolHandles: {} }
-
       switch (inner._tag) {
         case 'ToolInputStarted': {
           // Emit signal for parent fork activity tracking (before any early returns)
@@ -929,10 +868,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             return fork
           }
 
-          // Consult agent definition's display policy
-          void read(AgentStatusProjection)
-          const entry = catalog.entries[event.toolKey]
-          if ('display' in entry && entry.display === false) {
+          // Skip hidden tools
+          if (HIDDEN_TOOLS.has(event.toolKey)) {
             return fork
           }
 
@@ -976,10 +913,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             return fork
           }
 
-          // Consult agent definition's display policy
-          void read(AgentStatusProjection)
-          const entry = catalog.entries[event.toolKey]
-          if ('display' in entry && entry.display === false) {
+          // Skip hidden tools
+          if (HIDDEN_TOOLS.has(event.toolKey)) {
             return fork
           }
 
@@ -991,31 +926,17 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
               fork.messages,
               fork.activeThinkBlockId,
               event.toolCallId,
-              (s) => s.type === 'tool'
-                ? {
-                    ...s,
-                    state: getVisualState(toolStateFork, event.toolCallId) ?? s.state,
-                  }
-                : s
+              (s) => {
+                if (s.type !== 'tool') return s
+
+                return {
+                  ...s,
+                  state: getVisualState(toolStateFork, event.toolCallId) ?? s.state,
+                }
+              }
             )
           }
         }
-
-        case 'ToolObservation':
-          // Store the filter query when observation is set
-          if (fork.currentTurnId !== event.turnId) return fork
-          if (!fork.activeThinkBlockId) return fork
-          return {
-            ...fork,
-            messages: updateStepInThinkBlock(
-              fork.messages,
-              fork.activeThinkBlockId,
-              event.toolCallId,
-              (s) => s.type === 'tool'
-                ? { ...s, filter: inner.query }
-                : s
-            )
-          }
 
         default: {
           if (fork.currentTurnId !== event.turnId) return fork
@@ -1044,7 +965,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         return fork
       }
 
-      if (event.outcome._tag === 'Completed' && event.outcome.completion.yieldTarget === 'invoke') {
+      if (event.outcome._tag === 'Completed' && event.outcome.completion.toolCallsCount > 0) {
         return {
           ...fork,
           currentTurnId: null,

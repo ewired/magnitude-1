@@ -1,11 +1,11 @@
 import { Ambient, AmbientServiceTag } from '@magnitudedev/event-core'
 import { Effect } from 'effect'
-import { ProviderState } from '@magnitudedev/providers'
-import type { ProviderStateShape } from '@magnitudedev/providers/src/runtime/contracts'
+import { resolveModel } from '@magnitudedev/roles'
 
-import { MAGNITUDE_SLOTS, type MagnitudeSlot } from '../model-slots'
+import { ROLE_IDS, type RoleId } from '../agents/role-validation'
+import { MagnitudeConfig, type MagnitudeConfigShape } from '../model/magnitude-config'
 
-export interface SlotConfig {
+export interface RoleConfig {
   readonly providerId: string | null
   readonly modelId: string | null
   readonly hardCap: number
@@ -13,71 +13,49 @@ export interface SlotConfig {
 }
 
 export interface ConfigState {
-  readonly bySlot: Readonly<Record<MagnitudeSlot, SlotConfig>>
+  readonly byRole: Readonly<Record<RoleId, RoleConfig>>
 }
 
-export function getSlotConfig(state: ConfigState, slot: MagnitudeSlot): SlotConfig {
-  return state.bySlot[slot]
+export function getRoleConfig(state: ConfigState, roleId: RoleId): RoleConfig {
+  return state.byRole[roleId]
 }
 
-export function buildConfigState(opts: {
-  providerState: ProviderStateShape<MagnitudeSlot>
-}) {
-  const { providerState } = opts
+export function buildConfigState(config: MagnitudeConfigShape) {
+  return Effect.sync(() => {
+    const byRole = {} as Record<RoleId, RoleConfig>
+    for (const roleId of ROLE_IDS) {
+      const override = config.overrides?.[roleId]
+      const profile = override?.profile ?? config.defaultProfile
+      const modelId = override ? override.spec.modelId : `role/${roleId}`
 
-  return Effect.gen(function* () {
-    const entries = yield* Effect.forEach(
-      MAGNITUDE_SLOTS,
-      (slot) =>
-        Effect.gen(function* () {
-          const peek = yield* providerState.peek(slot)
-          const { hardCap, softCap } = yield* providerState.contextLimits(slot)
-
-          const config: SlotConfig = {
-            providerId: peek?.model.providerId ?? null,
-            modelId: peek?.model.id ?? null,
-            hardCap,
-            softCap,
-          }
-
-          return [slot, config] as const
-        }),
-    )
-
-    const bySlot = {} as Record<MagnitudeSlot, SlotConfig>
-    for (const [slot, config] of entries) {
-      bySlot[slot] = config
+      byRole[roleId] = {
+        providerId: 'magnitude',
+        modelId,
+        hardCap: profile.contextWindow,
+        softCap: Math.floor(profile.contextWindow * 0.9),
+      }
     }
-
-    return {
-      bySlot,
-    }
+    return { byRole }
   })
 }
 
-export const ConfigAmbient = Ambient.define<ConfigState, ProviderStateShape<MagnitudeSlot>>({
+export const ConfigAmbient = Ambient.define<ConfigState, MagnitudeConfig>({
   name: 'Config',
   initial: Effect.gen(function* () {
-    const providerState = yield* ProviderState
-    return yield* buildConfigState({
-      providerState: providerState as ProviderStateShape<MagnitudeSlot>,
-    })
+    const config = yield* MagnitudeConfig
+    return yield* buildConfigState(config)
   }),
 })
 
-export function publishConfig(opts: {
-  providerState: ProviderStateShape<MagnitudeSlot>
-}) {
+export function publishConfig(config: MagnitudeConfigShape) {
   return Effect.gen(function* () {
     const ambientService = yield* AmbientServiceTag
-    const state = yield* buildConfigState(opts)
+    const state = yield* buildConfigState(config)
     yield* ambientService.update(ConfigAmbient, state)
   })
 }
 
-export const publishConfigFromProviders = Effect.gen(function* () {
-  const providerState = yield* ProviderState
-  yield* publishConfig({
-    providerState: providerState as ProviderStateShape<MagnitudeSlot>,
-  })
+export const publishConfigFromMagnitude = Effect.gen(function* () {
+  const config = yield* MagnitudeConfig
+  yield* publishConfig(config)
 })

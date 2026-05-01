@@ -29,7 +29,7 @@ export const AgentLifecycle = Worker.define<AppEvent>()({
     // Create root fork resources when session starts
     session_initialized: (event, _publish) => Effect.gen(function* () {
       const execManager = yield* ExecutionManager
-      const rootVariant = event.context?.oneshot ? 'lead-oneshot' : 'lead'
+      const rootVariant = 'leader'
       yield* execManager.initFork(null, rootVariant)
     }).pipe(Effect.orDie),
 

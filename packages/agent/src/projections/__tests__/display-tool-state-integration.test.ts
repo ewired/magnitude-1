@@ -117,7 +117,7 @@ describe('DisplayProjection tool state integration', () => {
         toolKey: 'spawnWorker',
         event: {
           _tag: 'ToolInputReady',
-          input: { id: 'task-1', role: 'builder', message: 'do it' },
+          input: { id: 'task-1', role: 'engineer', message: 'do it' },
         },
       } as any,
     ])
@@ -161,7 +161,7 @@ describe('DisplayProjection tool state integration', () => {
         toolKey: 'spawnWorker',
         event: {
           _tag: 'ToolInputReady',
-          input: { id: 'task-1', role: 'builder', message: 'do it' },
+          input: { id: 'task-1', role: 'engineer', message: 'do it' },
         },
       } as any,
       {
@@ -171,7 +171,7 @@ describe('DisplayProjection tool state integration', () => {
         parentForkId: null,
         agentId: 'task-1',
         name: 'Builder',
-        role: 'builder',
+        role: 'engineer',
         taskId: 'task-1',
         mode: 'spawn',
         context: 'do it',

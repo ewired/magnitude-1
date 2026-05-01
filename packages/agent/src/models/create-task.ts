@@ -1,16 +1,15 @@
-import { defineStateModel, type BaseState } from '@magnitudedev/tools'
+import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { createTaskTool } from '../tools/task-tools'
 
 export interface CreateTaskState extends BaseState {
-  toolKey: 'createTask'
   id?: string
 }
 
-const initial: Omit<CreateTaskState, 'phase' | 'toolKey'> = {
+const initial: Omit<CreateTaskState, 'phase'> = {
   id: undefined,
 }
 
-export const createTaskModel = defineStateModel('createTask', createTaskTool)({
+export const createTaskModel = defineStateModel(createTaskTool)<CreateTaskState>({
   initial,
   reduce: (state, event): CreateTaskState => {
     switch (event._tag) {
@@ -21,9 +20,9 @@ export const createTaskModel = defineStateModel('createTask', createTaskTool)({
           ? { ...state, phase: 'streaming', id: (state.id ?? '') + event.delta }
           : state
       case 'ToolInputReady':
-        return { ...state, phase: 'streaming', id: event.input.id }
+        return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing' }
+        return { ...state, phase: 'executing', id: event.input.id ?? state.id }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':
@@ -34,10 +33,12 @@ export const createTaskModel = defineStateModel('createTask', createTaskTool)({
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
+          default:
+            return state
         }
       }
-      case 'ToolParseError':
-        return { ...state, phase: 'error' }
+      case 'ToolInputDecodeFailed':
+        return { ...state, phase: 'error', errorMessage: event.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

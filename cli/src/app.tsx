@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
-import { Effect, Layer, Cause } from 'effect'
+import { Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, type DisplayState, type AgentStatusState, type DebugSnapshot, type AppEvent, type ErrorDisplayMessage, PROVIDERS, getProvider, type ProviderDefinition, type AuthMethodDef, type ModelSelection, type ProviderAuthMethodStatus, type ForkMemoryState, type CompactionState, type ToolStateProjectionState } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot } from '@magnitudedev/agent'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
 import { JsonChatPersistence, loadSessionSummary } from './persistence'
@@ -22,12 +22,7 @@ import { SelectedFileProvider } from './hooks/use-file-viewer'
 
 import { BOX_CHARS } from './utils/ui-constants'
 import { hasConversationActivity } from './utils/start-state'
-import {
-  localProviderAddedModelToast,
-  localProviderSavedApiKeyToast,
-  localProviderSavedEmptyApiKeyToast,
-  localProviderSavedEndpointToast,
-} from './utils/local-provider-toast-messages'
+
 import { AnimatedLogo } from './components/animated-logo'
 import { RecentChatsWidget } from './components/recent-chats-widget'
 import { SessionLoadingView } from './components/session-loading-view'
@@ -36,22 +31,16 @@ import { INIT_PROMPT } from './commands/init-prompt'
 import { registerSkillCommands, type SlashCommandDefinition } from './commands/slash-commands'
 import { useSelectionAutoCopy } from './utils/clipboard'
 import { useRecentChatsNavigation } from './hooks/use-recent-chats-navigation'
-import { useModelSelectNavigation } from './hooks/use-model-select-navigation'
-import { useProviderSelectNavigation } from './hooks/use-provider-select-navigation'
-import type { SettingsTab } from './hooks/use-settings-navigation'
 
-import { useAuthFlow } from './hooks/use-auth-flow'
-import { type WizardStep } from './components/setup-wizard-overlay'
 import { AppOverlays } from './components/app-overlays'
 
 
-import { buildModelPickerItems, filterModelPickerItems, resolveSlotDefaultSelection } from './utils/model-picker'
-import { resolveLocalWizardSlotDefaults } from './utils/wizard-flow'
+
 import { getRecentChats, type RecentChat } from './data/recent-chats'
 import { logger, initLogger, subscribeToLogs, clearSessionLog, getSessionLogPath, type LogEntry } from '@magnitudedev/logger'
 
 
-import path from 'path'
+
 import { executeBashCommand, type BashResult } from './utils/bash-executor'
 
 
@@ -65,23 +54,17 @@ import { ChatController } from './components/chat/chat-controller'
 import { useTasks } from './hooks/use-tasks'
 import { useLocalWidth } from './hooks/use-local-width'
 
-import { initTelemetry, shutdownTelemetry, trackSessionStart, trackSessionEnd, SessionTracker } from '@magnitudedev/telemetry'
+import { initTelemetry, trackSessionStart, SessionTracker } from '@magnitudedev/telemetry'
 
 import { setSessionTracker } from './utils/telemetry-state'
 import { TextAttributes, type KeyEvent } from '@opentui/core'
 
 import { createId } from '@magnitudedev/generate-id'
 
-import { useProviderRuntime } from './providers/provider-runtime'
 import { useStorage } from './providers/storage-provider'
-import { useProviderUiState } from './hooks/use-provider-ui-state'
 import { useFilePanel } from './hooks/use-file-panel'
 import { useLazyClient } from './hooks/use-lazy-client'
-import { MAGNITUDE_SLOTS, type MagnitudeSlot } from '@magnitudedev/agent'
-
-import type { Preset, ProviderOptions } from '@magnitudedev/storage'
-
-const SYSTEM_DEFAULTS_PRESET = '__system_defaults__'
+import { createRoles, ROLE_IDS } from '@magnitudedev/roles'
 
 export const getSelectedForkContentVersion = (
   selectedForkId: string | null,
@@ -153,15 +136,8 @@ function AppInner({
   onSessionId?: (id: string) => void
 }) {
   const renderer = useRenderer()
-  const providerRuntime = useProviderRuntime()
   const storage = useStorage()
-  const { state: providerUiState, reload: reloadProviderState } = useProviderUiState()
   const { client, workspacePath, send: clientSend, ensureReady: ensureClientReady, setFactory: setClientFactory, setClient: setLazyClient } = useLazyClient()
-
-  const reloadProviderAndConfig = useCallback(async () => {
-    await reloadProviderState()
-    await client?.refreshConfig()
-  }, [reloadProviderState, client])
 
   const [display, setDisplay] = useState<DisplayState | null>(null)
   const [toolState, setToolState] = useState<ToolStateProjectionState | null>(null)
@@ -182,25 +158,9 @@ function AppInner({
   const [systemMessages, setSystemMessages] = useState<Array<{ id: string; text: string; timestamp: number }>>([])
   const systemMessageTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [showRecentChatsOverlay, setShowRecentChatsOverlay] = useState(false)
-  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null)
-  const [selectingModelFor, setSelectingModelFor] = useState<MagnitudeSlot | null>(null)
-  const emptySlotModels = (): Record<MagnitudeSlot, ModelSelection | null> => (
-    Object.fromEntries(MAGNITUDE_SLOTS.map((slot) => [slot, null])) as Record<MagnitudeSlot, ModelSelection | null>
-  )
-  const [slotModels, setSlotModels] = useState<Record<MagnitudeSlot, ModelSelection | null>>(emptySlotModels)
-  const [presets, setPresets] = useState<Preset[]>([])
-
-  const [preferencesSelectedIndex, setPreferencesSelectedIndex] = useState(0)
-  const [showAllProviders, setShowAllProviders] = useState(false)
-  const [showRecommendedOnly, setShowRecommendedOnly] = useState(false)
-  const [modelSearch, setModelSearch] = useState('')
-  const [providerDetailId, setProviderDetailId] = useState<string | null>(null)
-  const [providerDetailSelectedIndex, setProviderDetailSelectedIndex] = useState(0)
-  const [providerRefreshKey, setProviderRefreshKey] = useState(0)
-  const [providerDetailStatus, setProviderDetailStatus] = useState<ProviderAuthMethodStatus | null>(null)
-  const [providerDetailOptions, setProviderDetailOptions] = useState<ProviderOptions | undefined>(undefined)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [contextHardCap, setContextHardCap] = useState<number | null>(null)
-  const [agentProjectionMode, setAgentProjectionMode] = useState<string>('default')
+
   const [bashMode, setBashMode] = useState(false)
   const [bashOutputs, setBashOutputs] = useState<BashResult[]>([])
   const [debugPanelVisible, setDebugPanelVisible] = useState(false)
@@ -213,17 +173,8 @@ function AppInner({
   const [lastActualInputTokens, setLastActualInputTokens] = useState<number | null>(null)
   const [hasCompletedTurn, setHasCompletedTurn] = useState(false)
   const [isCompacting, setIsCompacting] = useState(false)
-  const returnToProviderDetailRef = useRef<string | null>(null)
   const turnStartTimeRef = useRef<number | null>(null)
   const hasAnimatedRef = useRef(skipAnimation)
-
-
-  const resetModelPickerState = useCallback(() => {
-    setModelSearch('')
-    setShowAllProviders(false)
-    setShowRecommendedOnly(false)
-    setSelectingModelFor(null)
-  }, [])
 
   const formatFooterTokens = (n: number) => {
     if (n >= 1000) {
@@ -265,28 +216,7 @@ function AppInner({
   // Browser setup overlay state
   const [showBrowserSetup, setShowBrowserSetup] = useState(false)
 
-  // Setup wizard state
-  const [showSetupWizard, setShowSetupWizard] = useState(false)
-  const [wizardStep, setWizardStep] = useState<WizardStep>('provider')
-  const [wizardProviderSelectedIndex, setWizardProviderSelectedIndex] = useState(0)
-  const [wizardModelSelectedIndex, setWizardModelSelectedIndex] = useState(0)
   const [recentChatsSelectedIndex, setRecentChatsSelectedIndex] = useState(0)
-  const [authMethodSelectedIndex, setAuthMethodSelectedIndex] = useState(0)
-  const [wizardSlotModels, setWizardSlotModels] = useState<Record<MagnitudeSlot, ModelSelection | null>>(emptySlotModels)
-  const [wizardConnectedProvider, setWizardConnectedProvider] = useState<string | null>(null)
-  const [wizardNeedsChromium, setWizardNeedsChromium] = useState<boolean | null>(null)
-
-  const [wizardSelectedProviderId, setWizardSelectedProviderId] = useState<string | null>(null)
-  const [wizardSelectedProviderDiscoveredModels, setWizardSelectedProviderDiscoveredModels] = useState<Array<{ id: string, name: string }>>([])
-  const [wizardSelectedProviderRememberedModelIds, setWizardSelectedProviderRememberedModelIds] = useState<string[]>([])
-  const localProviderSet = useMemo(() => new Set(['lmstudio', 'ollama', 'llama.cpp', 'openai-compatible-local']), [])
-  const wizardHasProviderEndpointStep = !!wizardSelectedProviderId && localProviderSet.has(wizardSelectedProviderId)
-
-  const wizardTotalSteps = useMemo(() => {
-    const baseSteps = wizardHasProviderEndpointStep ? 3 : 2 // provider (+endpoint when local) + models
-    if (wizardNeedsChromium === false) return baseSteps
-    return baseSteps + 1
-  }, [wizardNeedsChromium, wizardHasProviderEndpointStep])
 
   const [recentChats, setRecentChats] = useState<RecentChat[] | null>(null)
 
@@ -301,40 +231,8 @@ function AppInner({
   }, [debugMode, refreshRecentChats])
 
   useEffect(() => {
-    if (!providerUiState) return
-
-    setSlotModels(providerUiState.slotModels)
-    storage.config.getPresets().then((loaded: Preset[]) => {
-      setPresets(loaded)
-    }).catch((error: unknown) => {
-      logger.warn({ error: error instanceof Error ? error.message : String(error) }, 'Failed to load presets')
-    })
-
-    initTelemetry({ telemetryEnabled: providerUiState.telemetryEnabled })
-
-    if (!providerUiState.setupComplete) {
-      setShowSetupWizard(true)
-    }
-  }, [providerUiState, storage])
-
-  useEffect(() => {
-    if (!providerUiState) return
-    providerRuntime.state.contextLimits('lead').then((limits) => {
-      setContextHardCap(limits.hardCap)
-    }).catch((error) => {
-      logger.warn({ error: error instanceof Error ? error.message : String(error) }, 'Failed to load provider context limits')
-    })
-  }, [providerRuntime, slotModels.lead, providerUiState])
-
-  // Check Chromium installation when wizard opens
-  useEffect(() => {
-    if (!showSetupWizard) return
-    import('@magnitudedev/browser-harness').then(({ isBrowserInstalled }) => {
-      setWizardNeedsChromium(!isBrowserInstalled())
-    }).catch(() => {
-      setWizardNeedsChromium(true)
-    })
-  }, [showSetupWizard])
+    initTelemetry({ telemetryEnabled: true })
+  }, [])
 
   // Subscribe to live logs for debug panel
   useEffect(() => {
@@ -406,7 +304,6 @@ function AppInner({
         persistence: persistenceLayer,
         storage,
         debug: debugMode,
-        providerRuntime: providerRuntime.layer,
         sessionId: activeSessionId,
       })
     }
@@ -444,8 +341,8 @@ function AppInner({
           sessionTracker.recordUserMessage()
         }
 
-        if (event.type === 'turn_completed') {
-          sessionTracker.recordTurn(event.providerId ?? null, event.modelId ?? null, event.inputTokens, event.outputTokens)
+        if (event.type === 'turn_outcome') {
+          sessionTracker.recordTurn(event.providerId ?? null, event.modelId ?? null, event.inputTokens ?? 0, event.outputTokens ?? 0)
         }
 
         if (event.type === 'compaction_completed') {
@@ -536,7 +433,7 @@ function AppInner({
       onClientReady?.(null)
       c?.dispose()
     }
-  }, [debugMode, onClientReady, onSessionId, providerRuntime, renderer, sessionSelection, setClientFactory, setLazyClient, storage])
+  }, [debugMode, onClientReady, onSessionId, renderer, sessionSelection, setClientFactory, setLazyClient, storage])
 
   // Subscribe to display state for selected fork
   useEffect(() => {
@@ -658,93 +555,46 @@ function AppInner({
 
   const activeDisplay = selectedForkId ? forkDisplay : display
 
+  // Roles data for settings display
+  const rolesData = useMemo(() => {
+    const roles = createRoles()
+    return ROLE_IDS.map(id => ({
+      id,
+      description: roles[id].description,
+      model: 'magnitude/' + id,
+    }))
+  }, [])
+
+  // Model summary derived from agent status (role-based, no provider lookup)
   const activeModelSummary = useMemo(() => {
-    const leadModel = slotModels.lead
-    const rootModelSummary = leadModel ? {
-      provider: getProvider(leadModel.providerId)?.name ?? leadModel.providerId,
-      model: getProvider(leadModel.providerId)?.models.find(m => m.id === leadModel.modelId)?.name ?? leadModel.modelId,
-    } : null
-    if (!selectedForkId || !agentStatusState) return rootModelSummary
-    const agentId = agentStatusState.agentByForkId.get(selectedForkId)
-    const agent = agentId ? agentStatusState.agents.get(agentId) : undefined
-    if (!agent) return rootModelSummary
-    // agent.role is the slot name (lead or worker)
-    const slot = (MAGNITUDE_SLOTS as readonly string[]).includes(agent.role)
-      ? agent.role as MagnitudeSlot
-      : 'lead' as MagnitudeSlot
-    const selection = slotModels[slot]
-    if (!selection) return null
-    return {
-      provider: getProvider(selection.providerId)?.name ?? selection.providerId,
-      model: getProvider(selection.providerId)?.models.find(m => m.id === selection.modelId)?.name ?? selection.modelId,
+    if (!selectedForkId || !agentStatusState) {
+      return { provider: 'Magnitude', model: 'leader' }
     }
-  }, [selectedForkId, agentStatusState, slotModels])
-
-  const activeModelSupportsVision = useMemo(() => {
-    const leadModel = slotModels.lead
-    const rootModelDef = leadModel
-      ? getProvider(leadModel.providerId)?.models.find(m => m.id === leadModel.modelId)
-      : undefined
-    const rootSupportsVision = rootModelDef?.supportsVision ?? false
-    if (!selectedForkId || !agentStatusState) return rootSupportsVision
     const agentId = agentStatusState.agentByForkId.get(selectedForkId)
     const agent = agentId ? agentStatusState.agents.get(agentId) : undefined
-    if (!agent) return rootSupportsVision
-    const slot = (MAGNITUDE_SLOTS as readonly string[]).includes(agent.role)
-      ? agent.role as MagnitudeSlot
-      : 'lead' as MagnitudeSlot
-    const selection = slotModels[slot]
-    if (!selection) return false
-    const modelDef = getProvider(selection.providerId)?.models.find(m => m.id === selection.modelId)
-    return modelDef?.supportsVision ?? false
-  }, [selectedForkId, agentStatusState, slotModels])
+    if (!agent) return { provider: 'Magnitude', model: 'leader' }
+    return { provider: 'Magnitude', model: agent.role }
+  }, [selectedForkId, agentStatusState])
 
-  const forkSlot = useMemo(() => {
+  // Vision support — assume true since Magnitude handles model capabilities server-side
+  const activeModelSupportsVision = true
+
+  const forkRole = useMemo(() => {
     if (!expandedForkId || !agentStatusState) return null
     const agentId = agentStatusState.agentByForkId.get(expandedForkId)
     const agent = agentId ? agentStatusState.agents.get(agentId) : undefined
     if (!agent) return null
-    return (MAGNITUDE_SLOTS as readonly string[]).includes(agent.role)
-      ? agent.role as MagnitudeSlot
-      : 'lead' as MagnitudeSlot
+    return agent.role
   }, [expandedForkId, agentStatusState])
 
   const forkModelSummary = useMemo(() => {
-    if (!forkSlot) return null
-    const selection = slotModels[forkSlot]
-    if (!selection) return null
-    return {
-      provider: getProvider(selection.providerId)?.name ?? selection.providerId,
-      model: getProvider(selection.providerId)?.models.find(m => m.id === selection.modelId)?.name ?? selection.modelId,
-    }
-  }, [forkSlot, slotModels])
+    if (!forkRole) return null
+    return { provider: 'Magnitude', model: forkRole }
+  }, [forkRole])
 
-  const [forkContextHardCap, setForkContextHardCap] = useState<number | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    if (!forkSlot) {
-      setForkContextHardCap(contextHardCap)
-      return () => {
-        cancelled = true
-      }
-    }
-
-    providerRuntime.state.contextLimits(forkSlot).then((limits) => {
-      if (!cancelled) {
-        setForkContextHardCap(limits.hardCap)
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        setForkContextHardCap(contextHardCap)
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [providerRuntime, forkSlot, contextHardCap])
+  // Fork context cap: for now, use the main context cap.
+  // TODO: resolve per-fork context limits from Magnitude API when available.
+  const forkContextHardCap = contextHardCap
 
   const mainTimelineMessages = useMemo(
     () => (activeDisplay?.messages ?? []).filter(m => {
@@ -907,8 +757,8 @@ function AppInner({
     logger.info('Init project activated')
   }, [clientSend])
 
-  const openSettings = useCallback((tab: SettingsTab = 'provider') => {
-    setSettingsTab(tab)
+  const openSettings = useCallback((_tab?: string) => {
+    setSettingsOpen(true)
   }, [])
 
   const openBrowserSetup = useCallback(() => {
@@ -944,780 +794,8 @@ function AppInner({
     }
   }, [showRecentChatsOverlay])
 
-  // Model selection overlay handlers
-  const handleModelSelect = useCallback(async (providerId: string, modelId: string) => {
-    if (!selectingModelFor || !providerUiState) return
-
-    const selection: ModelSelection = { providerId, modelId }
-    const auth = await providerRuntime.auth.getAuth(providerId)
-    await providerRuntime.state.setSelection(selectingModelFor, providerId, modelId, auth ?? null)
-    await storage.config.setModelSelection(selectingModelFor, selection)
-    await storage.config.updateFull((current) => {
-      const existing = current.providers?.[providerId] ?? {}
-      const rememberedRaw = (existing as any).rememberedModelIds
-      const remembered = Array.isArray(rememberedRaw) ? rememberedRaw.filter((id): id is string => typeof id === 'string') : []
-      return {
-        ...current,
-        providers: {
-          ...(current.providers ?? {}),
-          [providerId]: {
-            ...existing,
-            modelId,
-            rememberedModelIds: Array.from(new Set([...remembered, modelId])),
-          },
-        },
-      }
-    })
-    setSlotModels(prev => ({ ...prev, [selectingModelFor]: selection }))
-
-    await reloadProviderAndConfig()
-    setSelectingModelFor(null)
-  }, [selectingModelFor, providerUiState, providerRuntime, reloadProviderAndConfig, storage])
-
-  const applySlotModelMap = useCallback(async (models: Preset['models']) => {
-    for (const slot of MAGNITUDE_SLOTS) {
-      const selection = models[slot]
-      if (selection) {
-        const auth = await providerRuntime.auth.getAuth(selection.providerId)
-        await providerRuntime.state.setSelection(slot, selection.providerId, selection.modelId, auth ?? null)
-        await storage.config.setModelSelection(slot, selection)
-      } else {
-        await providerRuntime.state.clear(slot)
-        await storage.config.setModelSelection(slot, null)
-      }
-    }
-    const slotMap = Object.fromEntries(
-      MAGNITUDE_SLOTS.map((slot) => [slot, models[slot] ?? null])
-    ) as Record<MagnitudeSlot, ModelSelection | null>
-    setSlotModels(slotMap)
-    await reloadProviderAndConfig()
-  }, [providerRuntime, storage, reloadProviderAndConfig])
-
-  const refreshPresets = useCallback(async () => {
-    const loaded: Preset[] = await storage.config.getPresets()
-    setPresets(loaded)
-  }, [storage])
-
-  const handleSavePreset = useCallback(async (name: string) => {
-    await storage.config.savePreset(name, slotModels)
-    await refreshPresets()
-  }, [storage, slotModels, refreshPresets])
-
-  const handleDeletePreset = useCallback(async (name: string) => {
-    await storage.config.deletePreset(name)
-    await refreshPresets()
-  }, [storage, refreshPresets])
-
-  const handleLoadPreset = useCallback(async (name: string, preferredProviderId?: string) => {
-    if (!providerUiState) return
-
-    if (name === SYSTEM_DEFAULTS_PRESET) {
-      if (!preferredProviderId) return
-      const connectedProviderIds = new Set(providerUiState.detectedProviders.map(d => d.provider.id))
-      const detectedAuthTypeByProviderId = new Map<string, string | null>()
-      for (const detected of providerUiState.detectedProviders) {
-        detectedAuthTypeByProviderId.set(detected.provider.id, detected.auth?.type ?? null)
-      }
-
-      const defaultModels: Record<MagnitudeSlot, ModelSelection | null> = emptySlotModels()
-
-      const preferredProvider = PROVIDERS.find((provider) => provider.id === preferredProviderId)
-      const isLocalPreferredProvider = preferredProvider?.providerFamily === 'local'
-      const firstLocalModelId = isLocalPreferredProvider ? preferredProvider?.models[0]?.id ?? null : null
-
-      if (isLocalPreferredProvider && firstLocalModelId) {
-        for (const slot of MAGNITUDE_SLOTS) {
-          defaultModels[slot] = { providerId: preferredProviderId, modelId: firstLocalModelId }
-        }
-      } else {
-        for (const slot of MAGNITUDE_SLOTS) {
-          defaultModels[slot] = resolveSlotDefaultSelection({
-            allProviders: PROVIDERS,
-            connectedProviderIds,
-            slot,
-            preferredProviderId,
-            detectedAuthTypeByProviderId,
-          })
-        }
-      }
-
-      await applySlotModelMap(defaultModels)
-      return
-    }
-
-    const preset = presets.find((p) => p.name === name)
-    if (!preset) return
-    await applySlotModelMap(preset.models)
-  }, [providerUiState, presets, applySlotModelMap])
-
-  const detectedProviders = providerUiState?.detectedProviders ?? []
-
-  useEffect(() => {
-    if (!providerDetailId) {
-      setProviderDetailStatus(null)
-      setProviderDetailOptions(undefined)
-      return
-    }
-    setProviderDetailStatus(null)
-    setProviderDetailOptions(undefined)
-    let stale = false
-
-    providerRuntime.auth.detectProviderAuthMethods(providerDetailId).then((status) => {
-      if (!stale) setProviderDetailStatus(status)
-    }).catch((error) => {
-      logger.warn({
-        providerId: providerDetailId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Failed to load provider auth methods')
-      if (!stale) setProviderDetailStatus(null)
-    })
-
-    storage.config.getProviderOptions(providerDetailId).then((options) => {
-      if (!stale) setProviderDetailOptions(options)
-    }).catch((error) => {
-      logger.warn({
-        providerId: providerDetailId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Failed to load provider options')
-      if (!stale) setProviderDetailOptions(undefined)
-    })
-
-    return () => { stale = true }
-  }, [providerDetailId, providerRefreshKey, providerRuntime, storage])
-
-  const providerDetailActions = useMemo(() => {
-    if (!providerDetailStatus) return []
-    const actions: Array<{ type: 'connect' | 'disconnect' | 'update-key' | 'retry-discovery' | 'configure-endpoint'; methodIndex: number; label: string }> = []
-    const providerId = providerDetailStatus.provider.id
-    const isLocal = localProviderSet.has(providerId)
-
-    for (const m of providerDetailStatus.methods) {
-      if (m.connected) {
-        if (m.method.type === 'api-key' && m.source === 'stored') {
-          actions.push({ type: 'update-key', methodIndex: m.methodIndex, label: 'Update Key' })
-          actions.push({ type: 'disconnect', methodIndex: m.methodIndex, label: 'Disconnect' })
-        } else if (!isLocal && (m.source === 'stored' || m.source === 'none')) {
-          actions.push({ type: 'disconnect', methodIndex: m.methodIndex, label: 'Disconnect' })
-        }
-      } else if (!isLocal) {
-        actions.push({ type: 'connect', methodIndex: m.methodIndex, label: 'Connect' })
-      }
-    }
-    return actions
-  }, [providerDetailStatus, localProviderSet])
-
-  const connectedProviderIds = useMemo(
-    () => new Set(detectedProviders.map(d => d.provider.id)),
-    [detectedProviders],
-  )
-
-  const connectedProviders = useMemo(
-    () => PROVIDERS.filter(p => connectedProviderIds.has(p.id)),
-    [connectedProviderIds],
-  )
-
-  const authStatusesByProviderId = useMemo(() => {
-    const map = new Map<string, ProviderAuthMethodStatus | null>()
-    if (providerDetailId) {
-      map.set(providerDetailId, providerDetailStatus)
-    }
-    return map
-  }, [providerDetailId, providerDetailStatus])
-
-  const detectedAuthTypeByProviderId = useMemo(() => {
-    const map = new Map<string, string | null>()
-    for (const detected of detectedProviders) {
-      map.set(detected.provider.id, detected.auth?.type ?? null)
-    }
-    return map
-  }, [detectedProviders])
-
-  const modelItems = useMemo(() => {
-    if (!selectingModelFor) return []
-    return buildModelPickerItems({
-      allProviders: PROVIDERS,
-      connectedProviderIds,
-      selectingModelFor,
-
-      authStatusesByProviderId,
-      detectedAuthTypeByProviderId,
-    })
-  }, [selectingModelFor, connectedProviderIds, providerUiState, authStatusesByProviderId, detectedAuthTypeByProviderId])
-
-  const filteredModelItems = useMemo(() => {
-    if (!selectingModelFor) return []
-    return filterModelPickerItems({
-      items: modelItems,
-      selectingModelFor,
-      showAllProviders,
-      showRecommendedOnly,
-      search: modelSearch,
-    })
-  }, [modelItems, selectingModelFor, showAllProviders, showRecommendedOnly, modelSearch])
-
-  const modelNavigation = useModelSelectNavigation(
-    filteredModelItems,
-    handleModelSelect,
-    settingsTab === 'model',
-  )
-
-  // Track wizard state in a ref so authFlow callbacks don't trigger re-creation
-  const showSetupWizardRef = useRef(false)
-  showSetupWizardRef.current = showSetupWizard
-
-  // Auth flow (shared between settings overlay and setup wizard)
-  const authFlow = useAuthFlow({
-    onAuthSuccess: (providerId, providerName) => {
-      setProviderRefreshKey(prev => prev + 1)
-
-      if (showSetupWizardRef.current) {
-        // Wizard mode: advance to models step with defaults for this provider
-        const provider = getProvider(providerId)
-        setWizardSelectedProviderId(providerId)
-
-        const newWizardSlotModels: Record<MagnitudeSlot, ModelSelection | null> = emptySlotModels()
-        const freshConnectedProviderIds = new Set([...connectedProviderIds, providerId])
-        for (const slot of MAGNITUDE_SLOTS) {
-          const selection = resolveSlotDefaultSelection({
-            allProviders: PROVIDERS,
-            connectedProviderIds: freshConnectedProviderIds,
-            slot,
-            preferredProviderId: providerId,
-            detectedAuthTypeByProviderId,
-          })
-          if (selection) newWizardSlotModels[slot] = selection
-        }
-        setWizardSlotModels(newWizardSlotModels)
-        setWizardConnectedProvider(providerName)
-        setWizardStep('models')
-      } else {
-        // Settings mode: return to provider list
-        setSettingsTab('provider')
-        if (returnToProviderDetailRef.current) {
-          setProviderDetailId(returnToProviderDetailRef.current)
-          setProviderDetailSelectedIndex(0)
-          returnToProviderDetailRef.current = null
-        }
-      }
-    },
-    onAuthCancel: () => {
-      if (showSetupWizardRef.current) {
-        // Wizard mode: go back to provider selection
-        setWizardStep('provider')
-      } else {
-        // Settings mode
-        setSettingsTab('provider')
-        if (returnToProviderDetailRef.current) {
-          setProviderDetailId(returnToProviderDetailRef.current)
-          setProviderDetailSelectedIndex(0)
-          returnToProviderDetailRef.current = null
-        }
-      }
-    },
-    onMessage: (msg) => showSystemMessage(msg),
-    showEphemeral,
-    theme,
-    reloadProviderState: reloadProviderAndConfig,
-  })
-
-  // --- Setup wizard handlers ---
-
-  const handleWizardProviderSelected = useCallback(async (providerId: string) => {
-    const provider = getProvider(providerId)
-    if (!provider) return
-    setWizardSelectedProviderId(providerId)
-
-    const isLocalProvider = localProviderSet.has(providerId)
-    if (isLocalProvider) {
-      // Local wizard path is models-first. Seed default endpoint in background if missing.
-      const existing = await storage.config.getProviderOptions(providerId)
-      const hasBaseUrl = typeof existing?.baseUrl === 'string' && existing.baseUrl.trim().length > 0
-      if (!hasBaseUrl && provider.defaultBaseUrl) {
-        await storage.config.updateFull((current) => {
-          const providerOptions = current.providers?.[providerId] ?? {}
-          return {
-            ...current,
-            providers: {
-              ...(current.providers ?? {}),
-              [providerId]: {
-                ...providerOptions,
-                baseUrl: provider.defaultBaseUrl,
-              },
-            },
-          }
-        })
-      }
-
-      await providerRuntime.catalog.refresh().catch(() => undefined)
-      await reloadProviderAndConfig().catch(() => undefined)
-
-      const latestOptions = await storage.config.getProviderOptions(providerId).catch(() => null)
-      const discoveredModels = Array.isArray((latestOptions as any)?.discoveredModels)
-        ? (latestOptions as any).discoveredModels
-          .filter((m: { id?: unknown }) => typeof m?.id === 'string')
-          .map((m: { id: string; name?: unknown }) => ({ id: String(m.id), name: typeof m.name === 'string' ? m.name : String(m.id) }))
-        : []
-      const rememberedModelIds = Array.isArray((latestOptions as any)?.rememberedModelIds)
-        ? (latestOptions as any).rememberedModelIds.filter((id: any) => typeof id === 'string')
-        : []
-      setWizardSelectedProviderDiscoveredModels(discoveredModels)
-      setWizardSelectedProviderRememberedModelIds(rememberedModelIds)
-
-      const refreshedConnectedProviderIds = new Set([
-        ...connectedProviderIds,
-        providerId,
-      ])
-
-      const newWizardSlotModels = resolveLocalWizardSlotDefaults({
-        slots: MAGNITUDE_SLOTS,
-        providerId,
-        existingSlotModels: slotModels,
-        discoveredModelIds: discoveredModels.map((m: { id: string }) => m.id),
-        rememberedModelIds,
-        applyWizardDefaults: true,
-      }) as Record<MagnitudeSlot, ModelSelection | null>
-
-      setWizardSlotModels(newWizardSlotModels)
-      setWizardConnectedProvider(provider.name)
-      setWizardStep('local-provider')
-      return
-    }
-
-    const detected = detectedProviders
-    const match = detected.find(d => d.provider.id === providerId)
-
-    if (match) {
-      // Already authenticated and ready — compute model defaults and go to models step
-      const newWizardSlotModels: Record<MagnitudeSlot, ModelSelection | null> = emptySlotModels()
-      for (const slot of MAGNITUDE_SLOTS) {
-        const selection = resolveSlotDefaultSelection({
-          allProviders: PROVIDERS,
-          connectedProviderIds,
-          slot,
-          preferredProviderId: providerId,
-        })
-        if (selection) newWizardSlotModels[slot] = selection
-      }
-      setWizardSlotModels(newWizardSlotModels)
-      setWizardConnectedProvider(provider.name)
-      setWizardSelectedProviderDiscoveredModels([])
-      setWizardSelectedProviderRememberedModelIds([])
-      setWizardStep('models')
-    } else if (provider.authMethods.length === 1) {
-      // Single auth method — start it directly
-      authFlow.startAuthForProvider(provider, 0)
-    } else {
-      // Multiple auth methods — show picker
-      authFlow.openAuthMethodPicker(provider)
-    }
-  }, [authFlow.startAuthForProvider, authFlow.openAuthMethodPicker, detectedProviders, connectedProviderIds, localProviderSet, storage, providerRuntime, reloadProviderAndConfig, slotModels])
-
-  const finishWizard = useCallback(async () => {
-    setShowSetupWizard(false)
-    setWizardStep('provider')
-    setWizardSlotModels(emptySlotModels())
-    setWizardConnectedProvider(null)
-    setWizardSelectedProviderId(null)
-    setWizardSelectedProviderDiscoveredModels([])
-    setWizardSelectedProviderRememberedModelIds([])
-    setProviderRefreshKey(prev => prev + 1)
-
-    // Initialize global skills on first run
-    const { initGlobalSkills } = await import('@magnitudedev/skills')
-    await initGlobalSkills().catch((err) => {
-      logger.warn({ error: err.message }, 'Failed to initialize global skills')
-    })
-  }, [])
-
-  const handleWizardComplete = useCallback(async (result: Record<MagnitudeSlot, ModelSelection | null>) => {
-    if (!providerUiState) return
-    authFlow.cancelAll()
-
-    for (const [slot, selection] of Object.entries(result) as [MagnitudeSlot, ModelSelection | null][]) {
-      if (!selection) continue
-      const auth = await providerRuntime.auth.getAuth(selection.providerId)
-      await providerRuntime.state.setSelection(slot, selection.providerId, selection.modelId, auth ?? null)
-      await storage.config.setModelSelection(slot, selection)
-    }
-    setSlotModels(result)
-
-    if (wizardNeedsChromium !== false) {
-      await reloadProviderAndConfig()
-      setWizardStep('browser')
-    } else {
-      await storage.config.setSetupComplete(true)
-      await reloadProviderAndConfig()
-      finishWizard()
-    }
-  }, [authFlow.cancelAll, wizardNeedsChromium, finishWizard, providerUiState, providerRuntime, reloadProviderAndConfig, storage])
-
-  const handleWizardBrowserComplete = useCallback(async () => {
-    if (!providerUiState) return
-    await storage.config.setSetupComplete(true)
-    await reloadProviderAndConfig()
-    finishWizard()
-  }, [finishWizard, providerUiState, reloadProviderAndConfig, storage])
-
-  const handleWizardSkip = useCallback(async () => {
-    if (!providerUiState) return
-    authFlow.cancelAll()
-    await storage.config.setSetupComplete(true)
-    await reloadProviderAndConfig()
-    finishWizard()
-  }, [authFlow.cancelAll, finishWizard, providerUiState, reloadProviderAndConfig, storage])
-
-  const handleWizardContinueFromLocalProvider = useCallback(() => {
-    setWizardStep('models')
-  }, [])
-
-  const handleWizardBack = useCallback(() => {
-    if (wizardStep === 'browser') {
-      setWizardStep('models')
-      return
-    }
-    if (wizardStep === 'models' && wizardHasProviderEndpointStep) {
-      setWizardStep('local-provider')
-      return
-    }
-    if (wizardStep === 'local-provider') {
-      setWizardStep('provider')
-      return
-    }
-    setWizardStep('provider')
-    setWizardSlotModels(emptySlotModels())
-    setWizardConnectedProvider(null)
-  }, [wizardStep, wizardHasProviderEndpointStep])
-
-  // Providers shown in the wizard (exclude cloud providers that require manual credential setup)
-  const WIZARD_PROVIDERS = useMemo(() =>
-    PROVIDERS,
-  [])
-
-  useEffect(() => {
-    if (showSetupWizard && wizardStep === 'provider') {
-      setWizardProviderSelectedIndex(0)
-    }
-    if (showSetupWizard && wizardStep === 'models') {
-      setWizardModelSelectedIndex(0)
-    }
-  }, [showSetupWizard, wizardStep])
-
-  const handleProviderSelect = useCallback((providerId: string) => {
-    setProviderDetailId(providerId)
-    setProviderDetailSelectedIndex(0)
-  }, [])
-
-
-  const handleProviderDisconnect = useCallback(async (providerId: string) => {
-    if (!providerUiState) return
-    await storage.auth.remove(providerId)
-
-    const affectedSlots = MAGNITUDE_SLOTS.filter(slot => slotModels[slot]?.providerId === providerId)
-    if (affectedSlots.length > 0) {
-      for (const slot of affectedSlots) {
-        await providerRuntime.state.clear(slot)
-        await storage.config.setModelSelection(slot, null)
-      }
-      setSlotModels(prev => {
-        const next = { ...prev }
-        for (const slot of affectedSlots) next[slot] = null
-        return next
-      })
-    }
-
-
-    await storage.config.updateFull((current) => {
-      const providers = { ...(current.providers ?? {}) }
-      delete providers[providerId]
-      return { ...current, providers }
-    })
-
-    await reloadProviderAndConfig()
-    setProviderDetailSelectedIndex(0)
-    setProviderRefreshKey(prev => prev + 1)
-    showEphemeral(`Disconnected ${getProvider(providerId)?.name ?? providerId}`, theme.warning)
-  }, [slotModels, showEphemeral, theme.warning, providerUiState, providerRuntime, reloadProviderAndConfig, storage])
-
-  const handleProviderDetailBack = useCallback(() => {
-    setProviderDetailId(null)
-  }, [])
-
-  const handleProviderUpdateKey = useCallback((providerId: string) => {
-    const provider = getProvider(providerId)
-    if (!provider) return
-    const detected = detectedProviders.find(d => d.provider.id === providerId)
-    const existingKey = detected?.auth?.type === 'api' ? (detected.auth as { type: 'api'; key: string }).key : undefined
-    const method = provider.authMethods.find(m => m.type === 'api-key')
-    authFlow.openApiKeyOverlay(provider, method?.envKeys?.[0] ?? '', existingKey)
-    setProviderDetailId(null)
-    setSettingsTab(null)
-  }, [detectedProviders, authFlow.openApiKeyOverlay])
-
-  const handleProviderDetailAction = useCallback((actionIndex: number) => {
-    if (!providerDetailId) return
-    const action = providerDetailActions[actionIndex]
-    if (!action) return
-
-    if (action.type === 'update-key') {
-      handleProviderUpdateKey(providerDetailId)
-    } else if (action.type === 'disconnect') {
-      handleProviderDisconnect(providerDetailId)
-    } else if (action.type === 'retry-discovery') {
-      void providerRuntime.catalog.refresh()
-        .then(() => reloadProviderAndConfig())
-        .then(() => {
-          setProviderRefreshKey(prev => prev + 1)
-          showEphemeral(`Discovery refreshed for ${getProvider(providerDetailId)?.name ?? providerDetailId}`, theme.success)
-        })
-        .catch(() => {
-          showEphemeral(`Couldn't refresh models right now`, theme.warning, 5000)
-        })
-    } else if (action.type === 'connect') {
-      const provider = getProvider(providerDetailId)
-      if (provider) {
-        returnToProviderDetailRef.current = providerDetailId
-        setProviderDetailId(null)
-        setSettingsTab(null)
-        authFlow.startAuthForProvider(provider, action.methodIndex)
-      }
-    }
-  }, [providerDetailId, providerDetailActions, handleProviderUpdateKey, handleProviderDisconnect, authFlow.startAuthForProvider, providerRuntime, reloadProviderAndConfig, showEphemeral, theme.success, theme.warning])
-
-
-  const handleLocalProviderSaveEndpoint = useCallback(async (providerId: string, url: string) => {
-    const trimmed = url.trim()
-    if (!trimmed) return
-    const normalized = /^https?:\/\//.test(trimmed) ? trimmed : `http://${trimmed}`
-    await storage.config.updateFull((current) => {
-      const existing = current.providers?.[providerId] ?? {}
-      return {
-        ...current,
-        providers: {
-          ...(current.providers ?? {}),
-          [providerId]: {
-            ...existing,
-            baseUrl: normalized,
-          },
-        },
-      }
-    })
-    await providerRuntime.catalog.refresh().catch(() => undefined)
-    await reloadProviderAndConfig().catch(() => undefined)
-    const latestOptions = await storage.config.getProviderOptions(providerId).catch(() => null)
-    if (wizardSelectedProviderId === providerId) {
-      const discoveredModels = Array.isArray((latestOptions as any)?.discoveredModels)
-        ? (latestOptions as any).discoveredModels
-          .filter((m: { id?: unknown }) => typeof m?.id === 'string')
-          .map((m: { id: string; name?: unknown }) => ({ id: String(m.id), name: typeof m.name === 'string' ? m.name : String(m.id) }))
-        : []
-      const rememberedModelIds = Array.isArray((latestOptions as any)?.rememberedModelIds)
-        ? (latestOptions as any).rememberedModelIds.filter((id: any) => typeof id === 'string')
-        : []
-      setWizardSelectedProviderDiscoveredModels(discoveredModels)
-      setWizardSelectedProviderRememberedModelIds(rememberedModelIds)
-    }
-    setProviderRefreshKey(prev => prev + 1)
-    showEphemeral(localProviderSavedEndpointToast(getProvider(providerId)?.name ?? providerId), theme.success)
-  }, [storage, providerRuntime, reloadProviderAndConfig, showEphemeral, theme.success, wizardSelectedProviderId])
-
-  const handleLocalProviderRefreshModels = useCallback(async (providerId: string) => {
-    await providerRuntime.catalog.refresh().catch(() => undefined)
-    await reloadProviderAndConfig().catch(() => undefined)
-    const latestOptions = await storage.config.getProviderOptions(providerId).catch(() => null)
-    if (wizardSelectedProviderId === providerId) {
-      const discoveredModels = Array.isArray((latestOptions as any)?.discoveredModels)
-        ? (latestOptions as any).discoveredModels
-          .filter((m: { id?: unknown }) => typeof m?.id === 'string')
-          .map((m: { id: string; name?: unknown }) => ({ id: String(m.id), name: typeof m.name === 'string' ? m.name : String(m.id) }))
-        : []
-      const rememberedModelIds = Array.isArray((latestOptions as any)?.rememberedModelIds)
-        ? (latestOptions as any).rememberedModelIds.filter((id: any) => typeof id === 'string')
-        : []
-      setWizardSelectedProviderDiscoveredModels(discoveredModels)
-      setWizardSelectedProviderRememberedModelIds(rememberedModelIds)
-    }
-    setProviderRefreshKey(prev => prev + 1)
-  }, [providerRuntime, reloadProviderAndConfig, storage, wizardSelectedProviderId])
-
-  const handleLocalProviderAddManualModel = useCallback(async (providerId: string, modelId: string) => {
-    const trimmed = modelId.trim()
-    if (!trimmed) return
-    await storage.config.updateFull((current) => {
-      const existing = current.providers?.[providerId] ?? {}
-      const rememberedRaw = (existing as any).rememberedModelIds
-      const remembered = Array.isArray(rememberedRaw) ? rememberedRaw.filter((id): id is string => typeof id === 'string') : []
-      return {
-        ...current,
-        providers: {
-          ...(current.providers ?? {}),
-          [providerId]: {
-            ...existing,
-            rememberedModelIds: Array.from(new Set([...remembered, trimmed])),
-          },
-        },
-      }
-    })
-    await providerRuntime.catalog.refresh().catch(() => undefined)
-    await reloadProviderAndConfig().catch(() => undefined)
-    const latestOptions = await storage.config.getProviderOptions(providerId).catch(() => null)
-    if (wizardSelectedProviderId === providerId) {
-      const discoveredModels = Array.isArray((latestOptions as any)?.discoveredModels)
-        ? (latestOptions as any).discoveredModels
-          .filter((m: { id?: unknown }) => typeof m?.id === 'string')
-          .map((m: { id: string; name?: unknown }) => ({ id: String(m.id), name: typeof m.name === 'string' ? m.name : String(m.id) }))
-        : []
-      const rememberedModelIds = Array.isArray((latestOptions as any)?.rememberedModelIds)
-        ? (latestOptions as any).rememberedModelIds.filter((id: any) => typeof id === 'string')
-        : []
-      setWizardSelectedProviderDiscoveredModels(discoveredModels)
-      setWizardSelectedProviderRememberedModelIds(rememberedModelIds)
-    }
-    setProviderRefreshKey(prev => prev + 1)
-    showEphemeral(localProviderAddedModelToast(trimmed), theme.success)
-  }, [storage, providerRuntime, reloadProviderAndConfig, showEphemeral, theme.success, wizardSelectedProviderId])
-
-  const handleLocalProviderRemoveManualModel = useCallback(async (providerId: string, modelId: string) => {
-    await storage.config.updateFull((current) => {
-      const existing = current.providers?.[providerId] ?? {}
-      const rememberedRaw = (existing as any).rememberedModelIds
-      const remembered = Array.isArray(rememberedRaw) ? rememberedRaw.filter((id): id is string => typeof id === 'string') : []
-      return {
-        ...current,
-        providers: {
-          ...(current.providers ?? {}),
-          [providerId]: {
-            ...existing,
-            rememberedModelIds: remembered.filter((id) => id !== modelId),
-          },
-        },
-      }
-    })
-    await providerRuntime.catalog.refresh().catch(() => undefined)
-    await reloadProviderAndConfig().catch(() => undefined)
-    const latestOptions = await storage.config.getProviderOptions(providerId).catch(() => null)
-    if (wizardSelectedProviderId === providerId) {
-      const discoveredModels = Array.isArray((latestOptions as any)?.discoveredModels)
-        ? (latestOptions as any).discoveredModels
-          .filter((m: { id?: unknown }) => typeof m?.id === 'string')
-          .map((m: { id: string; name?: unknown }) => ({ id: String(m.id), name: typeof m.name === 'string' ? m.name : String(m.id) }))
-        : []
-      const rememberedModelIds = Array.isArray((latestOptions as any)?.rememberedModelIds)
-        ? (latestOptions as any).rememberedModelIds.filter((id: any) => typeof id === 'string')
-        : []
-      setWizardSelectedProviderDiscoveredModels(discoveredModels)
-      setWizardSelectedProviderRememberedModelIds(rememberedModelIds)
-    }
-    setProviderRefreshKey(prev => prev + 1)
-  }, [storage, providerRuntime, reloadProviderAndConfig, wizardSelectedProviderId])
-
-  const handleLocalProviderSaveOptionalApiKey = useCallback(async (providerId: string, apiKey: string) => {
-    const trimmed = apiKey.trim()
-    if (trimmed.length === 0) {
-      await storage.auth.remove(providerId)
-      showEphemeral(localProviderSavedEmptyApiKeyToast(getProvider(providerId)?.name ?? providerId), theme.success)
-    } else {
-      await storage.auth.set(providerId, { type: 'api', key: trimmed })
-      showEphemeral(localProviderSavedApiKeyToast(getProvider(providerId)?.name ?? providerId), theme.success)
-    }
-    await reloadProviderAndConfig().catch(() => undefined)
-    setProviderRefreshKey(prev => prev + 1)
-  }, [storage, reloadProviderAndConfig, showEphemeral, theme.success])
-
-  const handleChangeSlot = useCallback((slot: MagnitudeSlot) => {
-    resetModelPickerState()
-    setSelectingModelFor(slot)
-  }, [resetModelPickerState])
-
-  const SLOT_UI_ORDER_KEYS: MagnitudeSlot[] = [...MAGNITUDE_SLOTS]
-
-  // Combined model tab keyboard handler — switches between slot view and model picker
-  const modelTabHandleKeyEvent = useCallback((key: KeyEvent): boolean => {
-    if (settingsTab !== 'model') return false
-    const plain = !key.ctrl && !key.meta && !key.option
-
-    // When in model picker sub-view
-    if (selectingModelFor) {
-      // Esc goes back to slot view
-      if (key.name === 'escape') {
-        resetModelPickerState()
-        return true
-      }
-      return modelNavigation.handleKeyEvent(key)
-    }
-
-    // Slot view navigation (7 items: 0-6)
-    if (key.name === 'up' && plain) {
-      setPreferencesSelectedIndex(prev => Math.max(0, prev - 1))
-      return true
-    }
-    if (key.name === 'down' && plain) {
-      setPreferencesSelectedIndex(prev => Math.min(6, prev + 1))
-      return true
-    }
-    if (key.name === 'return' && plain) {
-      handleChangeSlot(SLOT_UI_ORDER_KEYS[preferencesSelectedIndex])
-      return true
-    }
-    return false
-  }, [settingsTab, selectingModelFor, modelNavigation.handleKeyEvent, preferencesSelectedIndex, handleChangeSlot, resetModelPickerState])
-
-  const providerNavigation = useProviderSelectNavigation(
-    PROVIDERS,
-    handleProviderSelect,
-    settingsTab === 'provider',
-  )
-
-  useEffect(() => {
-    if (authFlow.showAuthMethodOverlay) {
-      setAuthMethodSelectedIndex(0)
-    }
-  }, [authFlow.showAuthMethodOverlay, authFlow.authMethodProvider?.id])
-
-
-
-  const providerTabHandleKeyEvent = useCallback((key: KeyEvent): boolean => {
-    if (providerDetailId) {
-      const plain = !key.ctrl && !key.meta && !key.option
-      if (key.name === 'escape' && !key.shift) {
-        setProviderDetailId(null)
-        return true
-      }
-      const actionCount = providerDetailActions.length
-      if (actionCount > 0) {
-        if (key.name === 'up' && plain) {
-          setProviderDetailSelectedIndex(prev => Math.max(0, prev - 1))
-          return true
-        }
-        if (key.name === 'down' && plain) {
-          setProviderDetailSelectedIndex(prev => Math.min(actionCount - 1, prev + 1))
-          return true
-        }
-        if ((key.name === 'return' || key.name === 'enter') && plain && !key.shift) {
-          handleProviderDetailAction(providerDetailSelectedIndex)
-          return true
-        }
-      }
-      return false
-    }
-    return providerNavigation.handleKeyEvent(key)
-  }, [providerDetailId, providerDetailActions, providerDetailSelectedIndex, providerNavigation, handleProviderDetailAction])
-
-  const handleSettingsTabChange = useCallback((tab: SettingsTab) => {
-    // If user navigates away from model tab while selecting, cancel selecting mode
-    if (selectingModelFor && tab !== 'model') {
-      resetModelPickerState()
-    }
-    setProviderDetailId(null)
-    setSettingsTab(tab)
-  }, [selectingModelFor, resetModelPickerState])
-
-  const openSetup = useCallback(() => {
-    setWizardStep('provider')
-    setWizardProviderSelectedIndex(0)
-    setWizardModelSelectedIndex(0)
-    setWizardSlotModels(emptySlotModels())
-    setWizardNeedsChromium(null)
-    setShowSetupWizard(true)
+  const onSettingsClose = useCallback(() => {
+    setSettingsOpen(false)
   }, [])
 
   const commandContext: CommandContext = useMemo(() => ({
@@ -1729,9 +807,9 @@ function AppInner({
     activateSkill,
     initProject,
     openSettings,
-    openSetup,
+    openSetup: openSettings,
     openBrowserSetup,
-  }), [resetConversation, showEphemeral, theme.error, exitApp, openRecentChats, enterBashMode, activateSkill, initProject, openSettings, openSetup, openBrowserSetup])
+  }), [resetConversation, showEphemeral, theme.error, exitApp, openRecentChats, enterBashMode, activateSkill, initProject, openSettings, openBrowserSetup])
 
 
 
@@ -1761,16 +839,10 @@ function AppInner({
   }, [client, agentStatusState])
 
   const activeOverlayKind =
-    (showSetupWizard && wizardStep === 'browser') ? 'setup-browser'
-    : (showSetupWizard && wizardNeedsChromium !== null && !authFlow.oauthState && !authFlow.apiKeySetup && !authFlow.endpointSetup && !authFlow.showAuthMethodOverlay) ? 'setup-wizard'
-    : showRecentChatsOverlay ? 'recent-chats'
+    showRecentChatsOverlay ? 'recent-chats'
     : (expandedForkId && client) ? 'fork-detail'
     : showBrowserSetup ? 'browser-setup'
-    : settingsTab !== null ? 'settings'
-    : (authFlow.showAuthMethodOverlay && authFlow.authMethodProvider) ? 'auth-method'
-    : authFlow.endpointSetup ? 'provider-endpoint'
-    : authFlow.apiKeySetup ? 'api-key'
-    : authFlow.oauthState ? 'oauth'
+    : settingsOpen ? 'settings'
     : 'none'
 
   const isOverlayActive = activeOverlayKind !== 'none'
@@ -1926,24 +998,6 @@ function AppInner({
     return () => clearInterval(interval)
   }, [activeThinkBlock, isCollapsed])
 
-  const onWizardCtrlCExit = useCallback(() => {
-    if (providerUiState) {
-      void storage.config.setSetupComplete(true).then(() => reloadProviderAndConfig())
-    }
-    authFlow.cancelAll()
-    process.kill(process.pid, 'SIGINT')
-  }, [providerUiState, storage, reloadProviderAndConfig, authFlow])
-
-  const onSettingsClose = useCallback(() => {
-    setSettingsTab(null)
-    resetModelPickerState()
-    setProviderDetailId(null)
-  }, [resetModelPickerState])
-
-  const handleBackFromModelPicker = useCallback(() => {
-    resetModelPickerState()
-  }, [resetModelPickerState])
-
   const handleSubmitViaClientBoundary = useCallback((payload: {
     forkId: string | null
     message: string
@@ -1973,73 +1027,12 @@ function AppInner({
 
   const overlayContent = (
     <AppOverlays
-      showSetupWizard={showSetupWizard}
-      wizardStep={wizardStep}
-      wizardTotalSteps={wizardTotalSteps}
-      wizardHasProviderEndpointStep={wizardHasProviderEndpointStep}
-      wizardSlotModels={wizardSlotModels}
-      wizardConnectedProvider={wizardConnectedProvider}
-      wizardSelectedProviderId={wizardSelectedProviderId}
-      wizardSelectedProviderDiscoveredModels={wizardSelectedProviderDiscoveredModels}
-      wizardSelectedProviderRememberedModelIds={wizardSelectedProviderRememberedModelIds}
-      wizardProviderSelectedIndex={wizardProviderSelectedIndex}
-      wizardModelSelectedIndex={wizardModelSelectedIndex}
       showBrowserSetup={showBrowserSetup}
       setShowBrowserSetup={setShowBrowserSetup}
-      handleWizardBrowserComplete={handleWizardBrowserComplete}
-      handleWizardProviderSelected={handleWizardProviderSelected}
-      handleWizardComplete={handleWizardComplete}
-      handleWizardBack={handleWizardBack}
-      handleWizardContinueFromLocalProvider={handleWizardContinueFromLocalProvider}
-      handleWizardSkip={handleWizardSkip}
-      onLocalProviderSaveEndpoint={handleLocalProviderSaveEndpoint}
-      onLocalProviderRefreshModels={handleLocalProviderRefreshModels}
-      onLocalProviderAddManualModel={handleLocalProviderAddManualModel}
-      onLocalProviderRemoveManualModel={handleLocalProviderRemoveManualModel}
-      onLocalProviderSaveOptionalApiKey={handleLocalProviderSaveOptionalApiKey}
-      setWizardProviderSelectedIndex={setWizardProviderSelectedIndex}
-      setWizardModelSelectedIndex={setWizardModelSelectedIndex}
-      wizardProviders={WIZARD_PROVIDERS}
-      onWizardCtrlCExit={onWizardCtrlCExit}
-      authFlow={authFlow}
-      authMethodSelectedIndex={authMethodSelectedIndex}
-      setAuthMethodSelectedIndex={setAuthMethodSelectedIndex}
-      detectedProviders={detectedProviders}
-      connectedProviders={connectedProviders}
-      slotModels={slotModels}
-      selectingModelFor={selectingModelFor}
-      setSelectingModelFor={setSelectingModelFor}
-      preferencesSelectedIndex={preferencesSelectedIndex}
-      setPreferencesSelectedIndex={setPreferencesSelectedIndex}
-      providerDetailStatus={providerDetailStatus}
-      providerDetailOptions={providerDetailOptions}
-      providerDetailActions={providerDetailActions}
-      providerDetailSelectedIndex={providerDetailSelectedIndex}
-      setProviderDetailSelectedIndex={setProviderDetailSelectedIndex}
-      settingsTab={settingsTab}
-      handleSettingsTabChange={handleSettingsTabChange}
-      handleModelSelect={handleModelSelect}
-      modelSearch={modelSearch}
-      onModelSearchChange={setModelSearch}
-      showAllProviders={showAllProviders}
-      onToggleShowAllProviders={() => setShowAllProviders(prev => !prev)}
-      showRecommendedOnly={showRecommendedOnly}
-      onToggleShowRecommendedOnly={() => setShowRecommendedOnly(prev => !prev)}
-      handleProviderSelect={handleProviderSelect}
-      handleProviderDetailAction={handleProviderDetailAction}
-      handleProviderDetailBack={handleProviderDetailBack}
-      handleChangeSlot={handleChangeSlot}
-      modelTabHandleKeyEvent={modelTabHandleKeyEvent}
-      providerTabHandleKeyEvent={providerTabHandleKeyEvent}
-      modelNavigation={modelNavigation}
-      providerNavigation={providerNavigation}
+      settingsVisible={settingsOpen}
       onSettingsClose={onSettingsClose}
-      onBackFromModelPicker={handleBackFromModelPicker}
-      presets={presets}
-      systemDefaultsPresetToken={SYSTEM_DEFAULTS_PRESET}
-      onSavePreset={handleSavePreset}
-      onLoadPreset={handleLoadPreset}
-      onDeletePreset={handleDeletePreset}
+      connectionStatus={{ connected: !!client, mode: 'cloud' }}
+      roles={rolesData}
       showRecentChatsOverlay={showRecentChatsOverlay}
       recentChats={recentChats}
       recentChatsSelectedIndex={recentChatsSelectedIndex}
@@ -2186,19 +1179,11 @@ function AppInner({
     </scrollbox>
   )
 
-  const modelSummary = slotModels.lead ? {
-    provider: getProvider(slotModels.lead.providerId)?.name ?? slotModels.lead.providerId,
-    model: getProvider(slotModels.lead.providerId)?.models.find(m => m.id === slotModels.lead!.modelId)?.name ?? slotModels.lead.modelId,
-  } : null
 
-  const composerCanFocus = !showSetupWizard
-    && !showBrowserSetup
+
+  const composerCanFocus = !showBrowserSetup
     && !showRecentChatsOverlay
-    && settingsTab === null
-    && !authFlow.showAuthMethodOverlay
-    && !authFlow.oauthState
-    && !authFlow.endpointSetup
-    && !authFlow.apiKeySetup
+    && !settingsOpen
     && expandedForkId === null
 
   const debugVisible = debugMode && debugPanelVisible
@@ -2237,7 +1222,7 @@ function AppInner({
               pendingApproval: pendingApproval != null,
               hasRunningForks,
               bashMode,
-              modelsConfigured: !!slotModels.lead,
+              modelsConfigured: true,
               modelSummary: activeModelSummary,
               tokenUsage: selectedForkId
                 ? (forkLastActualInputTokens ?? (forkHasCompletedTurn ? forkTokenEstimate : null))
@@ -2378,25 +1363,7 @@ function AppInner({
         )}
 
 
-        {providerUiState && !providerUiState.slotModels.lead && (
-          <box style={{
-            paddingLeft: 1,
-            paddingRight: 1,
-            flexShrink: 0,
-          }}>
-            <box style={{
-              borderStyle: 'single',
-              borderColor: theme.error,
-              customBorderChars: BOX_CHARS,
-              paddingLeft: 1,
-              paddingRight: 1,
-            }}>
-              <text style={{ fg: theme.error }}>
-                No model configured. Run /models to set up your models.
-              </text>
-            </box>
-          </box>
-        )}
+
       </box>
 
       {canRenderPanel && selectedFile && (

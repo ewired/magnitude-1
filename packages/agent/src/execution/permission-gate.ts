@@ -4,16 +4,35 @@
  * Evaluates the agent's tool policy for the current tool call and routes the decision.
  */
 
-import { Effect } from 'effect'
+import { Effect, Context } from 'effect'
 import { Fork } from '@magnitudedev/event-core'
-import type { InterceptorContext, InterceptorDecision } from '@magnitudedev/xml-act'
 import { PermissionRejection } from './permission-rejection'
-import type { RoleDefinition, Policy } from '@magnitudedev/roles'
-import type { ToolCatalog } from '@magnitudedev/tools'
+import type { RoleDefinition } from '@magnitudedev/roles'
+import { evaluatePolicy } from '@magnitudedev/roles'
+import type { ToolCallId } from '@magnitudedev/ai'
+import type { ExecuteHookContext, InterceptorDecision } from '@magnitudedev/harness'
+import type { PolicyContext as RolesPolicyContext } from '@magnitudedev/roles'
 import { PolicyContextProviderTag } from '../agents/types'
-import { evaluate } from '../agents/policy'
 
 const { ForkContext } = Fork
+
+/** Context provided to the interceptor for each tool call. */
+export interface InterceptorContext {
+  readonly toolName: string
+  readonly toolCallId: ToolCallId
+  readonly input: unknown
+  readonly meta: unknown
+}
+
+/** Tool interceptor interface — evaluates policy before tool execution. */
+export interface ToolInterceptor {
+  readonly beforeExecute: (ctx: InterceptorContext) => Effect.Effect<InterceptorDecision, never, any>
+}
+
+/** Service tag for the tool interceptor. */
+export class ToolInterceptorTag extends Context.Tag('ToolInterceptor')<
+  ToolInterceptorTag, ToolInterceptor
+>() {}
 
 /** Resolves the active agent definition for a given fork. */
 export type AgentResolver = (forkId: string | null) => RoleDefinition
@@ -26,27 +45,27 @@ export function buildPolicyInterceptor(
       const { forkId } = yield* ForkContext
       const agentDef = resolveAgent(forkId)
       const policyCtx = yield* (yield* PolicyContextProviderTag).get
-      const defKey = getDefKey(ctx.meta)
-      if (defKey === null) {
+      const toolKey = getDefKey(ctx.meta)
+      if (toolKey === null) {
         return reject(PermissionRejection.Forbidden({ reason: 'Invalid tool metadata' }))
       }
 
-      if (!(defKey in agentDef.tools.entries)) {
-        return reject(PermissionRejection.Forbidden({ reason: `Unknown tool: ${defKey}` }))
+      const hookCtx: ExecuteHookContext & { policyContext: RolesPolicyContext } = {
+        toolCallId: ctx.toolCallId,
+        toolName: ctx.toolName,
+        toolKey,
+        input: ctx.input,
+        policyContext: {
+          cwd: policyCtx.cwd,
+          workspacePath: policyCtx.workspacePath,
+          disableShellSafeguards: policyCtx.disableShellSafeguards,
+          disableCwdSafeguards: policyCtx.disableCwdSafeguards,
+        },
       }
 
-      const decision = yield* evaluate(
-        agentDef.policy as Policy<ToolCatalog, unknown>,
-        defKey,
-        ctx.input,
-        policyCtx,
-      )
+      const decision = yield* evaluatePolicy(agentDef.policy, hookCtx)
 
-      if (decision.decision === 'allow') {
-        return { _tag: 'Proceed' } satisfies InterceptorDecision
-      }
-
-      return reject(PermissionRejection.Forbidden({ reason: decision.reason }))
+      return decision
     })
 }
 

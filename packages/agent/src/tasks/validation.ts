@@ -1,8 +1,8 @@
-import { isValidVariant } from '../agents/variants'
+import { isRoleId } from '../agents/role-validation'
 import type { TaskAssignee, WorkerAssignee } from './types'
 
 function isWorkerAssignee(value: string): value is WorkerAssignee {
-  return isValidVariant(value) && value !== 'lead' && value !== 'lead-oneshot'
+  return isRoleId(value) && value !== 'leader'
 }
 
 export function parseTaskAssignee(value: string): TaskAssignee | null {
@@ -13,6 +13,6 @@ export function parseTaskAssignee(value: string): TaskAssignee | null {
 
 export function assertTaskAssignee(value: string): TaskAssignee {
   const parsed = parseTaskAssignee(value)
-  if (!parsed) throw new Error(`Invalid task assignee "${value}". Expected "user" or a valid worker variant.`)
+  if (!parsed) throw new Error(`Invalid task assignee "${value}". Expected "user" or a valid worker role.`)
   return parsed
 }

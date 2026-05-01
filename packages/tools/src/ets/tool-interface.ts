@@ -6,8 +6,8 @@
  */
 
 import ts from "typescript"
-import { Schema } from "@effect/schema"
-import { AST } from "@effect/schema"
+import { Schema } from "effect"
+import { SchemaAST as AST } from "effect"
 import type { ToolDefinition } from "../tool-definition"
 import type { ToolErrorBase } from "../errors"
 import { schemaToTypeNode, getTypeNode, printAst, unwrapOptionalUnion, type KnownEntityInfo } from "./converter"

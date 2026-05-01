@@ -14,18 +14,22 @@ import { AgentRoutingProjection } from './agent-routing'
 import { AgentStatusProjection, type AgentStatusState } from './agent-status'
 import { UserMessageResolutionProjection } from './user-message-resolution'
 import { CanonicalTurnProjection } from './canonical-turn'
-import { ConfigAmbient, getSlotConfig, type SlotConfig, type ConfigState } from '../ambient/config-ambient'
+import { ConfigAmbient, getRoleConfig, type RoleConfig, type ConfigState } from '../ambient/config-ambient'
 import { SkillsAmbient } from '../ambient/skills-ambient'
+import { ToolkitAmbient } from '../ambient/toolkit-ambient'
 import type { Skill } from '@magnitudedev/skills'
 
-import { CHARS_PER_TOKEN_XML } from '../constants'
+import { estimateContentTokens, estimateCompletedTurn, estimateText } from '../util/token-estimation'
 
-import type { AgentVariant } from '../agents/variants'
-import { getAgentDefinition, getAgentSlot, getForkInfo } from '../agents/registry'
+import { isRoleId, type RoleId } from '../agents/role-validation'
+import { getAgentDefinition, getForkInfo } from '../agents/registry'
 import { buildSessionContextContent } from '../prompts/session-context'
-import { renderSystemPrompt } from '../prompts/system-prompt'
-import { buildResolvedToolSet } from '../tools/resolved-toolset'
-import { ContentPart } from '../content'
+import { buildSystemPrompt } from '../prompts/system-prompt-builder'
+import { renderToolDocs } from '../prompts/render-tool-docs'
+import { getEffectiveToolkit } from '../tools/toolkits'
+import type { UserPart } from '@magnitudedev/ai'
+import type { CompletedTurn } from '../inbox/types'
+
 
 // =============================================================================
 // Context Limit Helpers
@@ -38,7 +42,7 @@ function isCompactionBlocking(tag: CompactionState['_tag']): boolean {
 function deriveShouldCompact(
   tag: CompactionState['_tag'],
   tokenEstimate: number,
-  limits: SlotConfig
+  limits: RoleConfig
 ): boolean {
   return tag === 'idle' && tokenEstimate > limits.softCap
 }
@@ -47,106 +51,33 @@ function deriveShouldCompact(
 function computeContextLimitBlocked(
   tag: CompactionState['_tag'],
   tokenEstimate: number,
-  limits: SlotConfig
+  limits: RoleConfig
 ): boolean {
   return isCompactionBlocking(tag) && tokenEstimate >= limits.hardCap
 }
 
-/** Estimate tokens for content string or content parts using XML format constant */
-function estimateContentTokens(content: string): number
-function estimateContentTokens(content: ContentPart[], modelId?: string | null, providerId?: string | null): number
-function estimateContentTokens(content: string | ContentPart[], modelId?: string | null, providerId?: string | null): number {
-  if (typeof content === 'string') {
-    return Math.ceil(content.length / CHARS_PER_TOKEN_XML)
-  }
-  let tokens = 0
-  for (const part of content) {
-    switch (part.type) {
-      case 'text':
-        tokens += Math.ceil(part.text.length / CHARS_PER_TOKEN_XML)
-        break
-      case 'image':
-        tokens += getImageTokenEstimator(modelId ?? null, providerId ?? null)(part.width, part.height)
-        break
-    }
-  }
-  return tokens
-}
+
 
 const systemPromptTokenCache = new Map<string, number>()
 
-function estimateSystemPromptTokens(variant: AgentVariant, skills: Map<string, Skill>, configState: ConfigState): number {
-  const cacheKey = variant
+function estimateSystemPromptTokens(roleId: RoleId, skills: Map<string, Skill>, configState: ConfigState): number {
+  const cacheKey = roleId
   const cached = systemPromptTokenCache.get(cacheKey)
   if (cached !== undefined) return cached
   
-  const agentDef = getAgentDefinition(variant)
-  const slot = getAgentSlot(variant)
-  const toolSet = buildResolvedToolSet(agentDef, configState, slot)
-  const prompt = renderSystemPrompt(agentDef, skills, toolSet)
+  const agentDef = getAgentDefinition(roleId)
+  const toolkit = getEffectiveToolkit(roleId, configState)
+  const toolDefs = toolkit.keys.map(key => toolkit.entries[key].tool.definition)
+  const toolDocs = toolDefs.length > 0 ? renderToolDocs(toolDefs) : ''
+  const prompt = buildSystemPrompt({ roleDef: agentDef, skills, lenses: [], toolDocs })
   
-  // Use XML format constant for system prompt token estimation
-  const tokens = Math.ceil(prompt.length / CHARS_PER_TOKEN_XML)
+  const tokens = estimateText(prompt)
   systemPromptTokenCache.set(cacheKey, tokens)
   return tokens
 }
 
-type ImageTokenEstimator = (width: number, height: number) => number
-
-const estimators: Record<string, ImageTokenEstimator> = {
-  anthropic: (w, h) => {
-    const longEdge = Math.max(w, h)
-    if (longEdge > 1568) {
-      const scale = 1568 / longEdge
-      w = Math.round(w * scale)
-      h = Math.round(h * scale)
-    }
-    return Math.ceil((w * h) / 750)
-  },
-
-  openai: (w, h) => {
-    const maxDim = Math.max(w, h)
-    if (maxDim > 2048) {
-      const scale = 2048 / maxDim
-      w = Math.round(w * scale)
-      h = Math.round(h * scale)
-    }
-    const minDim = Math.min(w, h)
-    if (minDim > 768) {
-      const scale = 768 / minDim
-      w = Math.round(w * scale)
-      h = Math.round(h * scale)
-    }
-    const tilesW = Math.ceil(w / 512)
-    const tilesH = Math.ceil(h / 512)
-    return (tilesW * tilesH * 170) + 85
-  },
-
-  google: () => 560,
-  'google-ai': () => 560,
-  'vertex-ai': () => 560,
-}
-
-function getImageTokenEstimator(modelId: string | null, providerId: string | null): ImageTokenEstimator {
-  if (modelId) {
-    if (/claude/i.test(modelId)) return estimators.anthropic
-    if (/gpt|o[1-9]-/i.test(modelId)) return estimators.openai
-    if (/gemini/i.test(modelId)) return estimators.google
-  }
-
-  if (providerId === 'anthropic' || providerId === 'aws-bedrock') return estimators.anthropic
-  if (providerId === 'openai') return estimators.openai
-  if (providerId === 'google' || providerId === 'google-ai' || providerId === 'vertex-ai') return estimators.google
-
-  return estimators.anthropic
-}
-
-function asAgentVariant(role: string): AgentVariant | null {
-  if (
-    role === 'lead'
-    || role === 'lead-oneshot'
-    || role === 'worker'
-  ) {
+function toRoleId(role: string): RoleId | null {
+  if (isRoleId(role)) {
     return role
   }
   return null
@@ -225,17 +156,17 @@ function getForkConfig(
   configState: ConfigState,
   agentStatus: AgentStatusState,
   forkId: string | null,
-): SlotConfig | null {
+): RoleConfig | null {
   const info = getForkInfo(agentStatus, forkId)
   if (!info) return null
-  const slot = info.slot
-  if (!slot) return null
-  return getSlotConfig(configState, slot)
+  const roleId = info.roleId
+  if (!roleId) return null
+  return getRoleConfig(configState, roleId)
 }
 
 function recomputeOperationalFields(
   fork: CompactionState,
-  limits: SlotConfig,
+  limits: RoleConfig,
   updates: Partial<AmbientCompactionFields> = {}
 ): CompactionState {
   const tokenEstimate = updates.tokenEstimate ?? fork.tokenEstimate
@@ -254,7 +185,7 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
   name: 'Compaction',
 
   reads: [AgentRoutingProjection, AgentStatusProjection, UserMessageResolutionProjection, CanonicalTurnProjection] as const,
-  ambients: [ConfigAmbient, SkillsAmbient] as const,
+  ambients: [ConfigAmbient, SkillsAmbient, ToolkitAmbient] as const,
 
   signals: {
     shouldCompactChanged: Signal.create<{ forkId: string | null; shouldCompact: boolean }>('Compaction/shouldCompactChanged'),
@@ -278,7 +209,7 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
       const contentTokens = estimateContentTokens(content)
       const skills = ambient.get(SkillsAmbient)
       const configState = ambient.get(ConfigAmbient)
-      const tokenEstimate = estimateSystemPromptTokens('lead', skills, configState) + contentTokens
+      const tokenEstimate = estimateSystemPromptTokens('leader', skills, configState) + contentTokens
       const agentStatus = read(AgentStatusProjection)
       const limits = getForkConfig(configState, agentStatus, event.forkId)
       if (!limits) return fork
@@ -306,15 +237,19 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
         return nextState
       }
 
-      const canonical = read(CanonicalTurnProjection)
-      // Use canonical XML serialization for compaction
-      const completedText = canonical.lastCompleted?.turnId === event.turnId
-        ? canonical.lastCompleted.canonicalXml
-        : ''
-      const addedTokens = estimateContentTokens(completedText)
-      const tokenEstimate = event.inputTokens !== null
-        ? event.inputTokens + addedTokens
-        : fork.tokenEstimate + addedTokens
+      let tokenEstimate: number
+
+      if (event.inputTokens !== null) {
+        // Tier 1: actual API usage — this IS the total prompt size, no additive correction
+        tokenEstimate = event.inputTokens
+      } else {
+        // Tier 3: heuristic fallback — add estimated turn cost to running total
+        const canonical = read(CanonicalTurnProjection)
+        const turnCost = canonical.lastCompleted?.turnId === event.turnId
+          ? estimateCompletedTurn(canonical.lastCompleted)
+          : 0
+        tokenEstimate = fork.tokenEstimate + turnCost
+      }
 
       const nextState = recomputeOperationalFields(fork, limits, {
         tokenEstimate,
@@ -442,14 +377,14 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
         throw new Error(`Parent fork ${parentForkId} not found in CompactionProjection`)
       }
 
-      const variant = asAgentVariant(role)
-      if (variant === null) {
-        throw new Error(`Unknown agent variant: ${role}`)
+      const resolvedRoleId = toRoleId(role)
+      if (resolvedRoleId === null) {
+        throw new Error(`Unknown agent role: ${role}`)
       }
 
       const skills = ambient.get(SkillsAmbient)
       const configState = ambient.get(ConfigAmbient)
-      const tokenEstimate = estimateSystemPromptTokens(variant, skills, configState)
+      const tokenEstimate = estimateSystemPromptTokens(resolvedRoleId, skills, configState)
       const agentStatus = read(AgentStatusProjection)
       const limits = getForkConfig(configState, agentStatus, forkId)
       const newForkState = new CompactionIdle({
@@ -472,7 +407,7 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
       const fork = state.forks.get(value.forkId)
       if (!fork) return state
 
-      const addedTokens = estimateContentTokens([...value.content], fork.modelId, fork.providerId)
+      const addedTokens = estimateContentTokens([...value.content])
       const tokenEstimate = fork.tokenEstimate + addedTokens
       const configState = ambient.get(ConfigAmbient)
       const agentStatus = read(AgentStatusProjection)
