@@ -160,7 +160,7 @@ function encodeResultEntries(
             content:      msg,
           })
         } else {
-          // parse errors, message_ack, no_tools_or_messages, etc. → system note
+          // parse errors, message_ack, etc. → system note
           const k = item.kind as string
           const note = `[${k}]${(item as Record<string,unknown>)['message'] ? ': ' + (item as Record<string,unknown>)['message'] : ''}`
           systemNotes.push(note)
@@ -172,7 +172,7 @@ function encodeResultEntries(
       const msg = (entry as Record<string,unknown>)['message'] as string | undefined
       systemNotes.push(`[error${msg ? ': ' + msg : ''}]`)
     }
-    // noop, oneshot_liveness, yield_worker_retrigger — silently dropped
+    // noop, oneshot_liveness — silently dropped
   }
 
   return toolMessages

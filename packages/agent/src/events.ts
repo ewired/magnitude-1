@@ -200,7 +200,6 @@ export interface TurnCompletion {
 export type TurnFeedback =
   | { readonly _tag: 'InvalidMessageDestination'; readonly destination: string; readonly message: string }
   | { readonly _tag: 'OneshotLivenessRetriggered' }
-  | { readonly _tag: 'YieldWorkerRetriggered' }
 
 export interface ParseFailureEvent {
   readonly _tag: 'ToolInputDecodeFailure'

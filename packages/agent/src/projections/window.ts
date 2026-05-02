@@ -419,8 +419,6 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
 
           if (!hasContent) {
             feedback.push({ kind: 'error', message: EMPTY_RESPONSE_ERROR })
-          } else if (completedTurn!.toolResults.length === 0 && feedback.filter(f => f.kind === 'message_ack').length === 0) {
-            feedback.push({ kind: 'no_tools_or_messages' })
           }
 
           for (const fb of outcome.completion.feedback) {
@@ -428,9 +426,7 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
               case 'InvalidMessageDestination':
                 feedback.push({ kind: 'error', message: fb.message })
                 break
-              case 'YieldWorkerRetriggered':
-                feedback.push({ kind: 'yield_worker_retrigger' })
-                break
+
             }
           }
           break

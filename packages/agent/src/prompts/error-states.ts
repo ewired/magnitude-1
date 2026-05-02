@@ -44,4 +44,4 @@ export function formatMissingAssignmentRoleError(taskId: string): string {
   return `Task assignment rejected: role is required when task "${taskId}" has no active worker.`
 }
 
-export const EMPTY_RESPONSE_ERROR = `Your response was empty. You must respond with lenses/messages/tool calls. Use \`${'<' + 'magnitude:yield_user/>'}\` if done taking turns.`
+export const EMPTY_RESPONSE_ERROR = `Your response was empty. You must send a message and/or use tools.`

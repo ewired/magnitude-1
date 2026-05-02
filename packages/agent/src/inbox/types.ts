@@ -127,10 +127,8 @@ export type TimelineEntry =
 
 export type TurnFeedback =
   | { readonly kind: 'message_ack'; readonly destination: 'parent'; readonly chars: number }
-  | { readonly kind: 'no_tools_or_messages' }
   | { readonly kind: 'error'; readonly message: string }
   | { readonly kind: 'interrupted' }
-  | { readonly kind: 'yield_worker_retrigger' }
 
 export interface CompletedTurn {
   readonly turnId: string
