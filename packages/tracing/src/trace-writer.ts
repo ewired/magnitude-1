@@ -13,8 +13,7 @@ import {
   updateTraceMetaSync,
 } from '@magnitudedev/storage'
 import { logger } from '@magnitudedev/logger'
-import type { TraceData } from './types'
-import type { TraceSessionMeta } from './types'
+import type { AgentCallTrace, TraceSessionMeta } from './types'
 
 const globalPaths = makeGlobalStoragePaths(defaultGlobalStorageRoot())
 
@@ -45,7 +44,7 @@ export function initTraceSession(
   }
 }
 
-export function writeTrace(trace: TraceData): void {
+export function writeTrace(trace: AgentCallTrace): void {
   if (!currentSessionId) {
     logger.warn('[Tracing] writeTrace called before initTraceSession')
     return

@@ -70,10 +70,10 @@ import { AgentModelResolverLive } from './model/model-resolver'
 // Config & Auth
 import { MagnitudeClient, createMagnitudeClient } from '@magnitudedev/magnitude-client'
 import type { ModelOverrides } from '@magnitudedev/roles'
-import { makeNoopTracer, makeTracePersister } from './tracing/tracing'
+import { createTraceListenerLayer } from './tracing/tracing'
 import type { StorageClient } from '@magnitudedev/storage'
 import { initLogger, logger } from '@magnitudedev/logger'
-import { writeTrace, initTraceSession } from '@magnitudedev/tracing'
+import { initTraceSession } from '@magnitudedev/tracing'
 
 import { EphemeralSessionContextTag } from './agents/types'
 import { publishConfigFromCatalog } from './ambient/config-ambient'
@@ -233,17 +233,24 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
   )
 
   // Enable tracing in debug mode
+  const traceSessionId = options.sessionId ?? new Date().toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, 'Z')
   if (options.debug) {
-    const traceSessionId = options.sessionId ?? new Date().toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, 'Z')
     initTraceSession(traceSessionId, { cwd: process.cwd(), platform: process.platform, gitBranch: null })
   }
 
-  const tracerLayer = options.debug ? makeTracePersister((trace) => writeTrace(trace)) : makeNoopTracer()
+  const tracerLayer = options.debug
+    ? createTraceListenerLayer({
+        sessionId: traceSessionId,
+        agentId: 'lead',
+        forkId: null,
+        callType: 'chat',
+      })
+    : undefined
   const ephemeralSessionContextLayer = Layer.succeed(EphemeralSessionContextTag, {
     disableShellSafeguards: options.disableShellSafeguards ?? false,
     disableCwdSafeguards: options.disableCwdSafeguards ?? false,
   })
-  const layer = Layer.mergeAll(
+  const baseLayer = Layer.mergeAll(
     Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
     BrowserServiceLive,
 
@@ -252,9 +259,9 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
     FetchHttpClient.layer,
     FsLive,
-    tracerLayer,
     options.persistence,
   )
+  const layer = tracerLayer ? Layer.merge(baseLayer, tracerLayer) : baseLayer
   const client = await CodingAgent.createClient(layer)
 
   try {

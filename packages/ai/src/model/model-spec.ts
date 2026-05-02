@@ -8,10 +8,12 @@ import type { ResponseStreamEvent } from "../response/events"
 import type { AuthApplicator } from "../auth/auth"
 import type { StreamingFieldParser } from "../streaming/field-parser"
 import type { ConnectionError, StreamError } from "../errors/model-error"
+import type { TokenLogprob } from "../trace"
 
 export type ModelStreamResult<TStreamError> = {
   readonly events: Stream.Stream<ResponseStreamEvent<TStreamError>, never>
   readonly parsers: ReadonlyMap<ToolCallId, StreamingFieldParser>
+  readonly logprobs: TokenLogprob[]
 }
 
 export interface ModelSpec<

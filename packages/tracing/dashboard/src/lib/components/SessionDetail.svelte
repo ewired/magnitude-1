@@ -29,7 +29,7 @@
     }
 
     const exists = traceStore.allTracesSorted.some(
-      (trace) => (trace.metadata?.turnId || trace.timestamp) === selectedTurnIdFromRoute,
+      (trace) => trace.startedAt === selectedTurnIdFromRoute,
     )
 
     if (exists) {
@@ -46,11 +46,6 @@
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
     if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k'
     return String(n)
-  }
-
-  function formatCost(n: number): string {
-    if (n < 0.01) return '<$0.01'
-    return '$' + n.toFixed(2)
   }
 
   function formatTime(ts: string): string {
@@ -99,12 +94,7 @@
           <span class="text-[var(--text-secondary)]">Output tokens</span>
           <span class="font-mono">{formatTokens(traceStore.totalTokens.output)}</span>
         </div>
-        {#if traceStore.totalCost > 0}
-          <div class="flex justify-between">
-            <span class="text-[var(--text-secondary)]">Cost</span>
-            <span class="font-mono text-[var(--accent-yellow)]">{formatCost(traceStore.totalCost)}</span>
-          </div>
-        {/if}
+
       </div>
     </div>
 
@@ -167,31 +157,30 @@
         <div class="w-80 border-r border-[var(--border)] overflow-y-auto">
           {#each traceStore.allTracesSorted as trace}
                 <button
-                  class="w-full text-left px-3 py-2 text-sm border-b border-[var(--border)]/50 transition-colors cursor-pointer {traceStore.selectedTurnId === (trace.metadata?.turnId || trace.timestamp) ? 'bg-[var(--bg-hover)] border-l-2 border-l-[var(--accent-blue)]' : 'hover:bg-[var(--bg-hover)]'}"
+                  class="w-full text-left px-3 py-2 text-sm border-b border-[var(--border)]/50 transition-colors cursor-pointer {traceStore.selectedTurnId === trace.startedAt ? 'bg-[var(--bg-hover)] border-l-2 border-l-[var(--accent-blue)]' : 'hover:bg-[var(--bg-hover)]'}"
                   onclick={() => {
-                    const turnId = trace.metadata?.turnId || trace.timestamp
-                    traceStore.selectTurn(turnId)
-                    onSelectTurn?.(turnId)
+                    traceStore.selectTurn(trace.startedAt)
+                    onSelectTurn?.(trace.startedAt)
                   }}
                 >
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-1.5">
                       <span class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style="background: {getCallTypeColor(trace.callType)}"></span>
-                      <span class="font-mono text-xs" style="color: {getCallTypeColor(trace.callType)}">{trace.callType ?? 'chat'}</span>
+                      <span class="font-mono text-xs" style="color: {getCallTypeColor(trace.callType)}">{trace.callType}</span>
                     </div>
-                    <span class="text-xs text-[var(--text-muted)]">{formatTime(trace.timestamp)}</span>
+                    <span class="text-xs text-[var(--text-muted)]">{formatTime(trace.startedAt)}</span>
                   </div>
                   <div class="flex items-center gap-2 mt-1">
-                    <span class="text-xs text-[var(--text-secondary)]">{trace.model ?? 'unknown'}</span>
-                    {#if trace.usage.inputTokens}
-                      <span class="text-xs text-[var(--text-muted)]">{formatTokens(trace.usage.inputTokens)} in</span>
+                    <span class="text-xs text-[var(--text-secondary)]">{trace.modelId ?? 'unknown'}</span>
+                    {#if trace.response.usage?.inputTokens}
+                      <span class="text-xs text-[var(--text-muted)]">{formatTokens(trace.response.usage.inputTokens)} in</span>
                     {/if}
-                    {#if trace.usage.outputTokens}
-                      <span class="text-xs text-[var(--text-muted)]">{formatTokens(trace.usage.outputTokens)} out</span>
+                    {#if trace.response.usage?.outputTokens}
+                      <span class="text-xs text-[var(--text-muted)]">{formatTokens(trace.response.usage.outputTokens)} out</span>
                     {/if}
                   </div>
-                  {#if trace.metadata?.forkId}
-                    <div class="text-xs text-[var(--accent-purple)] mt-0.5 font-mono">{trace.metadata.forkId.slice(0, 8)}</div>
+                  {#if trace.forkId}
+                    <div class="text-xs text-[var(--accent-purple)] mt-0.5 font-mono">{trace.forkId.slice(0, 8)}</div>
                   {/if}
                 </button>
           {/each}

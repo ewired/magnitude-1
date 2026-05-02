@@ -52,6 +52,10 @@ export type { ChatCompletionsRequest, ChatCompletionsStreamChunk } from "./wire/
 export type { Codec } from "./codec/codec"
 export { nativeChatCompletionsCodec } from "./codec/native-chat-completions/index"
 
+// Trace
+export { TraceListener } from "./trace"
+export type { ModelCallTrace, AssembledToolCall, TokenLogprob } from "./trace"
+
 // Streaming field parser
 export { createStreamingFieldParser } from "./streaming/field-parser"
 export type { StreamingFieldParser } from "./streaming/field-parser"

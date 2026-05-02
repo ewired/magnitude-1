@@ -5,6 +5,7 @@ import type { ToolDefinition } from "../tools/tool-definition"
 import { Prompt } from "../prompt/prompt"
 import type { ResponseStreamEvent } from "../response/events"
 import type { StreamingFieldParser } from "../streaming/field-parser"
+import type { TokenLogprob } from "../trace"
 
 export interface Codec<TWireReq, TWireChunk> {
   readonly id: string
@@ -22,5 +23,6 @@ export interface Codec<TWireReq, TWireChunk> {
   ) => {
     readonly events: Stream.Stream<ResponseStreamEvent<TStreamError>, never>
     readonly parsers: ReadonlyMap<ToolCallId, StreamingFieldParser>
+    readonly logprobs: TokenLogprob[]
   }
 }

@@ -65,6 +65,8 @@ export interface ChatCompletionsRequest {
   readonly temperature?: number
   readonly top_p?: number
   readonly reasoning_effort?: "low" | "medium" | "high"
+  readonly logprobs?: boolean
+  readonly top_logprobs?: number
   readonly stream: true
   readonly stream_options?: {
     readonly include_usage: boolean
@@ -92,10 +94,22 @@ const ChatChunkDelta = Schema.Struct({
   tool_calls: Schema.optional(Schema.Array(ChatToolCallDelta)),
 })
 
+const ChatChunkLogprobs = Schema.Struct({
+  content: Schema.optional(Schema.NullOr(Schema.Array(Schema.Struct({
+    token: Schema.String,
+    logprob: Schema.Number,
+    top_logprobs: Schema.Array(Schema.Struct({
+      token: Schema.String,
+      logprob: Schema.Number,
+    })),
+  })))),
+})
+
 const ChatChunkChoice = Schema.Struct({
   index: Schema.Number,
   delta: ChatChunkDelta,
   finish_reason: Schema.optional(Schema.NullOr(Schema.String)),
+  logprobs: Schema.optional(Schema.NullOr(ChatChunkLogprobs)),
 })
 
 const ChatChunkUsage = Schema.Struct({

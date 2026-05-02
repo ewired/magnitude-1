@@ -1,79 +1,71 @@
-import { Context, Effect, Layer } from 'effect'
-import type { TraceInput as TracingTraceInput, TraceData as TracingTraceData } from '@magnitudedev/tracing'
+import { Layer } from 'effect'
+import { TraceListener, type ModelCallTrace } from '@magnitudedev/ai'
+import type { AgentCallTrace } from '@magnitudedev/tracing'
+import { writeTrace } from '@magnitudedev/tracing'
 
 /**
- * Agent-local tracing types and services.
+ * Agent trace context — metadata added to every ModelCallTrace.
  */
-
-/** Transport-level trace input */
-export type TraceInput = TracingTraceInput
-
-/** Full enriched trace data with agent context */
-export type TraceData<M extends Record<string, unknown> = Record<string, unknown>> = TracingTraceData<M>
+export interface AgentTraceContext {
+  readonly sessionId: string
+  readonly agentId: string
+  readonly forkId: string | null
+  readonly callType: AgentCallTrace["callType"]
+}
 
 /**
- * Driver-facing trace emitter — accepts transport-level trace input.
- * The driver emits TraceInput; withTraceScope enriches it to TraceData
- * before forwarding to the TracePersister.
+ * Create a TraceListener layer that converts ModelCallTrace to AgentCallTrace
+ * and persists it to disk via writeTrace.
  */
-export class TraceEmitter extends Context.Tag('TraceEmitter')<
-  TraceEmitter,
-  {
-    readonly emit: (trace: TraceInput) => Effect.Effect<void>
-    readonly debug: boolean
-  }
->() {}
-
-/**
- * Agent-facing trace persister — accepts fully enriched TraceData.
- * Created by makeTracePersister, consumed by withTraceScope.
- */
-export class TracePersister extends Context.Tag('TracePersister')<
-  TracePersister,
-  {
-    readonly emit: (trace: TraceData) => Effect.Effect<void>
-    readonly debug: boolean
-  }
->() {}
-
-/**
- * Create a TracePersister layer that calls the given callback on each enriched trace.
- */
-export function makeTracePersister(cb: (trace: TraceData) => void): Layer.Layer<TracePersister> {
-  return Layer.succeed(TracePersister, {
-    emit: (trace) => Effect.sync(() => cb(trace)),
-    debug: true,
+export function createTraceListenerLayer(context: AgentTraceContext): Layer.Layer<TraceListener> {
+  return Layer.succeed(TraceListener, {
+    onTrace: (trace: ModelCallTrace) => {
+      const agentTrace: AgentCallTrace = {
+        ...trace,
+        sessionId: context.sessionId,
+        agentId: context.agentId,
+        forkId: context.forkId,
+        callType: context.callType,
+      }
+      writeTrace(agentTrace)
+    },
   })
 }
 
 /**
- * Create no-op layers for both TraceEmitter and TracePersister.
+ * Create a no-op layer when tracing is disabled.
+ * TraceListener uses Effect.serviceOption so this isn't strictly needed,
+ * but useful for explicit opt-out in tests.
  */
-export function makeNoopTracer(): Layer.Layer<TraceEmitter | TracePersister> {
-  return Layer.mergeAll(
-    Layer.succeed(TraceEmitter, { emit: () => Effect.void, debug: false }),
-    Layer.succeed(TracePersister, { emit: () => Effect.void, debug: false }),
-  )
-}
-
-export interface TraceStore {
-  readonly traces: TraceData[]
+export function makeNoopTraceListener(): Layer.Layer<TraceListener> {
+  return Layer.succeed(TraceListener, {
+    onTrace: () => {},
+  })
 }
 
 /**
- * Create test layers that capture enriched traces for assertions.
+ * Test helper — captures traces for assertions.
  */
-export function makeTestTracer(): { layer: Layer.Layer<TraceEmitter | TracePersister>; store: TraceStore } {
+export interface TraceStore {
+  readonly traces: AgentCallTrace[]
+}
+
+export function makeTestTraceListener(context: AgentTraceContext): {
+  layer: Layer.Layer<TraceListener>
+  store: TraceStore
+} {
   const store: TraceStore = { traces: [] }
-  const layer = Layer.mergeAll(
-    Layer.succeed(TraceEmitter, { emit: () => Effect.void, debug: false }),
-    Layer.succeed(TracePersister, {
-      emit: (trace: TraceData) =>
-        Effect.sync(() => {
-          store.traces.push(trace)
-        }),
-      debug: true,
-    }),
-  )
+  const layer = Layer.succeed(TraceListener, {
+    onTrace: (trace: ModelCallTrace) => {
+      const agentTrace: AgentCallTrace = {
+        ...trace,
+        sessionId: context.sessionId,
+        agentId: context.agentId,
+        forkId: context.forkId,
+        callType: context.callType,
+      }
+      store.traces.push(agentTrace)
+    },
+  })
   return { layer, store }
 }

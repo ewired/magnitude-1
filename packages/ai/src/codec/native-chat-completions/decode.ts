@@ -9,6 +9,7 @@ import type { StreamFailure } from "../../errors/failure"
 import type { ToolDefinition } from "../../tools/tool-definition"
 import type { ChatCompletionsStreamChunk } from "../../wire/chat-completions"
 import type { FieldEvent } from "../../streaming/types"
+import type { TokenLogprob } from "../../trace"
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -101,6 +102,7 @@ function processChunk<TStreamError>(
   chunk: ChatCompletionsStreamChunk,
   state: DecoderState,
   parsers: Map<ToolCallId, StreamingFieldParser>,
+  logprobs: TokenLogprob[],
 ): readonly [DecoderState, readonly ResponseStreamEvent<TStreamError>[]] {
   const events: ResponseStreamEvent<TStreamError>[] = []
   let nextState = state
@@ -112,6 +114,17 @@ function processChunk<TStreamError>(
   const choice = chunk.choices[0]
   if (!choice) {
     return [nextState, events]
+  }
+
+  // Accumulate logprobs from chunk
+  if (choice.logprobs?.content) {
+    for (const lp of choice.logprobs.content) {
+      logprobs.push({
+        token: lp.token,
+        logprob: lp.logprob,
+        topLogprobs: lp.top_logprobs.map((tp) => ({ token: tp.token, logprob: tp.logprob })),
+      })
+    }
   }
 
   const delta = choice.delta
@@ -277,15 +290,17 @@ export function decode<E, TStreamError>(
 ): {
   readonly events: Stream.Stream<ResponseStreamEvent<TStreamError>, never>
   readonly parsers: ReadonlyMap<ToolCallId, StreamingFieldParser>
+  readonly logprobs: TokenLogprob[]
 } {
   const parsers = new Map<ToolCallId, StreamingFieldParser>()
+  const logprobs: TokenLogprob[] = []
 
   const raw: Stream.Stream<ResponseStreamEvent<TStreamError>, E> = Stream.flatMap(
     Stream.mapAccum(
       chunks,
       makeInitialState(options.tools),
       (state, chunk): readonly [DecoderState, readonly ResponseStreamEvent<TStreamError>[]] => {
-        return processChunk<TStreamError>(chunk, state, parsers)
+        return processChunk<TStreamError>(chunk, state, parsers, logprobs)
       },
     ),
     (events) => Stream.fromIterable(events),
@@ -318,5 +333,5 @@ export function decode<E, TStreamError>(
   // stream_end is the terminal event — include it then stop
   const events = Stream.takeUntil(withErrorHandling, (event) => event._tag === "stream_end")
 
-  return { events, parsers }
+  return { events, parsers, logprobs }
 }

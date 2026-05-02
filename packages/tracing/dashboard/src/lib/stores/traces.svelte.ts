@@ -1,9 +1,9 @@
-import type { AgentTrace, SessionInfo, ForkNode, SessionPage } from '../types'
+import type { AgentCallTrace, SessionInfo, ForkNode, SessionPage } from '../types'
 
 
 
 class TraceStore {
-  traces = $state<AgentTrace[]>([])
+  traces = $state<AgentCallTrace[]>([])
   sessions = $state<SessionInfo[]>([])
   selectedSessionId = $state<string | null>(null)
   hiddenForkIds = $state<Set<string | null>>(new Set())
@@ -20,15 +20,14 @@ class TraceStore {
   availableForks = $derived.by(() => {
     const forks = new Map<string | null, { count: number; name: string }>()
     for (const t of this.traces) {
-      const forkId = t.metadata?.forkId ?? null
+      const forkId = t.forkId
       const existing = forks.get(forkId)
       if (existing) {
         existing.count++
-        if (!existing.name && t.metadata?.callType === 'chat') existing.name = t.metadata.forkName
       } else {
         forks.set(forkId, {
           count: 1,
-          name: forkId === null ? 'root' : (t.metadata?.callType === 'chat' ? t.metadata.forkName : forkId.slice(0, 8)),
+          name: forkId === null ? 'root' : forkId.slice(0, 8),
         })
       }
     }
@@ -38,31 +37,17 @@ class TraceStore {
   allTracesSorted = $derived.by(() => {
     let traces = [...this.traces]
     if (this.hiddenForkIds.size > 0) {
-      traces = traces.filter(t => !this.hiddenForkIds.has(t.metadata?.forkId ?? null))
+      traces = traces.filter(t => !this.hiddenForkIds.has(t.forkId))
     }
     if (this.hiddenCallTypes.size > 0) {
-      traces = traces.filter(t => !this.hiddenCallTypes.has(t.callType ?? 'chat'))
+      traces = traces.filter(t => !this.hiddenCallTypes.has(t.callType))
     }
-    return traces.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-  })
-
-  groupedByChain = $derived.by(() => {
-    const groups = new Map<string, AgentTrace[]>()
-    for (const trace of this.allTracesSorted.filter(t => !t.callType || t.callType === 'chat')) {
-      const chainId = trace.metadata?.chainId ?? ''
-      const existing = groups.get(chainId)
-      if (existing) {
-        existing.push(trace)
-      } else {
-        groups.set(chainId, [trace])
-      }
-    }
-    return groups
+    return traces.sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
   })
 
   selectedTrace = $derived.by(() => {
     if (this.selectedTurnId === null) return null
-    return this.traces.find(t => (t.metadata?.turnId || t.timestamp) === this.selectedTurnId) ?? null
+    return this.traces.find(t => t.startedAt === this.selectedTurnId) ?? null
   })
 
   forkTree = $derived.by(() => {
@@ -73,18 +58,10 @@ class TraceStore {
     let input = 0
     let output = 0
     for (const t of this.traces) {
-      if (t.usage.inputTokens) input += t.usage.inputTokens
-      if (t.usage.outputTokens) output += t.usage.outputTokens
+      if (t.response.usage?.inputTokens) input += t.response.usage.inputTokens
+      if (t.response.usage?.outputTokens) output += t.response.usage.outputTokens
     }
     return { input, output, total: input + output }
-  })
-
-  totalCost = $derived.by(() => {
-    let cost = 0
-    for (const t of this.traces) {
-      if (t.usage.totalCost) cost += t.usage.totalCost
-    }
-    return cost
   })
 
   async fetchSessionsInitial(limit = 50) {
@@ -156,7 +133,7 @@ class TraceStore {
     const es = new EventSource(`/api/sessions/${encodeURIComponent(sessionId)}/stream`)
     es.onmessage = (event) => {
       try {
-        const trace: AgentTrace = JSON.parse(event.data)
+        const trace: AgentCallTrace = JSON.parse(event.data)
         this.traces = [...this.traces, trace]
       } catch {}
     }
@@ -184,7 +161,6 @@ class TraceStore {
 
   showAllForks() {
     if (this.hiddenForkIds.size === 0) {
-      // All shown → hide all
       this.hiddenForkIds = new Set(this.availableForks.keys())
     } else {
       this.hiddenForkIds = new Set()
@@ -205,7 +181,6 @@ class TraceStore {
 
   showAllCallTypes() {
     if (this.hiddenCallTypes.size === 0) {
-      // All shown → hide all
       this.hiddenCallTypes = new Set(this.callTypes)
     } else {
       this.hiddenCallTypes = new Set()
@@ -225,7 +200,7 @@ class TraceStore {
   get callTypes(): string[] {
     const types = new Set<string>()
     for (const t of this.traces) {
-      types.add(t.callType ?? 'chat')
+      types.add(t.callType)
     }
     return [...types].sort()
   }
@@ -235,18 +210,13 @@ class TraceStore {
   }
 }
 
-function buildForkTree(traces: AgentTrace[]): ForkNode[] {
-  const forkMap = new Map<string | null, { name: string; mode: string; parentForkId: string | null; count: number }>()
+function buildForkTree(traces: AgentCallTrace[]): ForkNode[] {
+  const forkMap = new Map<string | null, { count: number }>()
 
   for (const t of traces) {
-    const key = t.metadata?.forkId ?? null
+    const key = t.forkId
     if (!forkMap.has(key)) {
-      forkMap.set(key, {
-        name: key === null ? 'root' : (t.metadata?.callType === 'chat' ? t.metadata.forkName : key),
-        mode: key === null ? 'root' : (t.slot === 'secondary' ? 'spawn' : 'clone'),
-        parentForkId: null,
-        count: 0,
-      })
+      forkMap.set(key, { count: 0 })
     }
     forkMap.get(key)!.count++
   }
@@ -254,10 +224,10 @@ function buildForkTree(traces: AgentTrace[]): ForkNode[] {
   const nodes: ForkNode[] = []
   for (const [forkId, info] of forkMap) {
     nodes.push({
-      forkId: forkId,
-      name: info.name,
-      mode: info.mode as any,
-      parentForkId: info.parentForkId,
+      forkId,
+      name: forkId === null ? 'root' : forkId.slice(0, 8),
+      mode: forkId === null ? 'root' : 'spawn',
+      parentForkId: null,
       children: [],
       traceCount: info.count,
     })

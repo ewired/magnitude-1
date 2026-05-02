@@ -1,2 +1,7 @@
-export { withTraceScope } from './scoped-tracer'
-export type { TraceScope } from './scoped-tracer'
+export {
+  createTraceListenerLayer,
+  makeNoopTraceListener,
+  makeTestTraceListener,
+  type AgentTraceContext,
+  type TraceStore,
+} from './tracing'

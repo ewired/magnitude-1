@@ -216,8 +216,8 @@ export { type AgentCallUsage, fromResponseUsage } from './execution/types'
 
 // Tracing
 export { initTraceSession, writeTrace, getTraceSessionId } from '@magnitudedev/tracing'
-export type { TraceSessionMeta, AgentTrace } from '@magnitudedev/tracing'
-export { withTraceScope } from './tracing'
-export type { TraceScope } from './tracing'
+export type { TraceSessionMeta, AgentCallTrace } from '@magnitudedev/tracing'
+export { createTraceListenerLayer, makeNoopTraceListener, makeTestTraceListener } from './tracing'
+export type { AgentTraceContext, TraceStore } from './tracing'
 export type { UserPart, TextPart, ImagePart, ImageMediaType } from '@magnitudedev/ai'
 export { textParts, textOf, hasImages, wrapTextParts } from './content'
