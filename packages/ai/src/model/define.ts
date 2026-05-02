@@ -156,15 +156,20 @@ export function modelDefine<
                 case "tool_call_field_end": {
                   const tc = toolCallMap.get(event.toolCallId)
                   if (tc) {
-                    // Build nested path
-                    let target: any = tc.args
-                    for (let i = 0; i < event.path.length - 1; i++) {
-                      if (!(event.path[i] in target)) {
-                        target[event.path[i]] = {}
+                    if (event.path.length === 0) {
+                      // Root object completion — replace args entirely
+                      tc.args = event.value as Record<string, unknown>
+                    } else {
+                      // Build nested path
+                      let target: any = tc.args
+                      for (let i = 0; i < event.path.length - 1; i++) {
+                        if (!(event.path[i] in target)) {
+                          target[event.path[i]] = {}
+                        }
+                        target = target[event.path[i]]
                       }
-                      target = target[event.path[i]]
+                      target[event.path[event.path.length - 1]] = event.value
                     }
-                    target[event.path[event.path.length - 1]] = event.value
                   }
                   break
                 }
