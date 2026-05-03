@@ -36,7 +36,8 @@ export function buildConversationSummary(entries: readonly ConversationEntry[]):
   if (entries.length === 0) return null
 
   const formatted = entries.map(e =>
-    `<magnitude:message role="${e.role}">\n${e.text}\n</magnitude:message>`
+    `${e.role.toUpperCase()}:\n${e.text}`
+    //`<magnitude:message role="${e.role}>\n${e.text}\n</magnitude:message>`
   )
 
   // Always keep the first entry
@@ -59,5 +60,5 @@ export function buildConversationSummary(entries: readonly ConversationEntry[]):
 
   result = result.concat(included)
 
-  return `<conversation-context>\n${result.join('\n\n')}\n</conversation-context>`
+  return `<transcript>\nThe following is a transcript between the lead (your parent) and the user. It is provided so that you have better overall context. It is not part of your conversation with your parent.\n--- TRANSCRIPT START ---\n${result.join('\n\n')}\n--- TRANSCRIPT END ---\n</transcript>`
 }
