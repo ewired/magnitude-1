@@ -21,13 +21,26 @@ interface ToolCallState {
   readonly parser: StreamingFieldParser
 }
 
+// ---------------------------------------------------------------------------
+// Decoder phase — three states
+//
+//   STREAMING  → processing content, thoughts, tool calls
+//   FINISHING  → received finish_reason, waiting for usage chunk
+//   DONE       → emitted stream_end, terminal
+// ---------------------------------------------------------------------------
+
+type DecoderPhase =
+  | { readonly _tag: 'streaming' }
+  | { readonly _tag: 'finishing'; readonly finishReason: FinishReason }
+  | { readonly _tag: 'done' }
+
 interface DecoderState {
   readonly nextToolOrdinal: number
   readonly thoughtOpen: boolean
   readonly messageOpen: boolean
   readonly openToolCalls: ReadonlyMap<number, ToolCallState>
   readonly toolSchemas: ReadonlyMap<string, Schema.Schema.AnyNoContext>
-  readonly terminated: boolean
+  readonly phase: DecoderPhase
 }
 
 // ---------------------------------------------------------------------------
@@ -49,7 +62,7 @@ function makeInitialState(
     messageOpen: false,
     openToolCalls: new Map(),
     toolSchemas,
-    terminated: false,
+    phase: { _tag: 'streaming' },
   }
 }
 
@@ -107,10 +120,30 @@ function processChunk<TStreamError>(
   const events: ResponseStreamEvent<TStreamError>[] = []
   let nextState = state
 
-  if (nextState.terminated) {
+  // ── DONE: terminal, skip everything ────────────────────────────────────────
+  if (nextState.phase._tag === 'done') {
     return [nextState, events]
   }
 
+  // ── Usage chunk: emit stream_end if we have a stored finishReason ──────────
+  // OpenAI sends usage on a separate final chunk with choices: []
+  if (chunk.usage) {
+    if (nextState.phase._tag === 'finishing') {
+      events.push({
+        _tag: "stream_end",
+        reason: { _tag: "completed", finishReason: nextState.phase.finishReason },
+        usage: toUsage(chunk.usage),
+      })
+      return [{ ...nextState, phase: { _tag: 'done' } }, events]
+    }
+  }
+
+  // ── FINISHING: waiting for usage only, skip content chunks ──────────────────
+  if (nextState.phase._tag === 'finishing') {
+    return [nextState, events]
+  }
+
+  // ── STREAMING: normal processing ───────────────────────────────────────────
   const choice = chunk.choices[0]
   if (!choice) {
     return [nextState, events]
@@ -186,8 +219,7 @@ function processChunk<TStreamError>(
                 },
                 usage: null,
               })
-              nextState = { ...nextState, terminated: true, openToolCalls: new Map() }
-              return [nextState, events]
+              return [{ ...nextState, phase: { _tag: 'done' }, openToolCalls: new Map() }, events]
             }
 
             events.push({
@@ -237,8 +269,9 @@ function processChunk<TStreamError>(
     }
   }
 
-  // Finish reason
+  // ── Finish reason ──────────────────────────────────────────────────────────
   if (choice.finish_reason !== null && choice.finish_reason !== undefined) {
+    // Close open blocks
     if (nextState.thoughtOpen) {
       events.push({ _tag: "thought_end" })
       nextState = { ...nextState, thoughtOpen: false }
@@ -248,6 +281,7 @@ function processChunk<TStreamError>(
       nextState = { ...nextState, messageOpen: false }
     }
 
+    // Finalize open tool calls
     for (const toolCall of nextState.openToolCalls.values()) {
       const fieldEvents = toolCall.parser.end()
       events.push(...wrapFieldEvents<TStreamError>(fieldEvents, toolCall.toolCallId))
@@ -263,8 +297,7 @@ function processChunk<TStreamError>(
           },
           usage: chunk.usage ? toUsage(chunk.usage) : null,
         })
-        nextState = { ...nextState, terminated: true, openToolCalls: new Map() }
-        return [nextState, events]
+        return [{ ...nextState, phase: { _tag: 'done' }, openToolCalls: new Map() }, events]
       }
 
       events.push({
@@ -273,19 +306,20 @@ function processChunk<TStreamError>(
       })
     }
 
-    nextState = {
-      ...nextState,
-      openToolCalls: new Map(),
-      terminated: true,
+    const finishReason = mapReason(choice.finish_reason)
+
+    if (chunk.usage) {
+      // Usage on same chunk as finish_reason → emit stream_end immediately
+      events.push({
+        _tag: "stream_end",
+        reason: { _tag: "completed", finishReason },
+        usage: toUsage(chunk.usage),
+      })
+      nextState = { ...nextState, openToolCalls: new Map(), phase: { _tag: 'done' } }
+    } else {
+      // No usage yet → transition to FINISHING, wait for usage chunk
+      nextState = { ...nextState, openToolCalls: new Map(), phase: { _tag: 'finishing', finishReason } }
     }
-    events.push({
-      _tag: "stream_end",
-      reason: {
-        _tag: "completed",
-        finishReason: mapReason(choice.finish_reason),
-      },
-      usage: chunk.usage ? toUsage(chunk.usage) : null,
-    })
   }
 
   return [nextState, events]
@@ -309,15 +343,34 @@ export function decode<E, TStreamError>(
   const parsers = new Map<ToolCallId, StreamingFieldParser>()
   const logprobs: TokenLogprob[] = []
 
-  const raw: Stream.Stream<ResponseStreamEvent<TStreamError>, E> = Stream.flatMap(
-    Stream.mapAccum(
-      chunks,
-      makeInitialState(options.tools),
-      (state, chunk): readonly [DecoderState, readonly ResponseStreamEvent<TStreamError>[]] => {
-        return processChunk<TStreamError>(chunk, state, parsers, logprobs)
-      },
-    ),
-    (events) => Stream.fromIterable(events),
+  // Track final state for fallback stream_end emission
+  let lastState: DecoderState = makeInitialState(options.tools)
+  const tracked = Stream.mapAccum(
+    chunks,
+    makeInitialState(options.tools),
+    (state, chunk): readonly [DecoderState, readonly ResponseStreamEvent<TStreamError>[]] => {
+      const result = processChunk<TStreamError>(chunk, state, parsers, logprobs)
+      lastState = result[0]
+      return result
+    },
+  )
+
+  const flattened = Stream.flatMap(tracked, (events) => Stream.fromIterable(events))
+
+  // Fallback: if stream closes while FINISHING (usage never arrived), emit stream_end with null usage
+  const raw: Stream.Stream<ResponseStreamEvent<TStreamError>, E> = Stream.concat(
+    flattened,
+    Stream.suspend(() => {
+      if (lastState.phase._tag === 'finishing') {
+        const endEvent: ResponseStreamEvent<TStreamError> = {
+          _tag: "stream_end",
+          reason: { _tag: "completed", finishReason: lastState.phase.finishReason },
+          usage: null,
+        }
+        return Stream.make(endEvent)
+      }
+      return Stream.empty
+    }),
   )
 
   // Catch all errors, classify, and emit as stream_end { error }
