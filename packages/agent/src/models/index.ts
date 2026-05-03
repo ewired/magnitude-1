@@ -25,22 +25,6 @@ export { killWorkerModel, type KillWorkerState } from './kill-worker'
 export { shellModel, type ShellState } from './shell'
 export { skillActivationModel, type SkillActivationState } from './skill-activation'
 export { fileViewModel, type FileViewState } from './file-view'
-export {
-  createBrowserActionModel,
-  type BrowserActionState,
-  clickModel,
-  doubleClickModel,
-  rightClickModel,
-  typeModel,
-  scrollModel,
-  dragModel,
-  navigateModel,
-  goBackModel,
-  switchTabModel,
-  newTabModel,
-  screenshotModel,
-  evaluateModel,
-} from './browser-action'
 export { isToolKey, type ToolKey } from '../tools/toolkits'
 
 // Aliases for display compatibility

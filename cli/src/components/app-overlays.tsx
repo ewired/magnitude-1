@@ -1,4 +1,3 @@
-import { BrowserSetupOverlay } from './browser-setup-overlay'
 import { RecentChatsOverlay } from './recent-chats-overlay'
 import { ForkDetailOverlay } from './fork-detail-overlay'
 import { SettingsOverlay } from './settings-overlay'
@@ -13,9 +12,6 @@ import { BOX_CHARS } from '../utils/ui-constants'
 type AgentClient = Awaited<ReturnType<typeof createCodingAgentClient>>
 
 export type AppOverlaysProps = {
-  showBrowserSetup: boolean
-  setShowBrowserSetup: (v: boolean) => void
-
   settingsVisible: boolean
   onSettingsClose: () => void
   auth: MagnitudeAuthState
@@ -48,8 +44,6 @@ export type AppOverlaysProps = {
 }
 
 export function AppOverlays({
-  showBrowserSetup,
-  setShowBrowserSetup,
   settingsVisible,
   onSettingsClose,
   auth,
@@ -130,17 +124,6 @@ export function AppOverlays({
             </box>
           </box>
         )}
-      </box>
-    )
-  }
-
-  if (showBrowserSetup) {
-    return (
-      <box style={{ flexDirection: 'column', height: '100%' }}>
-        <BrowserSetupOverlay
-          onClose={() => setShowBrowserSetup(false)}
-          onResult={() => setShowBrowserSetup(false)}
-        />
       </box>
     )
   }

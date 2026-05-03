@@ -52,7 +52,6 @@ import { FsLive } from './services/fs'
 // Execution
 import { ExecutionManager } from './execution/types'
 import { ExecutionManagerLive } from './execution/execution-manager'
-import { BrowserServiceLive } from './services/browser-service'
 
 import { FetchHttpClient } from '@effect/platform'
 import { registerApprovalBridge } from './execution/approval-bridge'
@@ -246,7 +245,6 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
   })
   const baseLayer = Layer.mergeAll(
     Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
-    BrowserServiceLive,
 
     Layer.provide(AgentModelResolverLive(), magnitudeClientLayer),
     magnitudeClientLayer,

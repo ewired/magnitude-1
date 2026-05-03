@@ -6,7 +6,6 @@
     "@magnitudedev/evals": "0.1.0",
     "@magnitudedev/agent": "0.0.1",
     "@magnitudedev/agent-definition": "0.0.1",
-    "@magnitudedev/browser-harness": "0.0.1",
     "@magnitudedev/cli": "0.0.0",
     "@magnitudedev/dom-extract": "0.0.1",
     "@magnitudedev/event-core": "0.0.1",

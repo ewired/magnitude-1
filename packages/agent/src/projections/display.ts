@@ -197,10 +197,6 @@ export interface ForkActivityToolCounts {
   readonly webFetches: number
   readonly artifactWrites: number
   readonly artifactUpdates: number
-  readonly clicks: number
-  readonly navigations: number
-  readonly inputs: number
-  readonly evaluations: number
   readonly other: number
 }
 
@@ -531,10 +527,6 @@ const EMPTY_TOOL_COUNTS: ForkActivityToolCounts = {
   webFetches: 0,
   artifactWrites: 0,
   artifactUpdates: 0,
-  clicks: 0,
-  navigations: 0,
-  inputs: 0,
-  evaluations: 0,
   other: 0
 }
 
@@ -547,19 +539,7 @@ function incrementToolCount(counts: ForkActivityToolCounts, toolKey: ToolKey): F
     case 'fileEdit': return { ...counts, edits: counts.edits + 1 }
     case 'fileSearch': return { ...counts, searches: counts.searches + 1 }
     case 'webFetch': return { ...counts, webFetches: counts.webFetches + 1 }
-    case 'click':
-    case 'doubleClick':
-    case 'rightClick':
-    case 'drag': return { ...counts, clicks: counts.clicks + 1 }
-    case 'navigate':
-    case 'goBack':
-    case 'switchTab':
-    case 'newTab': return { ...counts, navigations: counts.navigations + 1 }
-    case 'type': return { ...counts, inputs: counts.inputs + 1 }
-    case 'evaluate': return { ...counts, evaluations: counts.evaluations + 1 }
     case 'fileView':
-    case 'scroll':
-    case 'screenshot':
       return { ...counts, other: counts.other + 1 }
     default:
       return { ...counts, other: counts.other + 1 }
@@ -583,10 +563,6 @@ function totalToolsUsed(counts: ForkActivityToolCounts): number {
     + counts.webFetches
     + counts.artifactWrites
     + counts.artifactUpdates
-    + counts.clicks
-    + counts.navigations
-    + counts.inputs
-    + counts.evaluations
     + counts.other
 }
 

@@ -17,8 +17,6 @@ import { buildPolicyInterceptor, type AgentResolver } from './permission-gate'
 export { IDENTICAL_RESPONSE_BREAKER_THRESHOLD } from './types'
 import { createApprovalState, ApprovalStateTag, type ApprovalStateService } from './approval-state'
 
-import { BrowserService } from '../services/browser-service'
-
 import { AgentStateReaderTag, type AgentStateReader } from '../tools/fork'
 import { AgentRegistryStateReaderTag, type AgentRegistryStateReader } from '../tools/agent-registry-reader'
 import { buildCloneContext, buildSpawnContext } from '../prompts/fork-context'
@@ -164,9 +162,6 @@ const makeExecutionManager = Effect.gen(function* () {
   // Pre-built teardown effects (captured at initFork time with services already provided)
   const forkTeardowns = new Map<string, Effect.Effect<void>>()
 
-  // Pre-built idle release effects (repeatable; run each time fork goes idle)
-  const forkIdleReleases = new Map<string, Effect.Effect<void>>()
-
   // Per-fork consecutive identical continue-response tracker
   const identicalContinueTracker = new Map<string | null, { lastResponseText: string; consecutiveCount: number }>()
 
@@ -237,19 +232,10 @@ const makeExecutionManager = Effect.gen(function* () {
         layers = Layer.merge(layers, setupLayer)
       }
 
-      // Pre-build teardown effect with services captured now (so disposeFork needs no requirements)
-      if (forkId && (roleDef.setup || roleDef.teardown)) {
-        const browserService = yield* BrowserService
-
-        if (roleDef.teardown) {
-          const teardownEffect = roleDef.teardown({ forkId, roleId, cwd, workspacePath }).pipe(
-            Effect.provideService(BrowserService, browserService)
-          ) as Effect.Effect<void>
-          forkTeardowns.set(forkId, teardownEffect)
-        }
-
-        // Store repeatable idle release (for browser forks)
-        forkIdleReleases.set(forkId, browserService.release(forkId) as Effect.Effect<void>)
+      // Pre-build teardown effect (so disposeFork needs no requirements)
+      if (forkId && roleDef.teardown) {
+        const teardownEffect = roleDef.teardown({ forkId, roleId, cwd, workspacePath }) as Effect.Effect<void>
+        forkTeardowns.set(forkId, teardownEffect)
       }
 
       // Store roleId for agent resolution
@@ -266,10 +252,10 @@ const makeExecutionManager = Effect.gen(function* () {
         bindObservable(obs, (effect) => Effect.provide(effect, layers))
       )
       boundObservables.set(forkId, agentObservables)
-    }) as Effect.Effect<void, never, Projection.ProjectionInstance<SessionContextState> | Projection.ProjectionInstance<AgentRoutingState> | Projection.ProjectionInstance<AgentStatusState> | Projection.ForkedProjectionInstance<ForkTurnState> | Projection.ProjectionInstance<ConversationState> | ChatPersistence | BrowserService | WorkerBusService<AppEvent>>),
+    }) as Effect.Effect<void, never, Projection.ProjectionInstance<SessionContextState> | Projection.ProjectionInstance<AgentRoutingState> | Projection.ProjectionInstance<AgentStatusState> | Projection.ForkedProjectionInstance<ForkTurnState> | Projection.ProjectionInstance<ConversationState> | ChatPersistence | WorkerBusService<AppEvent>>),
 
     disposeFork: (forkId) => Effect.gen(function* () {
-      // Run role teardown if defined (e.g. browser cleanup)
+      // Run role teardown if defined
       const teardown = forkTeardowns.get(forkId)
       if (teardown) {
         yield* Effect.ignore(teardown)
@@ -282,7 +268,6 @@ const makeExecutionManager = Effect.gen(function* () {
 
       boundObservables.delete(forkId)
       forkRoles.delete(forkId)
-      forkIdleReleases.delete(forkId)
       identicalContinueTracker.delete(forkId)
     }),
 
@@ -324,13 +309,6 @@ const makeExecutionManager = Effect.gen(function* () {
       })
 
       return forkId
-    }),
-
-    releaseBrowserFork: (forkId) => Effect.gen(function* () {
-      const release = forkIdleReleases.get(forkId)
-      if (release) {
-        yield* Effect.ignore(release)
-      }
     }),
 
     approvalState,

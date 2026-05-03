@@ -213,9 +213,6 @@ function AppInner({
 
 
 
-  // Browser setup overlay state
-  const [showBrowserSetup, setShowBrowserSetup] = useState(false)
-
   const [recentChatsSelectedIndex, setRecentChatsSelectedIndex] = useState(0)
 
   const [recentChats, setRecentChats] = useState<RecentChat[] | null>(null)
@@ -782,10 +779,6 @@ function AppInner({
     setSettingsOpen(true)
   }, [])
 
-  const openBrowserSetup = useCallback(() => {
-    setShowBrowserSetup(true)
-  }, [])
-
   const openUsage = useCallback(() => {
     setUsageOpen(true)
   }, [])
@@ -836,9 +829,8 @@ function AppInner({
     activateSkill,
     initProject,
     openSettings,
-    openBrowserSetup,
     openUsage,
-  }), [resetConversation, showEphemeral, theme.error, exitApp, openRecentChats, enterBashMode, activateSkill, initProject, openSettings, openBrowserSetup, openUsage])
+  }), [resetConversation, showEphemeral, theme.error, exitApp, openRecentChats, enterBashMode, activateSkill, initProject, openSettings, openUsage])
 
 
 
@@ -870,7 +862,6 @@ function AppInner({
   const activeOverlayKind =
     showRecentChatsOverlay ? 'recent-chats'
     : (expandedForkId && client) ? 'fork-detail'
-    : showBrowserSetup ? 'browser-setup'
     : settingsOpen ? 'settings'
     : usageOpen ? 'usage'
     : 'none'
@@ -1066,8 +1057,6 @@ function AppInner({
 
   const overlayContent = (
     <AppOverlays
-      showBrowserSetup={showBrowserSetup}
-      setShowBrowserSetup={setShowBrowserSetup}
       settingsVisible={settingsOpen}
       onSettingsClose={onSettingsClose}
       auth={auth}
@@ -1222,8 +1211,7 @@ function AppInner({
 
 
 
-  const composerCanFocus = !showBrowserSetup
-    && !showRecentChatsOverlay
+  const composerCanFocus = !showRecentChatsOverlay
     && !settingsOpen
     && !usageOpen
     && expandedForkId === null

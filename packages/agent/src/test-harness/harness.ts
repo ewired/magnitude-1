@@ -40,7 +40,6 @@ import { SessionTitleWorker } from '../workers/session-title-worker'
 
 // Runtime/services
 import { ExecutionManagerLive } from '../execution/execution-manager'
-import { BrowserService } from '../services/browser-service'
 import type { RoleId } from '../agents/role-validation'
 import { registerApprovalBridge } from '../execution/approval-bridge'
 import { makeTestModelResolver } from './test-resolver'
@@ -309,10 +308,6 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
     const fakeClock = options.clock === 'fake' ? createFakeClock() : null
 
     const testModelResolverLayer = makeTestModelResolver(options.model ?? {})
-    const stubBrowserServiceLayer = Layer.succeed(BrowserService, {
-      get: () => Effect.die(new Error('BrowserService not available in tests')),
-      release: () => Effect.die(new Error('BrowserService not available in tests')),
-    })
     const ephemeralSessionContextLayer = Layer.succeed(EphemeralSessionContextTag, {
       disableShellSafeguards: false,
       disableCwdSafeguards: false,
@@ -325,7 +320,6 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
 
     const runtimeLayer = Layer.mergeAll(
       Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
-      stubBrowserServiceLayer,
       testModelResolverLayer,
       fsLayer,
       MockTurnScriptLive,

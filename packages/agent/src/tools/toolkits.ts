@@ -14,7 +14,6 @@ import type { ConfigState } from '../ambient/config-ambient'
 import { readTool, writeTool, editTool, treeTool, grepTool, viewTool } from './fs'
 import { shellTool } from './shell'
 import { webSearchTool } from './web-search'
-import { type BrowserToolKey, isBrowserToolKey } from './browser-tools'
 import { webFetchTool } from './web-fetch-tool'
 import { createTaskTool, updateTaskTool, spawnWorkerTool, killWorkerTool } from './task-tools'
 import { skillTool } from './skill-tool'
@@ -117,10 +116,10 @@ const ROLE_TOOLKITS: Record<RoleId, Toolkit> = {
 /** Tools that should not be displayed in the UI */
 export const HIDDEN_TOOLS: ReadonlySet<string> = new Set(['createTask', 'updateTask', 'killWorker', 'messageWorker'])
 
-export type ToolKey = ToolkitKeys<typeof leaderToolkit> | BrowserToolKey
+export type ToolKey = ToolkitKeys<typeof leaderToolkit>
 
 export function isToolKey(value: string): value is ToolKey {
-  return value in leaderToolkit.entries || isBrowserToolKey(value)
+  return value in leaderToolkit.entries
 }
 
 /**

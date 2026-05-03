@@ -165,11 +165,6 @@ export { readTool, writeTool, editTool, treeTool, grepTool, fsTools } from './to
 // webSearchTool disabled — awaiting Exa reimplementation
 export { webFetchTool } from './tools/web-fetch-tool'
 
-export {
-  clickTool, doubleClickTool, rightClickTool, typeTool, scrollTool, dragTool,
-  navigateTool, goBackTool, switchTabTool, newTabTool, screenshotTool, evaluateTool,
-  browserTools,
-} from './tools/browser-tools'
 export type { AgentStateReader } from './tools/fork'
 
 // Workers

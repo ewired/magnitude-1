@@ -10,7 +10,6 @@ import { fileTreeDisplay } from './displays/file-tree'
 import { webSearchDisplay } from './displays/web-search'
 import { webFetchDisplay } from './displays/web-fetch'
 import { skillDisplay } from './displays/skill'
-import { browserActionDisplay } from './displays/browser-action'
 import { defaultDisplay } from './displays/default'
 import { spawnWorkerDisplay } from './displays/spawn-worker'
 
@@ -41,18 +40,6 @@ const displaysByToolKey: Partial<Record<string, ToolDisplay<BaseState>>> = {
   webFetch: eraseStateType(webFetchDisplay),
   skill: eraseStateType(skillDisplay),
   spawnWorker: eraseStateType(spawnWorkerDisplay),
-  click: eraseStateType(browserActionDisplay),
-  doubleClick: eraseStateType(browserActionDisplay),
-  rightClick: eraseStateType(browserActionDisplay),
-  type: eraseStateType(browserActionDisplay),
-  scroll: eraseStateType(browserActionDisplay),
-  drag: eraseStateType(browserActionDisplay),
-  navigate: eraseStateType(browserActionDisplay),
-  goBack: eraseStateType(browserActionDisplay),
-  switchTab: eraseStateType(browserActionDisplay),
-  newTab: eraseStateType(browserActionDisplay),
-  screenshot: eraseStateType(browserActionDisplay),
-  evaluate: eraseStateType(browserActionDisplay),
 }
 
 const fallback = eraseStateType(defaultDisplay)
