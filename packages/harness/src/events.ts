@@ -1,29 +1,93 @@
-import type { ResponseUsage, ToolCallId, ToolResultPart, ValidationIssue } from "@magnitudedev/ai"
+import type { ResponseUsage, ToolCallId, ToolResultPart, ValidationIssue, StreamingPartial } from "@magnitudedev/ai"
+import type { Schema } from "effect"
+
+// ── Tool Error ───────────────────────────────────────────────────────
+
+/** Base constraint for tool errors — all tool errors must have a message. */
+export interface ToolError {
+  readonly message: string
+}
 
 // ── Tool Result ──────────────────────────────────────────────────────
 
-export type ToolResult<TOutput = unknown, TError = unknown> =
+type ToolResultErased =
+  | { readonly _tag: "Success"; readonly output: any }
+  | { readonly _tag: "Error"; readonly error: any }
+  | { readonly _tag: "Rejected"; readonly rejection: unknown }
+  | { readonly _tag: "Interrupted" }
+
+type ToolResultConcrete<TOutput, TError extends ToolError> =
   | { readonly _tag: "Success"; readonly output: TOutput }
   | { readonly _tag: "Error"; readonly error: TError }
   | { readonly _tag: "Rejected"; readonly rejection: unknown }
   | { readonly _tag: "Interrupted" }
 
-// ── Turn Outcome ─────────────────────────────────────────────────────
+export type ToolResult<TOutput = never, TError extends ToolError = never> =
+  [TOutput] extends [never]
+    ? ToolResultErased
+    : ToolResultConcrete<TOutput, [TError] extends [never] ? ToolError : TError>
+
+// ── Safety Stop ──────────────────────────────────────────────────────
 
 export type SafetyStopReason =
   | { readonly _tag: "IdenticalResponseCircuitBreaker"; readonly threshold: number }
   | { readonly _tag: "Other"; readonly message: string }
 
-export type TurnOutcome =
+// ── Tool Input Decode Failure ─────────────────────────────────────────
+
+interface ToolInputDecodeFailureErased {
+  readonly _tag: "ToolInputDecodeFailure"
+  readonly toolCallId: ToolCallId
+  readonly toolName: string
+  readonly issue: ValidationIssue
+  readonly inputSchema: Schema.Schema.Any
+  readonly receivedInput: StreamingPartial<any>
+}
+
+interface ToolInputDecodeFailureConcrete<TInput> {
+  readonly _tag: "ToolInputDecodeFailure"
+  readonly toolCallId: ToolCallId
+  readonly toolName: string
+  readonly issue: ValidationIssue
+  readonly inputSchema: Schema.Schema<TInput, TInput, never>
+  readonly receivedInput: StreamingPartial<TInput>
+}
+
+export type ToolInputDecodeFailure<TInput = never> =
+  [TInput] extends [never]
+    ? ToolInputDecodeFailureErased
+    : ToolInputDecodeFailureConcrete<TInput>
+
+// ── Turn Outcome ─────────────────────────────────────────────────────
+
+interface TurnOutcomeBase {
+  readonly _tag: "Completed" | "OutputTruncated" | "ContentFiltered" | "SafetyStop" | "ToolInputDecodeFailure" | "GateRejected" | "EngineDefect" | "Interrupted"
+}
+
+type TurnOutcomeConcrete<TInput> =
   | { readonly _tag: "Completed"; readonly toolCallsCount: number }
   | { readonly _tag: "OutputTruncated" }
   | { readonly _tag: "ContentFiltered" }
   | { readonly _tag: "SafetyStop"; readonly reason: SafetyStopReason }
-  | { readonly _tag: "ToolInputDecodeFailure"; readonly toolCallId: ToolCallId; readonly toolName: string; readonly issue: ValidationIssue }
-
+  | ToolInputDecodeFailure<TInput>
   | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
   | { readonly _tag: "Interrupted" }
+
+type TurnOutcomeErased =
+  | { readonly _tag: "Completed"; readonly toolCallsCount: number }
+  | { readonly _tag: "OutputTruncated" }
+  | { readonly _tag: "ContentFiltered" }
+  | { readonly _tag: "SafetyStop"; readonly reason: SafetyStopReason }
+  | ToolInputDecodeFailure
+  | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly toolName: string }
+  | { readonly _tag: "EngineDefect"; readonly message: string }
+  | { readonly _tag: "Interrupted" }
+
+export type TurnOutcome<TInput = never> =
+  [TInput] extends [never]
+    ? TurnOutcomeErased
+    : TurnOutcomeConcrete<TInput>
 
 // ── Tool Input Lifecycle ─────────────────────────────────────────────
 
@@ -55,9 +119,45 @@ export interface ToolInputReady {
   readonly toolCallId: ToolCallId
 }
 
+// ── Tool Input Decode Failed ─────────────────────────────────────────
+
+interface ToolInputDecodeFailedErased {
+  readonly _tag: "ToolInputDecodeFailed"
+  readonly toolCallId: ToolCallId
+  readonly toolName: string
+  readonly toolKey: string
+  readonly issue: ValidationIssue
+  readonly inputSchema: Schema.Schema.Any
+  readonly receivedInput: StreamingPartial<any>
+}
+
+interface ToolInputDecodeFailedConcrete<TInput> {
+  readonly _tag: "ToolInputDecodeFailed"
+  readonly toolCallId: ToolCallId
+  readonly toolName: string
+  readonly toolKey: string
+  readonly issue: ValidationIssue
+  readonly inputSchema: Schema.Schema<TInput, TInput, never>
+  readonly receivedInput: StreamingPartial<TInput>
+}
+
+export type ToolInputDecodeFailed<TInput = never> =
+  [TInput] extends [never]
+    ? ToolInputDecodeFailedErased
+    : ToolInputDecodeFailedConcrete<TInput>
+
 // ── Tool Execution Lifecycle ─────────────────────────────────────────
 
-export interface ToolExecutionStarted<TInput = unknown> {
+interface ToolExecutionStartedErased {
+  readonly _tag: "ToolExecutionStarted"
+  readonly toolCallId: ToolCallId
+  readonly toolName: string
+  readonly toolKey: string
+  readonly input: any
+  readonly cached: boolean
+}
+
+interface ToolExecutionStartedConcrete<TInput> {
   readonly _tag: "ToolExecutionStarted"
   readonly toolCallId: ToolCallId
   readonly toolName: string
@@ -66,7 +166,20 @@ export interface ToolExecutionStarted<TInput = unknown> {
   readonly cached: boolean
 }
 
-export interface ToolExecutionEnded<TOutput = unknown, TError = unknown> {
+export type ToolExecutionStarted<TInput = never> =
+  [TInput] extends [never]
+    ? ToolExecutionStartedErased
+    : ToolExecutionStartedConcrete<TInput>
+
+interface ToolExecutionEndedErased {
+  readonly _tag: "ToolExecutionEnded"
+  readonly toolCallId: ToolCallId
+  readonly toolName: string
+  readonly toolKey: string
+  readonly result: ToolResult
+}
+
+interface ToolExecutionEndedConcrete<TOutput, TError extends ToolError> {
   readonly _tag: "ToolExecutionEnded"
   readonly toolCallId: ToolCallId
   readonly toolName: string
@@ -74,13 +187,31 @@ export interface ToolExecutionEnded<TOutput = unknown, TError = unknown> {
   readonly result: ToolResult<TOutput, TError>
 }
 
-export interface ToolEmission<TEmission = unknown> {
+export type ToolExecutionEnded<TOutput = never, TError extends ToolError = never> =
+  [TOutput] extends [never]
+    ? ToolExecutionEndedErased
+    : ToolExecutionEndedConcrete<TOutput, [TError] extends [never] ? ToolError : TError>
+
+interface ToolEmissionErased {
+  readonly _tag: "ToolEmission"
+  readonly toolCallId: ToolCallId
+  readonly toolName: string
+  readonly toolKey: string
+  readonly value: any
+}
+
+interface ToolEmissionConcrete<TEmission> {
   readonly _tag: "ToolEmission"
   readonly toolCallId: ToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly value: TEmission
 }
+
+export type ToolEmission<TEmission = never> =
+  [TEmission] extends [never]
+    ? ToolEmissionErased
+    : ToolEmissionConcrete<TEmission>
 
 // ── Tool Result Formatting ───────────────────────────────────────────
 
@@ -123,34 +254,63 @@ export interface MessageEnd {
 
 // ── Turn End ─────────────────────────────────────────────────────────
 
-export interface TurnEnd {
+interface TurnEndErased {
   readonly _tag: "TurnEnd"
   readonly outcome: TurnOutcome
   readonly usage: ResponseUsage | null
 }
 
-// ── Union Types ──────────────────────────────────────────────────────
-
-export interface ToolInputDecodeFailed {
-  readonly _tag: "ToolInputDecodeFailed"
-  readonly toolCallId: ToolCallId
-  readonly toolName: string
-  readonly toolKey: string
-  readonly message: string
+interface TurnEndConcrete<TInput> {
+  readonly _tag: "TurnEnd"
+  readonly outcome: TurnOutcome<TInput>
+  readonly usage: ResponseUsage | null
 }
 
-export type ToolLifecycleEvent<TInput = unknown, TOutput = unknown, TEmission = unknown, TError = unknown> =
+export type TurnEnd<TInput = never> =
+  [TInput] extends [never]
+    ? TurnEndErased
+    : TurnEndConcrete<TInput>
+
+// ── Union Types ──────────────────────────────────────────────────────
+
+type ToolLifecycleEventErased =
   | ToolInputStarted
   | ToolInputFieldChunk
   | ToolInputFieldComplete
   | ToolInputReady
   | ToolInputDecodeFailed
+  | ToolExecutionStarted
+  | ToolExecutionEnded
+  | ToolEmission
+  | ToolResultFormatted
+
+type ToolLifecycleEventConcrete<TInput, TOutput, TEmission, TError extends ToolError> =
+  | ToolInputStarted
+  | ToolInputFieldChunk
+  | ToolInputFieldComplete
+  | ToolInputReady
+  | ToolInputDecodeFailed<TInput>
   | ToolExecutionStarted<TInput>
   | ToolExecutionEnded<TOutput, TError>
   | ToolEmission<TEmission>
   | ToolResultFormatted
 
-export type HarnessEvent<TInput = unknown, TOutput = unknown, TEmission = unknown, TError = unknown> =
+export type ToolLifecycleEvent<TInput = never, TOutput = never, TEmission = never, TError extends ToolError = never> =
+  [TInput] extends [never]
+    ? ToolLifecycleEventErased
+    : ToolLifecycleEventConcrete<TInput, [TOutput] extends [never] ? any : TOutput, [TEmission] extends [never] ? any : TEmission, [TError] extends [never] ? ToolError : TError>
+
+type HarnessEventErased =
+  | ThoughtStart
+  | ThoughtDelta
+  | ThoughtEnd
+  | MessageStart
+  | MessageDelta
+  | MessageEnd
+  | ToolLifecycleEvent
+  | TurnEnd
+
+type HarnessEventConcrete<TInput, TOutput, TEmission, TError extends ToolError> =
   | ThoughtStart
   | ThoughtDelta
   | ThoughtEnd
@@ -158,4 +318,9 @@ export type HarnessEvent<TInput = unknown, TOutput = unknown, TEmission = unknow
   | MessageDelta
   | MessageEnd
   | ToolLifecycleEvent<TInput, TOutput, TEmission, TError>
-  | TurnEnd
+  | TurnEnd<TInput>
+
+export type HarnessEvent<TInput = never, TOutput = never, TEmission = never, TError extends ToolError = never> =
+  [TInput] extends [never]
+    ? HarnessEventErased
+    : HarnessEventConcrete<TInput, [TOutput] extends [never] ? any : TOutput, [TEmission] extends [never] ? any : TEmission, [TError] extends [never] ? ToolError : TError>

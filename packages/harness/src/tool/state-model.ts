@@ -1,4 +1,4 @@
-import type { ToolLifecycleEvent } from "../events"
+import type { ToolError, ToolLifecycleEvent } from "../events"
 import type { Effect } from "effect"
 
 // ── Phase ────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ interface StateModelConcrete<
   TInput,
   TOutput,
   TEmission,
-  TError,
+  TError extends ToolError,
 > {
   readonly initial: TState
   readonly reduce: (state: TState, event: ToolLifecycleEvent<TInput, TOutput, TEmission, TError>) => TState
@@ -35,7 +35,7 @@ export type StateModel<
   TInput = never,
   TOutput = never,
   TEmission = never,
-  TError = never,
+  TError extends ToolError = never,
 > = [TState] extends [never]
   ? StateModelErased
   : StateModelConcrete<TState & BaseState, TInput, TOutput, TEmission, TError>
@@ -46,13 +46,13 @@ export type StateModel<
  * Minimal shape used purely for generic type inference in defineStateModel.
  * Avoids coupling to the full HarnessTool type.
  */
-interface ToolTypeCarrier<TInput, TOutput, TEmission, TError = never> {
+interface ToolTypeCarrier<TInput, TOutput, TEmission, TError extends ToolError = never> {
   readonly execute: (input: TInput, ctx: any) => Effect.Effect<TOutput, any, any>
   readonly emissionSchema?: { readonly Type: TEmission }
   readonly errorSchema?: { readonly Type: TError }
 }
 
-interface ToolDefTypeCarrier<TInput, TOutput, TEmission = never, TError = never> {
+interface ToolDefTypeCarrier<TInput, TOutput, TEmission = never, TError extends ToolError = never> {
   readonly inputSchema: { readonly Type: TInput }
   readonly outputSchema: { readonly Type: TOutput }
 }
@@ -76,7 +76,7 @@ export function defineStateModel<
   TInput,
   TOutput,
   TEmission,
-  TError = never,
+  TError extends ToolError = never,
 >(
   _tool: ToolTypeCarrier<TInput, TOutput, TEmission, TError>,
 ): <TState extends BaseState>(config: {
@@ -91,7 +91,7 @@ export function defineStateModel<
   TInput,
   TOutput,
   TEmission = never,
-  TError = never,
+  TError extends ToolError = never,
 >(
   _tool: ToolDefTypeCarrier<TInput, TOutput, TEmission, TError>,
 ): <TState extends BaseState>(config: {
@@ -106,7 +106,7 @@ export function defineStateModel<
   TInput,
   TOutput,
   TEmission,
-  TError = never,
+  TError extends ToolError = never,
 >(
   _tool: ToolTypeCarrier<TInput, TOutput, TEmission, TError> | ToolDefTypeCarrier<TInput, TOutput, TEmission, TError>,
 ): <TState extends BaseState>(config: {

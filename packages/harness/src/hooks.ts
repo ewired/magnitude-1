@@ -1,5 +1,5 @@
-import type { Effect } from "effect"
-import type { ToolCallId, ToolResultPart } from "@magnitudedev/ai"
+import type { Effect, Schema } from "effect"
+import type { ToolCallId, ToolResultPart, ValidationIssue, StreamingPartial } from "@magnitudedev/ai"
 import type { HarnessEvent, ToolResult } from "./events"
 
 export interface ExecuteHookContext {
@@ -24,6 +24,7 @@ export interface HarnessHooks<R = never> {
     readonly value: unknown
   }) => Effect.Effect<void, never, R>
   readonly formatResult?: (toolName: string, toolKey: string, result: ToolResult) => readonly ToolResultPart[]
+  readonly formatDecodeFailure?: <TInput, R>(toolName: string, issue: ValidationIssue, inputSchema: Schema.Schema<TInput, TInput, R>, receivedInput: StreamingPartial<TInput>) => readonly ToolResultPart[]
   readonly onResult?: (ctx: {
     readonly toolCallId: ToolCallId
     readonly toolName: string

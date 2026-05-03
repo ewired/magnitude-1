@@ -340,6 +340,8 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
                   toolCallId: outcome.toolCallId,
                   toolName: outcome.toolName,
                   issue: outcome.issue,
+                  inputSchema: outcome.inputSchema,
+                  receivedInput: outcome.receivedInput,
                 },
               }
               break

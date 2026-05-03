@@ -22,8 +22,10 @@ export { createToolHandle } from "./tool/tool-handle"
 
 // Events
 export type {
+  ToolError,
   ToolResult,
   SafetyStopReason,
+  ToolInputDecodeFailure,
   TurnOutcome,
   ToolInputStarted,
   ToolInputFieldChunk,
@@ -56,8 +58,15 @@ export { CanonicalAccumulatorReducer, EngineStateReducer, createToolHandleReduce
 export type { DispatchConfig } from "./turn/dispatcher"
 export { dispatch } from "./turn/dispatcher"
 
-// Result formation
-export { formatToolResult } from "./turn/result-formation"
+// Content building
+export { ContentBuilder } from "./content"
+
+// Result formation (legacy, used by dispatcher)
+export { formatToolResult as formatToolResultLegacy } from "./turn/result-formation"
+
+// Formatting utilities
+export { formatToolResult, formatDecodeFailure } from "./formatting"
+export { isImageValue, toImagePart, isScalar, renderField, renderObjectOutput, renderWrapped } from "./formatting"
 
 // Harness
 export type { HarnessConfig, Harness, LiveTurn, ReplayTurn } from "./turn/harness"

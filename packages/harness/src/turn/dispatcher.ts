@@ -1,11 +1,12 @@
-import { Effect, Fiber, Cause, Layer, Stream } from "effect"
+import { Effect, Fiber, Cause, Layer, Stream, Schema } from "effect"
 import type { ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason, ValidationIssue } from "@magnitudedev/ai"
 import type { StreamingPartial } from "@magnitudedev/ai"
-import type { HarnessEvent, ToolResult, TurnOutcome } from "../events"
+import type { HarnessEvent, ToolError, ToolResult, TurnOutcome } from "../events"
 import type { HarnessHooks, ExecuteHookContext } from "../hooks"
 import type { Toolkit } from "../tool/toolkit"
 import type { HarnessToolErased, ToolContext, StreamHook } from "../tool/tool"
 import type { EngineState, ToolOutcome } from "./reducers"
+import { formatDecodeFailure } from "../formatting/format-decode-failure"
 import { formatToolResult } from "./result-formation"
 
 // ── Config ───────────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ interface ToolCallAccumulator {
   readonly toolName: string
   readonly toolKey: string
   readonly streamState: unknown
-  readonly streamHook: StreamHook<unknown, unknown, unknown, unknown, unknown> | undefined
+  readonly streamHook: StreamHook<any, any, any, any, any> | undefined
 }
 
 // ── Dispatch ─────────────────────────────────────────────────────────
@@ -163,7 +164,10 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         return { _tag: "Success" as const, output }
       }).pipe(
         Effect.catchAllCause((cause) => {
-          const error = Cause.squash(cause)
+          const squashed = Cause.squash(cause)
+          const error: ToolError = typeof squashed === 'object' && squashed !== null && 'message' in squashed
+            ? squashed as ToolError
+            : { message: String(squashed) }
           return Effect.succeed({ _tag: "Error" as const, error })
         }),
       )
@@ -329,19 +333,41 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
             }
             case "validation_failure": {
               const acc = accumulators.get(event.reason.toolCallId)!
+              const toolEntry = toolKeyToEntry.get(acc.toolKey)!
+              const parser = config.parsers.get(event.reason.toolCallId)
+              const inputSchema = toolEntry.tool.definition.inputSchema
+              const receivedInput = (parser?.partial ?? {}) as StreamingPartial<any>
+
               yield* emit({
                 _tag: "ToolInputDecodeFailed",
                 toolCallId: event.reason.toolCallId,
                 toolName: acc.toolName,
                 toolKey: acc.toolKey,
-                message: event.reason.issue.message,
+                issue: event.reason.issue,
+                inputSchema,
+                receivedInput,
               })
+
+              // Format the decode failure as a tool result so it appears in the prompt
+              const decodeFailureParts = config.hooks?.formatDecodeFailure
+                ? config.hooks.formatDecodeFailure(acc.toolName, event.reason.issue, inputSchema, receivedInput)
+                : formatDecodeFailure(acc.toolName, event.reason.issue, inputSchema, receivedInput)
+              yield* emit({
+                _tag: "ToolResultFormatted",
+                toolCallId: event.reason.toolCallId,
+                toolName: acc.toolName,
+                toolKey: acc.toolKey,
+                parts: decodeFailureParts,
+              })
+
               yield* interruptAllTools()
               outcome = {
                 _tag: "ToolInputDecodeFailure",
                 toolCallId: event.reason.toolCallId,
                 toolName: event.reason.toolName,
                 issue: event.reason.issue,
+                inputSchema,
+                receivedInput,
               }
               break
             }

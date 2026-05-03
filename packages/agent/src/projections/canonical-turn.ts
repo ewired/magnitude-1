@@ -2,7 +2,7 @@ import { Projection } from '@magnitudedev/event-core'
 import type { AppEvent } from '../events'
 import type { CompletedTurn, TurnFeedback } from '../inbox/types'
 import type { AssistantMessage, ToolResultMessage, ToolCallPart, ToolCallId, JsonValue } from '@magnitudedev/ai'
-import { renderToolOutput } from '../util/render-tool-output'
+
 
 export interface CanonicalTurnState {
   readonly turnId: string | null
@@ -106,15 +106,18 @@ export const CanonicalTurnProjection = Projection.defineForked<AppEvent, Canonic
           return { ...fork, toolCalls: next }
         }
 
-        case 'ToolExecutionEnded': {
-          const { toolCallId, toolName, result } = event.event
+        case 'ToolExecutionEnded':
+          return fork
+
+        case 'ToolResultFormatted': {
+          const { toolCallId, toolName, parts } = event.event
           return {
             ...fork,
             toolResults: [...fork.toolResults, {
               _tag: 'ToolResultMessage' as const,
               toolCallId: toolCallId as ToolCallId,
               toolName,
-              parts: [...renderToolOutput(result)],
+              parts: [...parts],
             }],
           }
         }
@@ -127,6 +130,11 @@ export const CanonicalTurnProjection = Projection.defineForked<AppEvent, Canonic
     turn_outcome: ({ event, fork }) => {
       if (fork.turnId !== event.turnId) return fork
 
+      let toolCalls = [...fork.toolCalls]
+      let toolResults = [...fork.toolResults]
+
+      const outcome = event.outcome
+
       const feedback: TurnFeedback[] = fork.parentChars > 0
         ? [{ kind: 'message_ack', destination: 'parent' as const, chars: fork.parentChars }]
         : []
@@ -135,13 +143,13 @@ export const CanonicalTurnProjection = Projection.defineForked<AppEvent, Canonic
         _tag: 'AssistantMessage',
         reasoning: fork.reasoning || undefined,
         text: fork.text || undefined,
-        toolCalls: fork.toolCalls.length > 0 ? [...fork.toolCalls] : undefined,
+        toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined,
       }
 
       const completed: CompletedTurn = {
         turnId: event.turnId,
         assistant,
-        toolResults: [...fork.toolResults],
+        toolResults,
         feedback,
         clean: event.outcome._tag === 'Completed',
       }

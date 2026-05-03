@@ -56,7 +56,7 @@ export const shellModel = defineStateModel(shellTool)<ShellState>({
         }
       }
       case 'ToolInputDecodeFailed':
-        return { ...state, phase: 'error', errorMessage: event.message }
+        return { ...state, phase: 'error', errorMessage: event.issue.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

@@ -42,7 +42,7 @@ export const webSearchModel = defineStateModel(webSearchTool)<WebSearchState>({
         }
       }
       case 'ToolInputDecodeFailed':
-        return { ...state, phase: 'error', errorDetail: event.message }
+        return { ...state, phase: 'error', errorDetail: event.issue.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

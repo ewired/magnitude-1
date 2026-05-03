@@ -10,7 +10,8 @@
 import type { UserPart } from './content'
 import type { ImageMediaType } from '@magnitudedev/ai'
 import type { ToolLifecycleEvent } from '@magnitudedev/harness'
-import type { ValidationIssue } from '@magnitudedev/ai'
+import type { ValidationIssue, StreamingPartial } from '@magnitudedev/ai'
+import type { Schema } from 'effect'
 import type { ToolKey } from './tools/toolkits'
 export type ObservationPart =
   | { readonly type: 'text'; readonly text: string }
@@ -206,6 +207,8 @@ export interface ParseFailureEvent {
   readonly toolCallId: string
   readonly toolName: string
   readonly issue: ValidationIssue
+  readonly inputSchema: Schema.Schema.Any
+  readonly receivedInput: StreamingPartial<any>
 }
 
 export type MagnitudeBillingReason =

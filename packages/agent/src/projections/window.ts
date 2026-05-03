@@ -432,9 +432,7 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
           break
         }
 
-        case 'ParseFailure':
-          feedback.push({ kind: 'error', message: outcome.error.message })
-          break
+
 
         case 'ConnectionFailure':
           feedback.push({ kind: 'error', message: describeConnectionFailure(outcome.detail) })

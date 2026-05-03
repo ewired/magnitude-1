@@ -51,7 +51,7 @@ export const spawnWorkerModel = defineStateModel(spawnWorkerTool)<SpawnWorkerSta
         }
       }
       case 'ToolInputDecodeFailed':
-        return { ...state, phase: 'error', errorMessage: event.message }
+        return { ...state, phase: 'error', errorMessage: event.issue.message }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

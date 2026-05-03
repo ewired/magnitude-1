@@ -140,7 +140,7 @@ export const fileEditModel = defineStateModel(editTool)<FileEditState>({
         }
       }
       case 'ToolInputDecodeFailed':
-        return { ...state, phase: 'error', errorMessage: event.message }
+        return { ...state, phase: 'error', errorMessage: event.issue.message }
       case 'ToolInputFieldComplete':
       default:
         return state

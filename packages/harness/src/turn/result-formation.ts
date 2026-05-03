@@ -25,15 +25,8 @@ export function formatToolResult<R>(
   return Effect.map(onResult, () => parts)
 }
 
+import { formatToolResult as formatToolResultDefault } from "../formatting/format-result"
+
 function defaultFormatResult(result: ToolResult): readonly ToolResultPart[] {
-  switch (result._tag) {
-    case "Success":
-      return [{ _tag: "TextPart" as const, text: typeof result.output === "string" ? result.output : JSON.stringify(result.output) }]
-    case "Error":
-      return [{ _tag: "TextPart" as const, text: `Error: ${result.error}` }]
-    case "Rejected":
-      return [{ _tag: "TextPart" as const, text: `Rejected: ${String(result.rejection)}` }]
-    case "Interrupted":
-      return [{ _tag: "TextPart" as const, text: "Interrupted" }]
-  }
+  return formatToolResultDefault(result)
 }
