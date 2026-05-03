@@ -229,9 +229,7 @@ export type MagnitudeBillingReason =
   | { readonly _tag: 'UsageLimitExceeded'; readonly message: string }
 
 export type ProviderNotReadyDetail =
-  | { readonly _tag: 'NotConfigured' }
-  | { readonly _tag: 'ProviderDisconnected'; readonly providerId: string; readonly providerName: string }
-  | { readonly _tag: 'AuthFailed'; readonly providerId: string; readonly providerName: string }
+  | { readonly _tag: 'AuthFailed' }
   | { readonly _tag: 'MagnitudeBilling'; readonly reason: MagnitudeBillingReason }
 
 export type ConnectionFailureDetail =

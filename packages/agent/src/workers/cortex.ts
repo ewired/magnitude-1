@@ -82,7 +82,7 @@ function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): TurnOutcome
     case 'AuthFailed':
       return {
         _tag: 'ProviderNotReady',
-        detail: { _tag: 'AuthFailed', providerId: 'magnitude', providerName: 'Magnitude' },
+        detail: { _tag: 'AuthFailed' },
       }
     case 'RateLimited':
       return { _tag: 'ConnectionFailure', detail: { _tag: 'TransportError', httpStatus: err.status } }

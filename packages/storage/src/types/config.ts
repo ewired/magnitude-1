@@ -5,17 +5,6 @@ const NullableOptional = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
     default: () => null as A | null,
   })
 
-export const ModelSelectionSchema = Schema.Struct({
-  providerId: Schema.String,
-  modelId: Schema.String,
-})
-export type ModelSelection = Schema.Schema.Type<typeof ModelSelectionSchema>
-
-export const RoleConfigSchema = Schema.Struct({
-  model: Schema.NullishOr(ModelSelectionSchema),
-})
-export type RoleConfig = Schema.Schema.Type<typeof RoleConfigSchema>
-
 export const ProviderOptionsSchema = Schema.Struct({
   baseUrl: Schema.optional(Schema.String),
   region: Schema.optional(Schema.String),
@@ -50,15 +39,6 @@ export const ContextLimitPolicySchema = Schema.Struct({
 export interface ContextLimitPolicy extends Omit<Schema.Schema.Type<typeof ContextLimitPolicySchema>, 'softCapMaxTokens'> {
   softCapMaxTokens: number | null
 }
-
-export const PresetSchema = Schema.Struct({
-  name: Schema.String,
-  models: Schema.Record({
-    key: Schema.String,
-    value: Schema.NullishOr(ModelSelectionSchema),
-  }),
-})
-export type Preset = Schema.Schema.Type<typeof PresetSchema>
 
 export const MagnitudeConfigSchema = Schema.Struct({
   // All fields here should be optional or optionalWith so they can have a generated default

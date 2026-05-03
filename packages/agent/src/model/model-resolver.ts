@@ -2,7 +2,6 @@ import { Context, Effect, Layer } from 'effect'
 import type { BoundModel } from '@magnitudedev/ai'
 import type { MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError, ModelProfile } from '@magnitudedev/magnitude-client'
 import { MagnitudeClient } from '@magnitudedev/magnitude-client'
-import type { ModelOverrides } from '@magnitudedev/roles'
 import { AmbientServiceTag, type AmbientService } from '@magnitudedev/event-core'
 import type { RoleId } from '../agents/role-validation'
 import { ConfigAmbient, getRoleConfig } from '../ambient/config-ambient'
@@ -23,7 +22,7 @@ export class AgentModelResolver extends Context.Tag('AgentModelResolver')<
   AgentModelResolverService
 >() {}
 
-export const AgentModelResolverLive = (overrides?: ModelOverrides) =>
+export const AgentModelResolverLive = () =>
   Layer.effect(
     AgentModelResolver,
     Effect.gen(function* () {
@@ -37,15 +36,10 @@ export const AgentModelResolverLive = (overrides?: ModelOverrides) =>
             const roleConfig = getRoleConfig(configState, roleId)
             const defaults = { maxTokens: roleConfig.profile.maxOutputTokens }
 
-            const override = overrides?.[roleId]
-            const model = override
-              ? override.spec.bind({ auth: override.auth ?? client.auth, defaults })
-              : client.role(roleId, defaults)
-
             return {
-              model,
+              model: client.role(roleId, defaults),
               roleId,
-              modelId: override?.spec.modelId ?? `role/${roleId}`,
+              modelId: `role/${roleId}`,
               profile: roleConfig.profile,
             }
           }),

@@ -272,12 +272,8 @@ function findTaskForAgent(state: TaskGraphState, args: { agentId: string, forkId
 
 function describeProviderNotReady(detail: ProviderNotReadyDetail): string {
   switch (detail._tag) {
-    case 'NotConfigured':
-      return 'No model configured.'
-    case 'ProviderDisconnected':
-      return `Provider "${detail.providerName}" is not connected.`
     case 'AuthFailed':
-      return `Authentication failed for ${detail.providerName}. API key may be invalid or expired.`
+      return 'Authentication failed. API key may be invalid or expired.'
     case 'MagnitudeBilling':
       return detail.reason.message
   }

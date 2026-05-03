@@ -69,7 +69,6 @@ import { AgentModelResolverLive } from './model/model-resolver'
 
 // Config & Auth
 import { MagnitudeClient, createMagnitudeClient } from '@magnitudedev/magnitude-client'
-import type { ModelOverrides } from '@magnitudedev/roles'
 import { createTraceListenerLayer } from './tracing/tracing'
 import type { StorageClient } from '@magnitudedev/storage'
 import { initLogger, logger } from '@magnitudedev/logger'
@@ -186,11 +185,6 @@ export interface CreateClientOptions {
   magnitudeEndpoint?: string
 
   /**
-   * Optional model overrides for development/testing.
-   */
-  modelOverrides?: ModelOverrides
-
-  /**
    * Disable shell command classification safeguards for this runtime only.
    */
   disableShellSafeguards?: boolean
@@ -254,7 +248,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
     BrowserServiceLive,
 
-    Layer.provide(AgentModelResolverLive(options.modelOverrides), magnitudeClientLayer),
+    Layer.provide(AgentModelResolverLive(), magnitudeClientLayer),
     magnitudeClientLayer,
 
     FetchHttpClient.layer,
@@ -334,7 +328,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
       }))
 
       // Publish config from catalog
-      yield* publishConfigFromCatalog(options.storage, options.modelOverrides)
+      yield* publishConfigFromCatalog(options.storage)
 
       // Load skills from standard directories
       const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
@@ -429,7 +423,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
       // AgentRoutingProjection handles message routing only. forkId remains the execution handle used by forked projections/workers.
 
       // Publish config from catalog
-      yield* publishConfigFromCatalog(options.storage, options.modelOverrides)
+      yield* publishConfigFromCatalog(options.storage)
 
       // Load skills from standard directories
       const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
@@ -484,7 +478,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     await originalDispose()
   }
 
-  const refreshConfig = () => client.runEffect(publishConfigFromCatalog(options.storage, options.modelOverrides))
+  const refreshConfig = () => client.runEffect(publishConfigFromCatalog(options.storage))
 
   return {
     ...client,

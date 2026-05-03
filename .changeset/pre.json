@@ -14,7 +14,6 @@
     "@magnitudedev/image": "0.0.1",
     "@magnitudedev/llm-core": "0.0.1",
     "@magnitudedev/logger": "0.0.1",
-    "@magnitudedev/providers": "0.0.1",
     "@magnitudedev/ripgrep": "0.0.1",
     "@magnitudedev/shell-classifier": "0.0.1",
     "@magnitudedev/telemetry": "0.0.1",

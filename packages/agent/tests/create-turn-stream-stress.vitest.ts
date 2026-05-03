@@ -1,11 +1,10 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Cause, Effect, Exit, Ref, Scope, Stream } from 'effect'
 import type { TurnEngineEvent, TurnEngineCrash } from '@magnitudedev/turn-engine'
-import type { CallUsage } from '@magnitudedev/providers'
 import type { MessageDestination, TurnOutcome } from '../src/events'
 import { createTurnStream } from '../src/execution/turn-stream'
 import { TurnError } from '../src/execution/types'
-import type { TurnEvent, TurnError as TurnErrorType, TurnEventSink, TurnStrategyResult } from '../src/execution/types'
+import type { AgentCallUsage, TurnEvent, TurnError as TurnErrorType, TurnEventSink, TurnStrategyResult } from '../src/execution/types'
 
 type PublishedEvent =
   | { readonly type: 'message_start'; readonly id: string; readonly destination: MessageDestination }
@@ -24,13 +23,11 @@ const successfulTurnResult: TurnOutcome = {
   completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [], yieldTarget: null },
 }
 
-const usage: CallUsage = {
+const usage: AgentCallUsage = {
   inputTokens: 1,
   outputTokens: 1,
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
-  inputCost: 0,
-  outputCost: 0,
   totalCost: 0,
 }
 
