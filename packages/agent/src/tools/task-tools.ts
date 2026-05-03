@@ -150,10 +150,12 @@ export const spawnWorkerTool = defineHarnessTool({
       id: Schema.String.annotations({ description: 'Task ID to spawn a worker for' }),
       message: Schema.String.annotations({ description: 'Initial instruction message for the worker' }),
       role: Schema.optional(Schema.String.annotations({ description: 'Worker role (e.g., engineer, scout, architect, critic, scientist, artisan). Defaults to engineer.' })),
+      yield: Schema.optional(Schema.Boolean.annotations({ description: 'Set true to wait for this worker to respond before doing anything else.' })),
     }),
     outputSchema: Schema.Struct({
       id: Schema.String,
       title: Schema.String,
+      yield: Schema.optional(Schema.Boolean),
     }),
   },
   errorSchema: TaskToolErrorSchema,
@@ -188,10 +190,10 @@ export const spawnWorkerTool = defineHarnessTool({
       })
 
       if ('title' in result) {
-        return { id: input.id, title: result.title }
+        return { id: input.id, title: result.title, yield: input.yield || undefined }
       }
 
-      return { id: input.id, title: '' }
+      return { id: input.id, title: '', yield: input.yield || undefined }
     }),
 })
 

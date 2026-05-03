@@ -16,12 +16,6 @@ or
 
 Upon messaging the coordinator and going idle, the coordinator may message you with answers or additional instructions.
 
-### Yielding
-
-After your response, a new turn normally starts automatically. Use the `yield` tool to prevent this — instead, wait for the coordinator to follow up.
-
-Yield when you have completed the requested work, or when you have escalated something unexpected and need the coordinator's response. Always message the coordinator before yielding.
-
 ## Workspace
 
 You have a workspace directory at `$M/`, shared across all agents in this session.

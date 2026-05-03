@@ -7,6 +7,7 @@ import { defineHarnessTool } from '@magnitudedev/harness'
 
 const MessageWorkerOutput = Schema.Struct({
   ok: Schema.Boolean,
+  yield: Schema.optional(Schema.Boolean),
 })
 
 export const messageWorkerTool = defineHarnessTool({
@@ -16,9 +17,10 @@ export const messageWorkerTool = defineHarnessTool({
     inputSchema: Schema.Struct({
       workerId: Schema.String.annotations({ description: 'ID of the worker to message' }),
       message: Schema.String.annotations({ description: 'Message content to send' }),
+      yield: Schema.optional(Schema.Boolean.annotations({ description: 'When true, yield to this worker — the turn will not retrigger.' })),
     }),
     outputSchema: MessageWorkerOutput,
   },
-  execute: (_input, _ctx) =>
-    Effect.succeed({ ok: true }),
+  execute: (input, _ctx) =>
+    Effect.succeed({ ok: true, yield: input.yield || undefined }),
 })

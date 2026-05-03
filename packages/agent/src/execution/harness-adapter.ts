@@ -284,10 +284,12 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
             hasToolErrors = true
           }
 
-          // Capture yield target
-          if (toolKey === 'yield' && event.result._tag === 'Success') {
-            const output = event.result.output as any
-            yieldTarget = output.target != null ? (output.target as YieldTarget) : 'parent'
+          // Capture yield target from spawn/message worker tools
+          if ((toolKey === 'spawnWorker' || toolKey === 'messageWorker') && event.result._tag === 'Success') {
+            const output = event.result.output as Record<string, unknown>
+            if (output.yield === true) {
+              yieldTarget = 'workers'
+            }
           }
 
           yield* emitToolEvent(event.toolCallId, toolKey, event)

@@ -5,6 +5,7 @@ export interface SpawnWorkerState extends BaseState {
   id?: string
   message?: string
   role?: string
+  yield?: boolean
   title?: string
 }
 
@@ -12,6 +13,7 @@ const initial: Omit<SpawnWorkerState, 'phase'> = {
   id: undefined,
   message: undefined,
   role: undefined,
+  yield: undefined,
   title: undefined,
 }
 
