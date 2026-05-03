@@ -169,6 +169,35 @@ function processChunk<TStreamError>(
       let toolCall = calls.get(toolCallDelta.index)
 
       if (!toolCall) {
+        // Finalize all open tool calls with lower indices — they won't receive more deltas
+        for (const [idx, openCall] of calls.entries()) {
+          if (idx < toolCallDelta.index) {
+            const fieldEvents = openCall.parser.end()
+            events.push(...wrapFieldEvents<TStreamError>(fieldEvents, openCall.toolCallId))
+
+            if (!openCall.parser.valid) {
+              events.push({
+                _tag: "stream_end",
+                reason: {
+                  _tag: "validation_failure",
+                  toolCallId: openCall.toolCallId,
+                  toolName: openCall.toolName,
+                  issue: openCall.parser.validationIssue!,
+                },
+                usage: null,
+              })
+              nextState = { ...nextState, terminated: true, openToolCalls: new Map() }
+              return [nextState, events]
+            }
+
+            events.push({
+              _tag: "tool_call_ready",
+              toolCallId: openCall.toolCallId,
+            })
+            calls.delete(idx)
+          }
+        }
+
         nextToolOrdinal += 1
         const name = toolCallDelta.function?.name ?? ""
         const schema = nextState.toolSchemas.get(name)
