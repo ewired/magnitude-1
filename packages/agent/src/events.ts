@@ -233,8 +233,8 @@ export type ProviderNotReadyDetail =
   | { readonly _tag: 'MagnitudeBilling'; readonly reason: MagnitudeBillingReason }
 
 export type ConnectionFailureDetail =
-  | { readonly _tag: 'ProviderError'; readonly httpStatus: number }
-  | { readonly _tag: 'TransportError'; readonly httpStatus?: number }
+  | { readonly _tag: 'ProviderError'; readonly httpStatus: number; readonly retryAfterMs?: number }
+  | { readonly _tag: 'TransportError'; readonly httpStatus?: number; readonly retryAfterMs?: number }
   | { readonly _tag: 'StreamError' }
 
 export type CancelledReason =

@@ -22,6 +22,8 @@ import { mapConnectionErrorToOutcome, mapStreamErrorToOutcome } from '../errors'
 import { WindowProjection } from '../projections/window'
 import { SessionContextProjection } from '../projections/session-context'
 import { AgentStatusProjection } from '../projections/agent-status'
+import { TurnProjection } from '../projections/turn'
+import { MAX_RETRIES, TERMINAL_RETRY_EXHAUSTED_MESSAGE } from '../util/retry-backoff'
 
 import { AgentModelResolver } from '../model/model-resolver'
 import { getAgentDefinition, getForkInfo } from '../agents/registry'
@@ -218,10 +220,28 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         const liveTurn = yield* harness.runTurn(prompt).pipe(
           Effect.catchAll((err: MagnitudeConnectionError) => Effect.gen(function* () {
             logger.error({ forkId, turnId, err }, '[Cortex] Pre-stream connection error')
+            const classified = mapConnectionErrorToOutcome(err)
+
+            // If this is a connection failure and we've already retried MAX times,
+            // terminate the chain with a friendly UnexpectedError instead of
+            // letting the projection schedule another retry.
+            let outcome = classified
+            if (classified._tag === 'ConnectionFailure') {
+              const turnFork = yield* read(TurnProjection, forkId)
+              const retryCount = turnFork?.connectionRetryCount ?? 0
+              if (retryCount >= MAX_RETRIES) {
+                outcome = {
+                  _tag: 'UnexpectedError',
+                  message: TERMINAL_RETRY_EXHAUSTED_MESSAGE,
+                  detail: { _tag: 'Unknown' },
+                }
+              }
+            }
+
             yield* publish({
               type: 'turn_outcome', forkId, turnId, chainId,
               strategyId: 'native',
-              outcome: mapConnectionErrorToOutcome(err),
+              outcome,
               inputTokens: null, outputTokens: null,
               cacheReadTokens: null, cacheWriteTokens: null,
               providerId: 'magnitude', modelId: agentModel.modelId,

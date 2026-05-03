@@ -40,7 +40,14 @@ export function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): Turn
         detail: { _tag: 'AuthFailed' },
       }
     case 'RateLimited':
-      return { _tag: 'ConnectionFailure', detail: { _tag: 'TransportError', httpStatus: err.status } }
+      return {
+        _tag: 'ConnectionFailure',
+        detail: {
+          _tag: 'TransportError',
+          httpStatus: err.status,
+          ...(err.retryAfterMs !== null ? { retryAfterMs: err.retryAfterMs } : {}),
+        },
+      }
     case 'UsageLimitExceeded':
       return { _tag: 'ConnectionFailure', detail: { _tag: 'ProviderError', httpStatus: err.status } }
     case 'ContextLimitExceeded':

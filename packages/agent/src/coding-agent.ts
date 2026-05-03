@@ -39,6 +39,7 @@ import { TurnController } from './workers/turn-controller'
 import { Cortex } from './workers/cortex'
 import { AgentLifecycle } from './workers/agent-lifecycle'
 import { LifecycleCoordinator } from './workers/lifecycle-coordinator'
+import { RetryController } from './workers/retry-controller'
 
 import { Autopilot } from './workers/autopilot'
 import { CompactionWorker } from './workers/compaction-worker'
@@ -113,6 +114,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
     Cortex,
     AgentLifecycle,
     LifecycleCoordinator,
+    RetryController,
     Autopilot,
     CompactionWorker,
     ApprovalWorker,
