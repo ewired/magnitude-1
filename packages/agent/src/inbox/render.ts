@@ -12,17 +12,6 @@ import { taskIdleReminder, taskCompleteReminder } from '../prompts/tasks/index'
 export interface RenderTimelineInput {
   timeline: readonly TimelineEntry[]
   timezone: string | null
-  supportsVision: boolean
-}
-
-export function imagePlaceholder(desc: { filename?: string; mediaType?: string; width?: number; height?: number }): string {
-  const parts: string[] = ['Image placeholder: current model does not support images']
-  const meta: string[] = []
-  if (desc.filename) meta.push(desc.filename)
-  if (desc.width && desc.height) meta.push(`${desc.width}x${desc.height}`)
-  else if (desc.mediaType) meta.push(desc.mediaType)
-  if (meta.length > 0) parts.push('—', meta.join(' '))
-  return `[${parts.join(' ')}]`
 }
 
 function formatTime(timestamp: number, timezone: string | null): string {
@@ -91,21 +80,12 @@ function renderAgentAtom(atom: AgentAtom): string {
   }
 }
 
-function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_message' }>, supportsVision: boolean): UserPart[] {
+function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_message' }>): UserPart[] {
   const builder = new ContentBuilder()
   builder.pushText(`<magnitude:message from="user">${entry.text}</magnitude:message>`)
   for (const attachment of entry.attachments) {
     if (attachment.kind === 'image') {
-      if (supportsVision) {
-        builder.pushPart(attachment.image)
-      } else {
-        builder.pushText(imagePlaceholder({
-          filename: attachment.filename,
-          mediaType: attachment.image.mediaType,
-          width: attachment.image.dimensions?.width,
-          height: attachment.image.dimensions?.height,
-        }))
-      }
+      builder.pushPart(attachment.image)
       continue
     }
 
@@ -258,11 +238,10 @@ export function renderTimeline(input: RenderTimelineInput): UserPart[] {
     if (entry.kind === 'observation') {
       for (const part of entry.parts) {
         if (part._tag === 'TextPart') builder.pushText(`\n${part.text}`)
-        else if (input.supportsVision) builder.pushPart(part)
-        else builder.pushText(imagePlaceholder({ mediaType: part.mediaType }))
+        else builder.pushPart(part)
       }
     } else if (entry.kind === 'user_message') {
-      const parts = renderUserMessageParts(entry, input.supportsVision)
+      const parts = renderUserMessageParts(entry)
       for (const part of parts) {
         if (part._tag === 'TextPart') builder.pushText(`\n${part.text}`)
         else builder.pushPart(part)

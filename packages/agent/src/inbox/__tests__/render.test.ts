@@ -14,14 +14,14 @@ const TS3 = TS0 + 120_000
 
 describe('renderTimeline', () => {
   test('returns empty array for empty input', () => {
-    expect(renderTimeline({ timeline: [], timezone: 'UTC', supportsVision: true })).toEqual([])
+    expect(renderTimeline({ timeline: [], timezone: 'UTC',  })).toEqual([])
   })
 
   test('timeline-only single user message includes marker and user reply reminder', () => {
     const timeline: readonly TimelineEntry[] = [
       { kind: 'user_message', timestamp: TS0, text: 'hello', attachments: [] },
     ]
-    expect(renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })).toEqual([
+    expect(renderTimeline({ timeline, timezone: 'UTC',  })).toEqual([
       {
         _tag: 'TextPart',
         text:
@@ -50,7 +50,7 @@ describe('renderTimeline', () => {
       },
     ]
 
-    expect(renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })).toEqual([
+    expect(renderTimeline({ timeline, timezone: 'UTC',  })).toEqual([
       {
         _tag: 'TextPart',
         text: '--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n<mention path="src/a.ts" type="text" truncated="true" original_bytes="42">export const a = 1</mention>',
@@ -64,7 +64,7 @@ describe('renderTimeline', () => {
       { kind: 'user_message', timestamp: TS0, text: 'a', attachments: [] },
       { kind: 'user_message', timestamp: TS2, text: 'b', attachments: [] },
     ]
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -79,7 +79,7 @@ describe('renderTimeline', () => {
       { kind: 'user_message', timestamp: TS2, text: 'second', attachments: [] },
       { kind: 'user_message', timestamp: TS0, text: 'first', attachments: [] },
     ]
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out[0]).toEqual({
       _tag: 'TextPart',
       text:
@@ -107,7 +107,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -130,7 +130,7 @@ describe('renderTimeline', () => {
         taskTitle: 'Investigate the crash',
       },
     ]
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([])
   })
 
@@ -139,7 +139,7 @@ describe('renderTimeline', () => {
       { kind: 'user_message', timestamp: TS0, text: 'first-input', attachments: [] },
       { kind: 'user_message', timestamp: TS0, text: 'second-input', attachments: [] },
     ]
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out[0]).toEqual({
       _tag: 'TextPart',
       text:
@@ -162,7 +162,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'engineer', hookType: 'idle' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out[0]).toEqual({
       _tag: 'TextPart',
       text:
@@ -181,7 +181,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -199,7 +199,7 @@ describe('renderTimeline', () => {
       { kind: 'task_update', timestamp: TS3 + 1, action: 'cancelled', taskId: 't2', cancelledCount: 3 },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -215,7 +215,7 @@ describe('renderTimeline', () => {
       { kind: 'task_tree_view', timestamp: TS1, renderedTree: '- [ ] t3 next' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -231,7 +231,7 @@ describe('renderTimeline', () => {
       { kind: 'user_message', timestamp: TS1, text: 'hello', attachments: [] },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -268,7 +268,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS3 + 1, agentId: 'builder-x', role: 'engineer', hookType: 'idle' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out[0]).toEqual({
       _tag: 'TextPart',
       text:
@@ -289,7 +289,7 @@ describe('renderTimeline', () => {
       },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -314,7 +314,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     const text = out[0]
     expect(text).toEqual({
       _tag: 'TextPart',
@@ -329,7 +329,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -364,7 +364,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS3, agentId: 'builder-x', role: 'engineer', hookType: 'idle' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -380,7 +380,7 @@ describe('renderTimeline', () => {
       { kind: 'task_idle_hook', timestamp: TS1, taskId: 't1', title: 'Build thing', agentId: 'builder-z' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -404,7 +404,7 @@ describe('renderTimeline', () => {
       },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC',  })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -415,7 +415,7 @@ describe('renderTimeline', () => {
   })
 
 
-  test('replaces image attachments with placeholder when supportsVision is false', () => {
+  test('always passes through image attachments', () => {
     const timeline: readonly TimelineEntry[] = [
       {
         kind: 'user_message',
@@ -427,29 +427,7 @@ describe('renderTimeline', () => {
       },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: false })
-    expect(out).toEqual([
-      {
-        _tag: 'TextPart',
-        text: `--- 2024-03-28 16:00 ---
-<magnitude\u003amessage from="user">look at this</magnitude\u003amessage>[Image placeholder: current model does not support images — screenshot.png 100x100]`,
-      },
-    ])
-  })
-
-  test('passes through image attachments when supportsVision is true', () => {
-    const timeline: readonly TimelineEntry[] = [
-      {
-        kind: 'user_message',
-        timestamp: TS0,
-        text: 'look at this',
-        attachments: [
-          { kind: 'image', image: { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png', dimensions: { width: 100, height: 100 } }, filename: 'screenshot.png' },
-        ],
-      },
-    ]
-
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: true })
+    const out = renderTimeline({ timeline, timezone: 'UTC' })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -460,7 +438,7 @@ describe('renderTimeline', () => {
     ])
   })
 
-  test('replaces observation images with placeholder when supportsVision is false', () => {
+  test('always passes through observation images', () => {
     const img: UserPart = { _tag: 'ImagePart', data: 'abc', mediaType: 'image/png' }
     const timeline: readonly TimelineEntry[] = [
       {
@@ -471,13 +449,13 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC', supportsVision: false })
+    const out = renderTimeline({ timeline, timezone: 'UTC' })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
-        text: `--- 2024-03-28 16:00 ---
-seen[Image placeholder: current model does not support images — image/png]`,
+        text: '--- 2024-03-28 16:00 ---\nseen',
       },
+      img,
     ])
   })
 })

@@ -35,9 +35,10 @@ export const AgentModelResolverLive = () =>
             const configState = ambientService.getValue(ConfigAmbient)
             const roleConfig = getRoleConfig(configState, roleId)
             const defaults = { maxTokens: roleConfig.profile.maxOutputTokens }
+            const capabilities = { vision: roleConfig.profile.capabilities.vision }
 
             return {
-              model: client.role(roleId, defaults),
+              model: client.role(roleId, { defaults, capabilities, imagePlaceholders: { enabled: true } }),
               roleId,
               modelId: `role/${roleId}`,
               profile: roleConfig.profile,

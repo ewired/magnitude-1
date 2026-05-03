@@ -6,7 +6,7 @@ import type { RoleId, UsageWindowsResponse } from "./contract"
 import { createModelCatalog, type ModelCatalog } from "./catalog"
 import { createRoleSpec, type MagnitudeCallOptions, type MagnitudeStreamError } from "./models"
 import type { MagnitudeConnectionError } from "./errors"
-import type { BoundModel } from "@magnitudedev/ai"
+import type { BoundModel, ModelCapabilities as AIModelCapabilities, ImagePlaceholderConfig } from "@magnitudedev/ai"
 
 // =============================================================================
 // Web Search Types
@@ -35,10 +35,16 @@ export interface MagnitudeClientConfig {
 const DEFAULT_ENDPOINT = "https://app.magnitude.dev/api/v1"
 const LOCAL_ENDPOINT = "http://localhost:3000/api/v1"
 
+export interface RoleOptions {
+  readonly defaults?: MagnitudeCallOptions
+  readonly capabilities?: AIModelCapabilities
+  readonly imagePlaceholders?: ImagePlaceholderConfig
+}
+
 export interface MagnitudeClientShape {
   readonly auth: AuthApplicator
   readonly catalog: ModelCatalog
-  readonly role: (id: RoleId, defaults?: MagnitudeCallOptions) => BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>
+  readonly role: (id: RoleId, options?: RoleOptions) => BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>
   readonly webSearch: (
     query: string,
     schema?: Record<string, unknown>
@@ -67,9 +73,9 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
     auth,
     catalog,
 
-    role: (id: RoleId, defaults?: MagnitudeCallOptions) => {
-      const spec = createRoleSpec(id, endpoint)
-      return spec.bind({ auth, defaults })
+    role: (id: RoleId, options?: RoleOptions) => {
+      const spec = createRoleSpec(id, endpoint, options?.capabilities)
+      return spec.bind({ auth, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
     },
 
     /** Fetch current usage windows for the authenticated user */

@@ -34,12 +34,10 @@ function renderFeedback(feedback: readonly TurnFeedback[]): UserPart[] {
 function inboxToAiMessages(
   msg: Extract<WindowEntry, { type: 'context' }>,
   timezone: string | null,
-  supportsVision: boolean,
 ): AiMessage[] {
   const inboxContent = renderTimeline({
     timeline: msg.timeline,
     timezone,
-    supportsVision,
   })
 
   const hasContent = inboxContent.some(p => {
@@ -70,7 +68,6 @@ export function windowToPrompt(
   windowState: ForkWindowState,
   systemPrompt: string,
   timezone: string | null,
-  supportsVision: boolean,
 ): Prompt {
   const messages: AiMessage[] = []
 
@@ -103,7 +100,7 @@ export function windowToPrompt(
       }
 
       case 'context': {
-        messages.push(...inboxToAiMessages(msg, timezone, supportsVision))
+        messages.push(...inboxToAiMessages(msg, timezone))
         break
       }
     }

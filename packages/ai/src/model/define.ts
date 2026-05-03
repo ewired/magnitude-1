@@ -7,8 +7,10 @@ import type { Codec } from "../codec/codec"
 import type { ChatCompletionsRequest } from "../wire/chat-completions"
 import type { HttpConnectionFailure, StreamFailure } from "../errors/failure"
 import { executeHttpStream } from "../transport/stream"
+import type { ModelCapabilities, ImagePlaceholderConfig } from "./capabilities"
 import type { ModelSpec, ModelStreamResult } from "./model-spec"
 import type { BoundModel } from "./bound-model"
+import { normalizeVision } from "../prompt/normalize-vision"
 import { TraceListener, type AssembledToolCall, type ModelCallTrace } from "../trace"
 import type { FinishReason } from "../response/events"
 import type { ResponseUsage } from "../response/usage"
@@ -38,6 +40,7 @@ export interface ModelDefineConfig<
   readonly classifyStreamError: (failure: StreamFailure) => TStreamError
   readonly decodePayload: (raw: string) => Effect.Effect<TWireChunk, Error>
   readonly doneSignal?: string
+  readonly capabilities?: ModelCapabilities
 }
 
 function joinUrl(endpoint: string, path: string): string {
@@ -58,8 +61,10 @@ export function modelDefine<
   const spec: ModelSpec<TCallOptions, TConnectionError, TStreamError> = {
     modelId: config.modelId,
     endpoint: config.endpoint,
+    capabilities: config.capabilities,
 
-    bind: (args) => modelBind(spec, args.auth, args.defaults),
+    bind: (args) => modelBind(spec, args.auth, args.defaults, { imagePlaceholders: args.imagePlaceholders }),
+
 
     _execute: (
       auth: AuthApplicator,
@@ -231,12 +236,16 @@ export function modelBind<
   spec: ModelSpec<TCallOptions, TConnectionError, TStreamError>,
   auth: AuthApplicator,
   defaults?: Partial<TCallOptions>,
+  options?: { imagePlaceholders?: ImagePlaceholderConfig },
 ): BoundModel<TCallOptions, TConnectionError, TStreamError> {
   return {
     spec,
-    stream: (prompt, tools, options?) => {
-      const merged = { ...defaults, ...options } as TCallOptions
-      return spec._execute(auth, prompt, tools, merged)
+    stream: (prompt, tools, callOptions?) => {
+      const merged = { ...defaults, ...callOptions } as TCallOptions
+      const normalizedPrompt = (options?.imagePlaceholders?.enabled && spec.capabilities?.vision === false)
+        ? normalizeVision(prompt, options.imagePlaceholders.format)
+        : prompt
+      return spec._execute(auth, normalizedPrompt, tools, merged)
     },
   }
 }

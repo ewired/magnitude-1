@@ -220,8 +220,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // 6. Build prompt from memory
         // ──────────────────────────────────────────────────────────────────────
         const timezone = sessionCtx.context?.timezone ?? null
-        const supportsVision = agentModel.profile.capabilities.vision
-        const prompt = windowToPrompt(windowState, systemPrompt, timezone, supportsVision)
+        const prompt = windowToPrompt(windowState, systemPrompt, timezone)
 
         // ──────────────────────────────────────────────────────────────────────
         // 7. Build adapter

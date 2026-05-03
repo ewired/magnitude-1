@@ -3,6 +3,7 @@ import {
   defaultClassifyStreamError,
   type ModelSpec,
   type StreamError,
+  type ModelCapabilities as AIModelCapabilities,
 } from "@magnitudedev/ai"
 import { classifyMagnitudeConnectionError, type MagnitudeConnectionError } from "./errors"
 import type { RoleId, ModelCapabilities, MagnitudeModelInfo } from './contract'
@@ -58,7 +59,7 @@ export function createMagnitudeCompatibleSpec(config: MagnitudeCompatibleSpecCon
   })
 }
 
-export function createRoleSpec(roleId: RoleId, endpoint: string) {
+export function createRoleSpec(roleId: RoleId, endpoint: string, capabilities?: AIModelCapabilities) {
   return NativeChatCompletions.model({
     modelId: `role/${roleId}`,
     endpoint,
@@ -67,5 +68,6 @@ export function createRoleSpec(roleId: RoleId, endpoint: string) {
       classifyMagnitudeConnectionError(failure),
     classifyStreamError: (failure) =>
       defaultClassifyStreamError(failure),
+    capabilities,
   })
 }
