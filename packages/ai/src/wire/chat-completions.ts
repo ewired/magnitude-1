@@ -88,7 +88,7 @@ const ChatToolCallDelta = Schema.Struct({
 })
 
 const ChatChunkDelta = Schema.Struct({
-  role: Schema.optional(Schema.String),
+  role: Schema.optional(Schema.NullOr(Schema.String)),
   content: Schema.optional(Schema.NullOr(Schema.String)),
   reasoning_content: Schema.optional(Schema.NullOr(Schema.String)),
   tool_calls: Schema.optional(Schema.NullOr(Schema.Array(ChatToolCallDelta))),
@@ -116,9 +116,11 @@ const ChatChunkUsage = Schema.Struct({
   prompt_tokens: Schema.Number,
   completion_tokens: Schema.Number,
   prompt_tokens_details: Schema.optional(
-    Schema.Struct({
-      cached_tokens: Schema.optional(Schema.Number),
-    }),
+    Schema.NullOr(
+      Schema.Struct({
+        cached_tokens: Schema.optional(Schema.NullOr(Schema.Number)),
+      }),
+    ),
   ),
 })
 
