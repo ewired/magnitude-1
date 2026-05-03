@@ -154,7 +154,7 @@ export function createIncrementalJsonParser(): IncrementalJsonParser {
             top.content += char
           }
         }
-        return { _tag: "close", charsConsumed: nextChars.length, completion: "incomplete" }
+        return { _tag: "continue", charsConsumed: nextChars.length }
       }
 
       case "inObjectKey":
@@ -168,7 +168,7 @@ export function createIncrementalJsonParser(): IncrementalJsonParser {
             top.content += char
           }
         }
-        return { _tag: "close", charsConsumed: nextChars.length, completion: "incomplete" }
+        return { _tag: "continue", charsConsumed: nextChars.length }
 
       case "inObjectValue":
         for (let index = 0; index < nextChars.length; index += 1) {
@@ -181,7 +181,7 @@ export function createIncrementalJsonParser(): IncrementalJsonParser {
             top.content += char
           }
         }
-        return { _tag: "close", charsConsumed: nextChars.length, completion: "incomplete" }
+        return { _tag: "continue", charsConsumed: nextChars.length }
 
       case "inArray":
         for (let index = 0; index < nextChars.length; index += 1) {
@@ -194,10 +194,10 @@ export function createIncrementalJsonParser(): IncrementalJsonParser {
             top.content += char
           }
         }
-        return { _tag: "close", charsConsumed: nextChars.length + 1, completion: "incomplete" }
+        return { _tag: "continue", charsConsumed: nextChars.length }
 
       case "unknown":
-        return { _tag: "continue" }
+        return { _tag: "continue", charsConsumed: 0 }
     }
   }
 
@@ -216,6 +216,8 @@ export function createIncrementalJsonParser(): IncrementalJsonParser {
           state: "incomplete",
           trailingBackslashes: 0,
           unescapedQuoteCount: 0,
+          pendingEscape: false,
+          pendingUnicodeHex: null,
         })
         return 0
       case " ":
@@ -228,10 +230,49 @@ export function createIncrementalJsonParser(): IncrementalJsonParser {
         const result = shouldCloseUnescapedString(nextChars)
         if (result._tag === "close") {
           completeCollection(result.completion)
-          return result.charsConsumed
         }
-        return 0
+        return result.charsConsumed
       }
+    }
+  }
+
+  /**
+   * Resolve an escape sequence given the specifier character and remaining text.
+   * @param fromPending - true if called from pending escape path (char is the specifier)
+   * @returns number of additional characters consumed from nextChars
+   *   When fromPending=true: chars consumed from nextChars (0 for simple escapes)
+   *   When fromPending=false: 1 + chars consumed from rest (1 for simple escapes)
+   */
+  function resolveEscape(top: import("./types").QuotedStringCollection, escaped: string, rest: string, fromPending: boolean): number {
+    const base = fromPending ? 0 : 1
+    switch (escaped) {
+      case "n": updateQuoteTracking(top, "\\"); top.content += "\n"; return base
+      case "t": updateQuoteTracking(top, "\\"); top.content += "\t"; return base
+      case "r": updateQuoteTracking(top, "\\"); top.content += "\r"; return base
+      case "b": updateQuoteTracking(top, "\\"); top.content += "\b"; return base
+      case "f": updateQuoteTracking(top, "\\"); top.content += "\f"; return base
+      case "\\": updateQuoteTracking(top, "\\"); top.content += "\\"; return base
+      case `"`: updateQuoteTracking(top, "\\"); top.content += `"`; return base
+      case "/": updateQuoteTracking(top, "\\"); top.content += "/"; return base
+      case "u": {
+        updateQuoteTracking(top, "\\")
+        const hex = rest.slice(0, 4)
+        if (hex.length === 4) {
+          if (/^[0-9A-Fa-f]{4}$/.test(hex)) {
+            top.content += String.fromCharCode(Number.parseInt(hex, 16))
+          } else {
+            top.content += "\\u" + hex
+          }
+          return base + 4
+        }
+        // Not enough hex digits in this chunk — buffer
+        top.pendingUnicodeHex = hex
+        return base + hex.length
+      }
+      default:
+        updateQuoteTracking(top, "\\")
+        top.content += "\\" + escaped
+        return base
     }
   }
 
@@ -250,7 +291,32 @@ export function createIncrementalJsonParser(): IncrementalJsonParser {
         if (char === ",") return 0
         return findAnyStartingValue(char, nextChars)
 
-      case "quotedString":
+      case "quotedString": {
+        // Handle pending unicode hex completion
+        if (top.pendingUnicodeHex !== null) {
+          const needed = 4 - top.pendingUnicodeHex.length
+          const available = char + nextChars
+          const hexPart = available.slice(0, needed)
+          top.pendingUnicodeHex += hexPart
+          if (top.pendingUnicodeHex.length === 4) {
+            const hex = top.pendingUnicodeHex
+            top.pendingUnicodeHex = null
+            if (/^[0-9A-Fa-f]{4}$/.test(hex)) {
+              top.content += String.fromCharCode(Number.parseInt(hex, 16))
+            } else {
+              top.content += "\\u" + hex
+            }
+          }
+          // consumed hexPart.length chars total, but first one is `char` itself
+          return hexPart.length - 1
+        }
+
+        // Handle pending escape from previous chunk
+        if (top.pendingEscape) {
+          top.pendingEscape = false
+          return resolveEscape(top, char, nextChars, true)
+        }
+
         if (char === `"`) {
           if (shouldCloseString()) { completeCollection("complete"); return 0 }
           updateQuoteTracking(top, char)
@@ -259,47 +325,26 @@ export function createIncrementalJsonParser(): IncrementalJsonParser {
         }
         if (char === "\\") {
           if (nextChars.length === 0) {
+            // Buffer the backslash for next chunk
             updateQuoteTracking(top, char)
-            top.content += char
+            top.pendingEscape = true
             return 0
           }
           const escaped = nextChars[0]
-          switch (escaped) {
-            case "n": updateQuoteTracking(top, char); top.content += "\n"; return 1
-            case "t": updateQuoteTracking(top, char); top.content += "\t"; return 1
-            case "r": updateQuoteTracking(top, char); top.content += "\r"; return 1
-            case "b": updateQuoteTracking(top, char); top.content += "\b"; return 1
-            case "f": updateQuoteTracking(top, char); top.content += "\f"; return 1
-            case "\\": updateQuoteTracking(top, char); top.content += "\\"; return 1
-            case `"`: updateQuoteTracking(top, char); top.content += `"`; return 1
-            case "u": {
-              updateQuoteTracking(top, char)
-              const hex = nextChars.slice(1, 5)
-              if (hex.length === 4) {
-                const code = Number.parseInt(hex, 16)
-                if (!Number.isNaN(code)) {
-                  top.content += String.fromCharCode(code)
-                  return 5
-                }
-              }
-              top.content += `u${hex}`
-              return 1 + hex.length
-            }
-            default: updateQuoteTracking(top, char); top.content += escaped; return 1
-          }
+          return resolveEscape(top, escaped, nextChars.slice(1), false)
         }
         updateQuoteTracking(top, char)
         top.content += char
         return 0
+      }
 
       case "unquotedString": {
         top.content += char
         const result = shouldCloseUnescapedString(nextChars)
         if (result._tag === "close") {
           completeCollection(result.completion)
-          return result.charsConsumed
         }
-        return 0
+        return result.charsConsumed
       }
     }
   }
@@ -349,6 +394,19 @@ export function createIncrementalJsonParser(): IncrementalJsonParser {
     },
 
     end(): void {
+      // Flush any pending escape state on quoted strings before closing
+      for (const col of collectionStack) {
+        if (col._tag === "quotedString") {
+          if (col.pendingUnicodeHex !== null) {
+            col.content += "\\u" + col.pendingUnicodeHex
+            col.pendingUnicodeHex = null
+          }
+          if (col.pendingEscape) {
+            col.content += "\\"
+            col.pendingEscape = false
+          }
+        }
+      }
       while (collectionStack.length > 0) {
         const top = collectionStack[collectionStack.length - 1]
         if (collectionStack.length === 1 && top._tag === "unquotedString" && isStringComplete(top)) {

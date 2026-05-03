@@ -81,6 +81,8 @@ export interface QuotedStringCollection {
   state: CompletionState
   trailingBackslashes: number
   unescapedQuoteCount: number
+  pendingEscape: boolean
+  pendingUnicodeHex: string | null
 }
 
 export interface UnquotedStringCollection {
@@ -91,7 +93,7 @@ export interface UnquotedStringCollection {
 
 export type CloseStringResult =
   | { readonly _tag: "close"; readonly charsConsumed: number; readonly completion: CompletionState }
-  | { readonly _tag: "continue" }
+  | { readonly _tag: "continue"; readonly charsConsumed: number }
 
 export type Pos =
   | { readonly _tag: "inNothing" }
