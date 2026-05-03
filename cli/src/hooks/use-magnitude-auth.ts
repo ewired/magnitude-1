@@ -23,17 +23,19 @@ interface Resolved {
 }
 
 async function resolveAuth(getStoredKey: () => Promise<string | undefined>): Promise<Resolved> {
-  const stored = await getStoredKey()
-  if (stored && stored.trim()) {
-    return { source: 'config', key: stored, envVarName: null }
-  }
-
   const useLocal = !!process.env.MAGNITUDE_USE_LOCAL
+
+  // In local mode, always prefer the local env var over stored config
   if (useLocal) {
     const localKey = process.env.MAGNITUDE_LOCAL_API_KEY
     if (localKey && localKey.trim()) {
       return { source: 'env-local', key: localKey, envVarName: 'MAGNITUDE_LOCAL_API_KEY' }
     }
+  }
+
+  const stored = await getStoredKey()
+  if (stored && stored.trim()) {
+    return { source: 'config', key: stored, envVarName: null }
   }
 
   const envKey = process.env.MAGNITUDE_API_KEY
