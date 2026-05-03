@@ -1,4 +1,4 @@
-import { Effect, Fiber, Cause, Layer, Stream, Schema } from "effect"
+import { Effect, Cause, Layer, Stream, Schema } from "effect"
 import type { ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason, ValidationIssue } from "@magnitudedev/ai"
 import type { StreamingPartial } from "@magnitudedev/ai"
 import type { HarnessEvent, ToolError, ToolResult, TurnOutcome } from "../events"
@@ -58,7 +58,6 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
   // Mutable dispatch state (scoped to this dispatch invocation)
   const accumulators = new Map<ToolCallId, ToolCallAccumulator>()
-  const toolFibers = new Map<ToolCallId, Fiber.RuntimeFiber<void, never>>()
   let terminalOverride: TurnOutcome | null = null
   let toolCallCount = 0
 
@@ -312,11 +311,8 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
             toolCallId: acc.toolCallId,
           })
 
-          // Fork tool execution concurrently
-          const fiber = yield* Effect.fork(
-            executeTool(acc.toolCallId, acc.toolName, acc.toolKey, parser.decoded!),
-          )
-          toolFibers.set(acc.toolCallId, fiber)
+          // Execute tool inline — sequential ordering required for dependent tools
+          yield* executeTool(acc.toolCallId, acc.toolName, acc.toolKey, parser.decoded!)
         })
       }
 
@@ -326,11 +322,6 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
           switch (event.reason._tag) {
             case "completed": {
-              // Join all in-flight tool fibers
-              for (const [, fiber] of toolFibers) {
-                yield* Fiber.join(fiber)
-              }
-              toolFibers.clear()
               outcome = terminalOverride ?? mapFinishReasonToOutcome(event.reason.finishReason, toolCallCount)
               break
             }
@@ -399,20 +390,9 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
   // ── Main processing with error/interrupt handling ────────────────
 
   function interruptAllTools(): Effect.Effect<void> {
-    return Effect.gen(function* () {
-      for (const [toolCallId, fiber] of toolFibers) {
-        yield* Fiber.interrupt(fiber)
-        const acc = accumulators.get(toolCallId)!
-        yield* emit({
-          _tag: "ToolExecutionEnded",
-          toolCallId,
-          toolName: acc.toolName,
-          toolKey: acc.toolKey,
-          result: { _tag: "Interrupted" },
-        })
-      }
-      toolFibers.clear()
-    })
+    // With inline execution, no detached tool fibers exist to interrupt.
+    // Stream errors/validation failures can only occur between tool executions.
+    return Effect.void
   }
 
   return Stream.runForEach(config.events, processEvent).pipe(

@@ -91,7 +91,7 @@ const ChatChunkDelta = Schema.Struct({
   role: Schema.optional(Schema.String),
   content: Schema.optional(Schema.NullOr(Schema.String)),
   reasoning_content: Schema.optional(Schema.NullOr(Schema.String)),
-  tool_calls: Schema.optional(Schema.Array(ChatToolCallDelta)),
+  tool_calls: Schema.optional(Schema.NullOr(Schema.Array(ChatToolCallDelta))),
 })
 
 const ChatChunkLogprobs = Schema.Struct({
