@@ -26,45 +26,76 @@ export function isScalar(value: unknown): value is string | number | boolean | n
   return value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
 }
 
-export function renderField(name: string, value: unknown): string {
-  if (!isScalar(value)) {
-    return `<${name}>${JSON.stringify(value)}</${name}>`
-  }
-  const raw = String(value)
-  if (raw.includes('\n')) {
-    return `<${name}>\n${raw}\n</${name}>`
-  }
-  return `<${name}>${raw}</${name}>`
+// --- Internal rendering functions ---
+
+function renderScalar(value: string | number | boolean | null): string {
+  return String(value)
 }
 
-export function renderObjectOutput(output: Record<string, unknown>): readonly ToolResultPart[] {
-  const builder = new ContentBuilder()
-  const entries = Object.entries(output).filter(([, v]) => v !== undefined)
-  for (let i = 0; i < entries.length; i++) {
-    const [key, value] = entries[i]
-    if (isImageValue(value)) {
-      builder.pushText(`<${key}>`)
-      builder.pushPart(toImagePart(value))
-      builder.pushText(`</${key}>`)
-    } else {
-      builder.pushText(renderField(key, value))
-    }
-    if (i < entries.length - 1) builder.pushText('\n')
+function renderValueInto(builder: ContentBuilder, value: unknown): void {
+  if (value === undefined) return
+  if (isScalar(value)) {
+    builder.pushText(renderScalar(value))
+    return
   }
+  if (isImageValue(value)) {
+    builder.pushPart(toImagePart(value))
+    return
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      if (i > 0) builder.pushText('\n')
+      renderFieldInto(builder, String(i), value[i])
+    }
+    return
+  }
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value).filter(([, v]) => v !== undefined)
+    for (let i = 0; i < entries.length; i++) {
+      if (i > 0) builder.pushText('\n')
+      renderFieldInto(builder, entries[i][0], entries[i][1])
+    }
+    return
+  }
+  builder.pushText(String(value))
+}
+
+function renderFieldInto(builder: ContentBuilder, name: string, value: unknown): void {
+  if (isScalar(value)) {
+    const raw = renderScalar(value)
+    if (!raw.includes('\n')) {
+      builder.pushText(`<${name}>${raw}</${name}>`)
+    } else {
+      builder.pushText(`<${name}>\n${raw}\n</${name}>`)
+    }
+    return
+  }
+  builder.pushText(`<${name}>\n`)
+  renderValueInto(builder, value)
+  builder.pushText(`\n</${name}>`)
+}
+
+// --- Exported rendering functions ---
+
+export function renderToolOutput(output: unknown): readonly ToolResultPart[] {
+  const builder = new ContentBuilder()
+  renderValueInto(builder, output)
   return builder.build()
 }
 
-export function renderWrapped(tag: string, value: unknown): readonly ToolResultPart[] {
-  if (typeof value === 'string') {
-    return [{ _tag: 'TextPart', text: `<${tag}>${value}</${tag}>` }]
-  }
-  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-    const builder = new ContentBuilder()
+export function renderTagged(tag: string, value: unknown): readonly ToolResultPart[] {
+  const builder = new ContentBuilder()
+  if (isScalar(value)) {
+    const raw = renderScalar(value)
+    if (!raw.includes('\n')) {
+      builder.pushText(`<${tag}>${raw}</${tag}>`)
+    } else {
+      builder.pushText(`<${tag}>\n${raw}\n</${tag}>`)
+    }
+  } else {
     builder.pushText(`<${tag}>\n`)
-    builder.pushParts(renderObjectOutput(value as Record<string, unknown>))
+    renderValueInto(builder, value)
     builder.pushText(`\n</${tag}>`)
-    return builder.build()
   }
-  const inner = value === undefined ? 'undefined' : JSON.stringify(value) ?? String(value)
-  return [{ _tag: 'TextPart', text: `<${tag}>${inner}</${tag}>` }]
+  return builder.build()
 }

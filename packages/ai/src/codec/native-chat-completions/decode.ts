@@ -26,7 +26,7 @@ interface DecoderState {
   readonly thoughtOpen: boolean
   readonly messageOpen: boolean
   readonly openToolCalls: ReadonlyMap<number, ToolCallState>
-  readonly toolSchemas: ReadonlyMap<string, Schema.Schema.Any>
+  readonly toolSchemas: ReadonlyMap<string, Schema.Schema.AnyNoContext>
   readonly terminated: boolean
 }
 
@@ -37,7 +37,7 @@ interface DecoderState {
 function makeInitialState(
   tools?: readonly ToolDefinition[],
 ): DecoderState {
-  const toolSchemas = new Map<string, Schema.Schema.Any>()
+  const toolSchemas = new Map<string, Schema.Schema.AnyNoContext>()
   if (tools) {
     for (const tool of tools) {
       toolSchemas.set(tool.name, tool.inputSchema)
@@ -173,7 +173,7 @@ function processChunk<TStreamError>(
         const name = toolCallDelta.function?.name ?? ""
         const schema = nextState.toolSchemas.get(name)
         const parser = schema
-          ? createStreamingFieldParser(schema as Schema.Schema<any, any, never>)
+          ? createStreamingFieldParser(schema)
           : createStreamingFieldParser()
         const toolCallId = (toolCallDelta.id ?? `tool_call_${nextToolOrdinal}`) as ToolCallId
         toolCall = { toolCallId, toolName: name, parser }
@@ -188,7 +188,7 @@ function processChunk<TStreamError>(
         const name = toolCallDelta.function.name
         const schema = nextState.toolSchemas.get(name)
         const parser = schema
-          ? createStreamingFieldParser(schema as Schema.Schema<any, any, never>)
+          ? createStreamingFieldParser(schema)
           : createStreamingFieldParser()
         toolCall = { ...toolCall, toolName: name, parser }
         calls.set(toolCallDelta.index, toolCall)
@@ -198,21 +198,6 @@ function processChunk<TStreamError>(
       if (toolCallDelta.function?.arguments) {
         const fieldEvents = toolCall.parser.push(toolCallDelta.function.arguments)
         events.push(...wrapFieldEvents<TStreamError>(fieldEvents, toolCall.toolCallId))
-
-        if (!toolCall.parser.valid) {
-          events.push({
-            _tag: "stream_end",
-            reason: {
-              _tag: "validation_failure",
-              toolCallId: toolCall.toolCallId,
-              toolName: toolCall.toolName,
-              issue: toolCall.parser.validationIssue!,
-            },
-            usage: chunk.usage ? toUsage(chunk.usage) : null,
-          })
-          nextState = { ...nextState, terminated: true }
-          return [nextState, events]
-        }
       }
     }
 

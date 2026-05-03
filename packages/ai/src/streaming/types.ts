@@ -124,8 +124,8 @@ export type FieldEvent =
 
 /** A streaming leaf value — discriminated on finality. */
 export type StreamingLeaf<T> =
-  | { isFinal: true; value: T }
-  | { isFinal: false; value: string }
+  | { readonly isFinal: true; readonly value: T }
+  | { readonly isFinal: false; readonly value: string }
 
 /**
  * Transforms a type into its streaming partial shape.
@@ -133,9 +133,9 @@ export type StreamingLeaf<T> =
  */
 export type StreamingPartial<T> = {
   [K in keyof T]?: T[K] extends ReadonlyArray<infer E>
-    ? Array<StreamingPartial<E>>
+    ? Array<E extends Record<string, unknown> ? StreamingPartial<E> : StreamingLeaf<E>>
     : T[K] extends Array<infer E>
-      ? Array<StreamingPartial<E>>
+      ? Array<E extends Record<string, unknown> ? StreamingPartial<E> : StreamingLeaf<E>>
       : T[K] extends Record<string, unknown>
         ? StreamingPartial<T[K]>
         : StreamingLeaf<T[K]>

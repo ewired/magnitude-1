@@ -8,3 +8,4 @@
 export type { StreamingFieldParser } from "./field-parser"
 export { createStreamingFieldParser } from "./field-parser"
 export type { FieldEvent, StreamingPartial, StreamingLeaf } from "./types"
+export { deriveStreamingSchema } from "./streaming-schema"

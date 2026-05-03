@@ -90,7 +90,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
     toolCallId: ToolCallId,
     toolName: string,
     toolKey: string,
-    input: unknown,
+    input: Record<string, unknown>,
   ): Effect.Effect<void> {
     const lookup = toolKeyToEntry.get(toolKey)
     if (!lookup) {
@@ -142,7 +142,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         return
       }
 
-      const effectiveInput = decision.modifiedInput ?? input
+      const effectiveInput = (decision.modifiedInput ?? input) as Record<string, unknown>
 
       yield* emit({
         _tag: "ToolExecutionStarted",
@@ -262,17 +262,20 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
               const toolCtx: ToolContext<unknown> = {
                 emit: makeToolEmit(acc.toolCallId, acc.toolName, acc.toolKey),
               }
-              const newStreamState = yield* provideLayer(
-                acc.streamHook.onInput(parser.partial as StreamingPartial<unknown>, acc.streamState, toolCtx),
-              ).pipe(
-                Effect.catchAllCause((cause) =>
-                  Effect.as(
-                    Effect.logWarning("Stream hook onInput failed", { cause: Cause.squash(cause) }),
-                    acc.streamState,
+              const partial = parser.partial
+              if (partial) {
+                const newStreamState = yield* provideLayer(
+                  acc.streamHook.onInput(partial, acc.streamState, toolCtx),
+                ).pipe(
+                  Effect.catchAllCause((cause) =>
+                    Effect.as(
+                      Effect.logWarning("Stream hook onInput failed", { cause: Cause.squash(cause) }),
+                      acc.streamState,
+                    ),
                   ),
-                ),
-              )
-              accumulators.set(event.toolCallId, { ...acc, streamState: newStreamState })
+                )
+                accumulators.set(event.toolCallId, { ...acc, streamState: newStreamState })
+              }
             }
           }
         })
@@ -311,7 +314,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
           // Fork tool execution concurrently
           const fiber = yield* Effect.fork(
-            executeTool(acc.toolCallId, acc.toolName, acc.toolKey, parser.decoded),
+            executeTool(acc.toolCallId, acc.toolName, acc.toolKey, parser.decoded!),
           )
           toolFibers.set(acc.toolCallId, fiber)
         })
@@ -336,7 +339,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
               const toolEntry = toolKeyToEntry.get(acc.toolKey)!
               const parser = config.parsers.get(event.reason.toolCallId)
               const inputSchema = toolEntry.tool.definition.inputSchema
-              const receivedInput = (parser?.partial ?? {}) as StreamingPartial<any>
+              const receivedInput = parser?.partial ?? ({} as StreamingPartial<Record<string, unknown>>)
 
               yield* emit({
                 _tag: "ToolInputDecodeFailed",

@@ -11,8 +11,8 @@ export interface ToolError {
 // ── Tool Result ──────────────────────────────────────────────────────
 
 type ToolResultErased =
-  | { readonly _tag: "Success"; readonly output: any }
-  | { readonly _tag: "Error"; readonly error: any }
+  | { readonly _tag: "Success"; readonly output: unknown }
+  | { readonly _tag: "Error"; readonly error: ToolError }
   | { readonly _tag: "Rejected"; readonly rejection: unknown }
   | { readonly _tag: "Interrupted" }
 
@@ -40,8 +40,8 @@ interface ToolInputDecodeFailureErased {
   readonly toolCallId: ToolCallId
   readonly toolName: string
   readonly issue: ValidationIssue
-  readonly inputSchema: Schema.Schema.Any
-  readonly receivedInput: StreamingPartial<any>
+  readonly inputSchema: Schema.Schema.AnyNoContext
+  readonly receivedInput: StreamingPartial<Record<string, unknown>>
 }
 
 interface ToolInputDecodeFailureConcrete<TInput> {
@@ -127,8 +127,8 @@ interface ToolInputDecodeFailedErased {
   readonly toolName: string
   readonly toolKey: string
   readonly issue: ValidationIssue
-  readonly inputSchema: Schema.Schema.Any
-  readonly receivedInput: StreamingPartial<any>
+  readonly inputSchema: Schema.Schema.AnyNoContext
+  readonly receivedInput: StreamingPartial<Record<string, unknown>>
 }
 
 interface ToolInputDecodeFailedConcrete<TInput> {
@@ -153,7 +153,7 @@ interface ToolExecutionStartedErased {
   readonly toolCallId: ToolCallId
   readonly toolName: string
   readonly toolKey: string
-  readonly input: any
+  readonly input: Record<string, unknown>
   readonly cached: boolean
 }
 
@@ -197,7 +197,7 @@ interface ToolEmissionErased {
   readonly toolCallId: ToolCallId
   readonly toolName: string
   readonly toolKey: string
-  readonly value: any
+  readonly value: unknown
 }
 
 interface ToolEmissionConcrete<TEmission> {
@@ -298,7 +298,7 @@ type ToolLifecycleEventConcrete<TInput, TOutput, TEmission, TError extends ToolE
 export type ToolLifecycleEvent<TInput = never, TOutput = never, TEmission = never, TError extends ToolError = never> =
   [TInput] extends [never]
     ? ToolLifecycleEventErased
-    : ToolLifecycleEventConcrete<TInput, [TOutput] extends [never] ? any : TOutput, [TEmission] extends [never] ? any : TEmission, [TError] extends [never] ? ToolError : TError>
+    : ToolLifecycleEventConcrete<TInput, [TOutput] extends [never] ? unknown : TOutput, [TEmission] extends [never] ? unknown : TEmission, [TError] extends [never] ? ToolError : TError>
 
 type HarnessEventErased =
   | ThoughtStart
@@ -323,4 +323,4 @@ type HarnessEventConcrete<TInput, TOutput, TEmission, TError extends ToolError> 
 export type HarnessEvent<TInput = never, TOutput = never, TEmission = never, TError extends ToolError = never> =
   [TInput] extends [never]
     ? HarnessEventErased
-    : HarnessEventConcrete<TInput, [TOutput] extends [never] ? any : TOutput, [TEmission] extends [never] ? any : TEmission, [TError] extends [never] ? ToolError : TError>
+    : HarnessEventConcrete<TInput, [TOutput] extends [never] ? unknown : TOutput, [TEmission] extends [never] ? unknown : TEmission, [TError] extends [never] ? ToolError : TError>

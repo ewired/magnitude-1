@@ -11,6 +11,7 @@
  */
 
 import { ParseResult, Schema } from "effect"
+import { deriveStreamingSchema } from "./streaming-schema"
 import type { JsonValue } from "../prompt/parts"
 import type { ValidationIssue } from "../response/events"
 import { createIncrementalJsonParser } from "./json-parser"
@@ -23,8 +24,8 @@ import type { FieldEvent, ParsedValue, StreamingPartial } from "./types"
 export interface StreamingFieldParserErased {
   push(chunk: string): readonly FieldEvent[]
   end(): readonly FieldEvent[]
-  readonly partial: unknown
-  readonly decoded: unknown | null
+  readonly partial: StreamingPartial<Record<string, unknown>> | undefined
+  readonly decoded: Record<string, unknown> | null
   readonly valid: boolean
   readonly validationIssue: ValidationIssue | null
 }
@@ -141,28 +142,26 @@ function walkAndDiff(
 // ---------------------------------------------------------------------------
 
 export function createStreamingFieldParser(): StreamingFieldParserErased
-export function createStreamingFieldParser<A, I>(schema: Schema.Schema<A, I>): StreamingFieldParserConcrete<A>
-export function createStreamingFieldParser(schema?: Schema.Schema.Any): StreamingFieldParserErased {
+export function createStreamingFieldParser<A>(schema: Schema.Schema<A, A, never>): StreamingFieldParserConcrete<A>
+export function createStreamingFieldParser(schema?: Schema.Schema.AnyNoContext): StreamingFieldParserErased {
   const jsonParser = createIncrementalJsonParser()
   const snapshot = new Map<string, FieldState>()
 
   // Schema validation setup
-  const fullSchema = schema ?? null
-  const partialSchema = fullSchema && fullSchema.ast._tag === "TypeLiteral"
-    ? Schema.partial(fullSchema as Schema.Struct<any>) as unknown as Schema.Schema<any, any, never>
+  const schemas = schema
+    ? { full: schema, streaming: deriveStreamingSchema(schema) }
     : null
 
   let _valid = true
   let _validationIssue: ValidationIssue | null = null
-  let _decoded: unknown | null = null
+  let _decoded: Record<string, unknown> | null = null
 
   function validatePartial(): void {
-    if (!fullSchema || !_valid) return
+    if (!schemas || !_valid) return
     const partial = jsonParser.partial
     if (!partial || partial._tag !== "object") return
     const raw = parsedValueToJson(partial)
-    const target = partialSchema ?? fullSchema
-    const result = Schema.decodeUnknownEither(target as Schema.Schema<any, any, never>)(raw as any)
+    const result = Schema.decodeUnknownEither(schemas.streaming)(raw)
     if (result._tag === "Left") {
       const issues = ParseResult.ArrayFormatter.formatErrorSync(result.left)
       if (issues.length > 0) {
@@ -173,11 +172,12 @@ export function createStreamingFieldParser(schema?: Schema.Schema.Any): Streamin
   }
 
   function validateFinal(): void {
-    if (!fullSchema) return
+    if (!schemas) return
     const partial = jsonParser.partial
     if (!partial) return
     const raw = parsedValueToJson(partial)
-    const result = Schema.decodeUnknownEither(fullSchema as Schema.Schema<any, any, never>)(raw as any)
+    const decode = Schema.decodeUnknownEither(schemas.full)
+    const result = decode(raw)
     if (result._tag === "Left") {
       const issues = ParseResult.ArrayFormatter.formatErrorSync(result.left)
       if (issues.length > 0) {
@@ -202,7 +202,7 @@ export function createStreamingFieldParser(schema?: Schema.Schema.Any): Streamin
     push(chunk: string): readonly FieldEvent[] {
       jsonParser.push(chunk)
       const events = diffPartial()
-      if (fullSchema && _valid) {
+      if (schemas && _valid) {
         validatePartial()
       }
       return events
@@ -211,19 +211,19 @@ export function createStreamingFieldParser(schema?: Schema.Schema.Any): Streamin
     end(): readonly FieldEvent[] {
       jsonParser.end()
       const events = diffPartial()
-      if (fullSchema && _valid) {
+      if (schemas && _valid) {
         validateFinal()
       }
       return events
     },
 
-    get partial(): unknown {
+    get partial(): StreamingPartial<Record<string, unknown>> | undefined {
       const p = jsonParser.partial
       if (p === undefined) return undefined
-      return parsedValueToStreamingPartial(p)
+      return parsedValueToStreamingPartial(p) as StreamingPartial<Record<string, unknown>>
     },
 
-    get decoded(): unknown | null {
+    get decoded(): Record<string, unknown> | null {
       return _decoded
     },
 

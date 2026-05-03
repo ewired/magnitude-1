@@ -66,7 +66,7 @@ export { formatToolResult as formatToolResultLegacy } from "./turn/result-format
 
 // Formatting utilities
 export { formatToolResult, formatDecodeFailure } from "./formatting"
-export { isImageValue, toImagePart, isScalar, renderField, renderObjectOutput, renderWrapped } from "./formatting"
+export { isImageValue, toImagePart, isScalar, renderToolOutput, renderTagged } from "./formatting"
 
 // Harness
 export type { HarnessConfig, Harness, LiveTurn, ReplayTurn } from "./turn/harness"

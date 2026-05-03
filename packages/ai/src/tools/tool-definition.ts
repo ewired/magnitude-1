@@ -6,8 +6,8 @@ import type { Schema } from "effect"
 export interface ToolDefinitionErased {
   readonly name: string
   readonly description: string
-  readonly inputSchema: Schema.Schema.Any
-  readonly outputSchema: Schema.Schema.Any
+  readonly inputSchema: Schema.Schema.AnyNoContext
+  readonly outputSchema: Schema.Schema.AnyNoContext
 }
 
 /**

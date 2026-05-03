@@ -217,7 +217,7 @@ interface ParamInfo {
   readonly defaultValue: unknown
 }
 
-function extractParams(schema: Schema.Schema.Any): ParamInfo[] {
+function extractParams(schema: Schema.Schema.AnyNoContext): ParamInfo[] {
   const transformDefaults = extractDefaultsFromTransformation(schema.ast)
 
   const inputAst = unwrapToTypeLiteral(schema.ast)
@@ -259,7 +259,7 @@ function extractParams(schema: Schema.Schema.Any): ParamInfo[] {
  *   title?: string  // optional
  * ```
  */
-export function renderExpectedParams(inputSchema: Schema.Schema.Any): string {
+export function renderExpectedParams(inputSchema: Schema.Schema.AnyNoContext): string {
   const params = extractParams(inputSchema)
 
   if (params.length === 0) {

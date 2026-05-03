@@ -1,19 +1,19 @@
 import type { ToolResultPart } from '@magnitudedev/ai'
-import type { ToolResult } from '../events'
-import { isImageValue, toImagePart, isScalar, renderObjectOutput, renderWrapped } from './helpers'
+import type { ToolResult, ToolError } from '../events'
+import { isImageValue, toImagePart, renderToolOutput, renderTagged } from './helpers'
 
 /**
  * Format a tool execution result (success/error/rejected/interrupted) into ToolResultParts.
  */
-export function formatToolResult(
-  result: ToolResult,
+export function formatToolResult<TOutput, TError extends ToolError>(
+  result: ToolResult<TOutput, TError>,
 ): readonly ToolResultPart[] {
   switch (result._tag) {
     case 'Error':
       return [{ _tag: 'TextPart', text: `<error>${result.error.message}</error>` }]
 
     case 'Rejected':
-      return renderWrapped('rejected', result.rejection)
+      return renderTagged('rejected', result.rejection)
 
     case 'Interrupted':
       return [{ _tag: 'TextPart', text: '<interrupted/>' }]
@@ -29,19 +29,7 @@ export function formatToolResult(
         return [toImagePart(output)]
       }
 
-      if (isScalar(output)) {
-        return [{ _tag: 'TextPart', text: String(output) }]
-      }
-
-      if (Array.isArray(output)) {
-        return [{ _tag: 'TextPart', text: JSON.stringify(output) }]
-      }
-
-      if (typeof output === 'object') {
-        return renderObjectOutput(output as Record<string, unknown>)
-      }
-
-      return [{ _tag: 'TextPart', text: JSON.stringify(output) }]
+      return renderToolOutput(output)
     }
   }
 }
