@@ -6,6 +6,7 @@
   let { trace }: { trace: AgentCallTrace } = $props()
 
   let collapsed = $state<Set<string>>(new Set(['system', 'tools']))
+  let autoCollapsed = $state<Set<string>>(new Set())
   let hoveredToken = $state<TokenLogprob | null>(null)
   let tooltipX = $state(0)
   let tooltipY = $state(0)
@@ -144,12 +145,14 @@
       })
     }
 
-    // Auto-collapse long entries
+    // Auto-collapse long entries (only on first encounter)
     for (const entry of entries) {
-      if (entry.kind === 'user' && lineCount(entry.content) > 10) {
+      if (entry.kind === 'user' && lineCount(entry.content) > 10 && !autoCollapsed.has(entry.key)) {
+        autoCollapsed.add(entry.key)
         collapsed.add(entry.key)
       }
-      if (entry.kind === 'tool' && lineCount(entry.content) > 15) {
+      if (entry.kind === 'tool' && lineCount(entry.content) > 15 && !autoCollapsed.has(entry.key)) {
+        autoCollapsed.add(entry.key)
         collapsed.add(entry.key)
       }
     }
