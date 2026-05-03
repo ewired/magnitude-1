@@ -43,7 +43,7 @@ describe('turn-control/concurrent-signal-race', () => {
         strategyId: 'xml-act',
         outcome: {
           _tag: 'Completed',
-          completion: { toolCallsCount: 1, finishReason: 'tool_calls', feedback: [] },
+          completion: { toolCallsCount: 1, finishReason: 'tool_calls', feedback: [], yieldTarget: null },
         },
         inputTokens: null,
         outputTokens: null,

@@ -524,6 +524,7 @@ describe('task tree rendering mechanics', () => {
           completion: {
             toolCallsCount: 0, finishReason: 'stop' as const,
             feedback: [],
+            yieldTarget: null,
           },
         },
       } as any,

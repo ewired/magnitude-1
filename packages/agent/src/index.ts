@@ -25,6 +25,7 @@ export type {
 
   TurnOutcome,
   TurnYieldTarget,
+  YieldTarget,
   TurnCompletion,
   TurnFeedback,
   TurnToolCall,

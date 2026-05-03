@@ -21,7 +21,7 @@ type PublishedEvent =
 
 const successfulTurnResult: TurnOutcome = {
   _tag: 'Completed',
-  completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] },
+  completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [], yieldTarget: null },
 }
 
 const usage: CallUsage = {

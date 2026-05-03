@@ -19,6 +19,7 @@ import { webFetchTool } from './web-fetch-tool'
 import { createTaskTool, updateTaskTool, spawnWorkerTool, killWorkerTool } from './task-tools'
 import { skillTool } from './skill-tool'
 import { messageWorkerTool } from './agent-communication'
+import { yieldTool, workerYieldTool } from './yield'
 
 // --- State Models ---
 import { fileReadModel } from '../models/file-read'
@@ -36,6 +37,7 @@ import { spawnWorkerModel } from '../models/spawn-worker'
 import { killWorkerModel } from '../models/kill-worker'
 import { skillActivationModel } from '../models/skill-activation'
 import { messageWorkerModel } from '../models/message-worker'
+import { yieldModel, workerYieldModel } from '../models/yield'
 
 // =============================================================================
 // Group Toolkits
@@ -65,29 +67,34 @@ export const taskToolkit = defineToolkit({
   spawnWorker:   { tool: spawnWorkerTool,   state: spawnWorkerModel },
   killWorker:    { tool: killWorkerTool,    state: killWorkerModel },
   messageWorker: { tool: messageWorkerTool, state: messageWorkerModel },
+  yield:         { tool: yieldTool,         state: yieldModel },
 })
 
 export const skillToolkit = defineToolkit({
   skill: { tool: skillTool, state: skillActivationModel },
 })
 
+export const workerYieldToolkit = defineToolkit({
+  yield: { tool: workerYieldTool, state: workerYieldModel },
+})
+
 // =============================================================================
 // Composite Toolkits
 // =============================================================================
 
-/** fs + shell + web + skill — shared by most worker roles */
+/** fs + shell + web + skill — shared by most worker roles (no yield — workers get yield separately) */
 const workerBase = mergeToolkits(
   mergeToolkits(fsToolkit, shellToolkit),
   mergeToolkits(webToolkit, skillToolkit),
 )
 
-/** fs + shell + skill — no web access (critic) */
+/** fs + shell + skill — no web access (critic base, no yield) */
 const criticBase = mergeToolkits(
   mergeToolkits(fsToolkit, shellToolkit),
   skillToolkit,
 )
 
-/** fs + shell + web + task + skill — full leader toolkit */
+/** fs + shell + web + task + skill + lead yield — full leader toolkit */
 export const leaderToolkit = mergeToolkits(
   workerBase,
   taskToolkit,
@@ -101,12 +108,12 @@ const emptyToolkit = defineToolkit({})
 
 const ROLE_TOOLKITS: Record<RoleId, Toolkit> = {
   leader:    leaderToolkit,
-  engineer:  workerBase,
-  artisan:   workerBase,
-  scientist: workerBase,
-  scout:     workerBase,
-  architect: workerBase,
-  critic:    criticBase,
+  engineer:  mergeToolkits(workerBase, workerYieldToolkit),
+  artisan:   mergeToolkits(workerBase, workerYieldToolkit),
+  scientist: mergeToolkits(workerBase, workerYieldToolkit),
+  scout:     mergeToolkits(workerBase, workerYieldToolkit),
+  architect: mergeToolkits(workerBase, workerYieldToolkit),
+  critic:    mergeToolkits(criticBase, workerYieldToolkit),
   advisor:   emptyToolkit,
 }
 
@@ -115,7 +122,7 @@ const ROLE_TOOLKITS: Record<RoleId, Toolkit> = {
 // =============================================================================
 
 /** Tools that should not be displayed in the UI */
-export const HIDDEN_TOOLS: ReadonlySet<string> = new Set(['createTask', 'updateTask', 'killWorker', 'messageWorker'])
+export const HIDDEN_TOOLS: ReadonlySet<string> = new Set(['createTask', 'updateTask', 'killWorker', 'messageWorker', 'yield'])
 
 export type ToolKey = ToolkitKeys<typeof leaderToolkit> | BrowserToolKey
 

@@ -29,6 +29,7 @@ import { TurnProjection, type PendingInboundCommunication } from './turn'
 
 
 import { textOf } from '../content'
+import { outcomeWillChainContinue } from '../events'
 import { createId } from '../util/id'
 
 import { finalizeOpenToolStepsAsInterruptedInSteps } from './display-interrupt'
@@ -965,7 +966,9 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         return fork
       }
 
-      if (event.outcome._tag === 'Completed' && event.outcome.completion.toolCallsCount > 0) {
+      if (event.outcome._tag === 'Completed' && outcomeWillChainContinue(event.outcome)) {
+        // Turn will chain-continue (has tool calls and no yield target) —
+        // keep the think block open for the next turn to reuse.
         return {
           ...fork,
           currentTurnId: null,

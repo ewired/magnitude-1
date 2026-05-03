@@ -36,7 +36,7 @@ describe('memory/timeline-events', () => {
         strategyId: 'xml-act',
 
 
-        outcome: { _tag: 'Completed', completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] } },
+        outcome: { _tag: 'Completed', completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [], yieldTarget: null } },
         inputTokens: null,
         outputTokens: null,
         cacheReadTokens: null,
@@ -106,6 +106,7 @@ describe('memory/timeline-events', () => {
             toolCallsCount: 0,
             finishReason: 'stop',
             feedback: [{ _tag: 'InvalidMessageDestination', destination: 'unknown', message: 'follow up on deployment checks' }],
+            yieldTarget: null,
           },
         },
         inputTokens: null,

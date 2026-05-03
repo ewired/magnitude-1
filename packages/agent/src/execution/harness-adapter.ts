@@ -11,12 +11,14 @@ import type {
   HarnessEvent,
   ToolLifecycleEvent,
 } from '@magnitudedev/harness'
-import type {
-  AppEvent,
-  MessageDestination,
-  TurnOutcome as AgentTurnOutcome,
-  TurnCompletion,
-  TurnFeedback,
+import {
+  type AppEvent,
+  type MessageDestination,
+  type TurnOutcome as AgentTurnOutcome,
+  type TurnCompletion,
+  type TurnFeedback,
+  type YieldTarget,
+  outcomeWillChainContinue,
 } from '../events'
 
 import type { ToolKey } from '../tools/toolkits'
@@ -90,11 +92,12 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
   let contentFingerprint = ''
 
   const feedback: TurnFeedback[] = []
+  let yieldTarget: YieldTarget | null = null
 
   // Result state
   let executionResult: AgentTurnOutcome = {
     _tag: 'Completed',
-    completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] },
+    completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [], yieldTarget: null },
   }
   let turnUsage: ExecuteResult['usage'] = null
 
@@ -281,6 +284,12 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
             hasToolErrors = true
           }
 
+          // Capture yield target
+          if (toolKey === 'yield' && event.result._tag === 'Success') {
+            const output = event.result.output as any
+            yieldTarget = output.target != null ? (output.target as YieldTarget) : 'parent'
+          }
+
           yield* emitToolEvent(event.toolCallId, toolKey, event)
           break
         }
@@ -312,6 +321,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
               toolCallsCount,
               finishReason: toolCallsCount > 0 ? 'tool_calls' : 'stop',
               feedback: [...feedback],
+              yieldTarget,
             } satisfies TurnCompletion,
           })
 
@@ -392,9 +402,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
           }
 
           // ── Circuit breaker ──────────────────────────────────
-          const willRetrigger =
-            (executionResult._tag === 'Completed' && executionResult.completion.toolCallsCount > 0)
-            || executionResult._tag === 'ParseFailure'
+          const willRetrigger = outcomeWillChainContinue(executionResult)
 
           if (willRetrigger) {
             const prevCount = trackerState && trackerState.lastResponseText === contentFingerprint

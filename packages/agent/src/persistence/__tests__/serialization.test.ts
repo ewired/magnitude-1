@@ -65,6 +65,7 @@ describe('Event Serialization', () => {
           completion: {
             toolCallsCount: 0, finishReason: 'stop' as const,
             feedback: [],
+            yieldTarget: null,
           },
         },
         inputTokens: null,

@@ -31,13 +31,13 @@ const LEAD_TOOLS: readonly ToolKey[] = [
   'fileRead', 'fileWrite', 'fileEdit', 'fileTree', 'fileSearch', 'fileView',
   'shell', 'webFetch', 'webSearch',
   'createTask', 'updateTask', 'spawnWorker', 'killWorker',
-  'skill', 'messageWorker',
+  'skill', 'messageWorker', 'yield',
 ] as const
 
 const WORKER_TOOLS: readonly ToolKey[] = [
   'fileRead', 'fileWrite', 'fileEdit', 'fileTree', 'fileSearch', 'fileView',
   'shell', 'webFetch', 'webSearch',
-  'skill',
+  'skill', 'yield',
 ] as const
 
 const ROLE_TOOL_KEYS: Record<RoleId, readonly ToolKey[]> = {

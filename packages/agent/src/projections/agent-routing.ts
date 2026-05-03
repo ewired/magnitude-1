@@ -5,7 +5,7 @@
  */
 
 import { Projection, Signal } from '@magnitudedev/event-core'
-import type { AppEvent } from '../events'
+import { type AppEvent, outcomeWillChainContinue } from '../events'
 import { TaskGraphProjection } from './task-graph'
 
 export interface RoutingEntry {
@@ -334,7 +334,11 @@ export const AgentRoutingProjection = Projection.define<AppEvent, AgentRoutingSt
       const deferredParentMessages = new Map(state.deferredParentMessages)
       deferredParentMessages.delete(event.forkId)
 
-      if (event.outcome._tag !== 'Completed' || event.outcome.completion.toolCallsCount > 0) {
+      if (outcomeWillChainContinue(event.outcome)) {
+        return { ...state, deferredParentMessages }
+      }
+
+      if (event.outcome._tag !== 'Completed') {
         return { ...state, deferredParentMessages }
       }
 

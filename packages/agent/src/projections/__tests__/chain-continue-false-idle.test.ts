@@ -190,7 +190,7 @@ describe('chain-continue false-idle bug', () => {
   it('Completed + invoke stays working (regression)', async () => {
     const snapshot = await makeSnapshot(subagentScenario({
       _tag: 'Completed',
-      completion: { toolCallsCount: 1, finishReason: 'tool_calls', feedback: [] },
+      completion: { toolCallsCount: 1, finishReason: 'tool_calls', feedback: [], yieldTarget: null },
     }))
 
     expect(getSubagentStatus(snapshot.agentStatus)).toBe('working')
@@ -201,7 +201,7 @@ describe('chain-continue false-idle bug', () => {
   it('Completed + user goes idle with subagent_finished step (regression)', async () => {
     const events = subagentScenario({
       _tag: 'Completed',
-      completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] },
+      completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [], yieldTarget: null },
     })
     // Add a follow-up task_updated to force TaskWorkerProjection to rebuild with fresh reads
     events.push({

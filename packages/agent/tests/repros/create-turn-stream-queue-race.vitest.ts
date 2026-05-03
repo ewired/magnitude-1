@@ -6,7 +6,7 @@ import { TurnError } from '../../src/execution/types'
 import type { TurnEvent, TurnEventSink, TurnStrategyResult } from '../../src/execution/types'
 
 const finalTurnResult: TurnStrategyResult = {
-  executeResult: { result: { _tag: 'Completed', completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [] } } },
+  executeResult: { result: { _tag: 'Completed', completion: { toolCallsCount: 0, finishReason: 'stop', feedback: [], yieldTarget: null } } },
   usage: {
     inputTokens: 1,
     outputTokens: 1,

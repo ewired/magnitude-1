@@ -183,12 +183,15 @@ export interface TurnOutcomeEvent {
 /** @deprecated xml-act paradigm only — kept for orphaned xml-act code. Use toolCallsCount on native path. */
 export type TurnYieldTarget = 'user' | 'invoke' | 'worker' | 'parent'
 
+/** Yield target carried in TurnCompletion when an agent explicitly yields. */
+export type YieldTarget = 'user' | 'advisor' | 'workers' | 'parent'
+
 export type TurnFinishReason = 'stop' | 'tool_calls' | 'length' | 'content_filter' | 'other'
 
 export interface TurnCompletion {
   /**
    * Number of tool calls dispatched this turn.
-   * Implicit turn control: chain-continue iff toolCallsCount > 0.
+   * Implicit turn control: chain-continue iff toolCallsCount > 0 AND yieldTarget is null.
    */
   readonly toolCallsCount: number
   /**
@@ -196,6 +199,15 @@ export interface TurnCompletion {
    */
   readonly finishReason: TurnFinishReason
   readonly feedback: readonly TurnFeedback[]
+  /**
+   * When non-null, the agent explicitly yielded and the turn should NOT retrigger.
+   * - 'user': yield to user (wait for user input)
+   * - 'advisor': yield to advisor (same as user for now)
+   * - 'workers': yield to workers (only valid when non-idle workers exist)
+   * - 'parent': worker yielding back to parent agent
+   * Null means normal retrigger logic applies.
+   */
+  readonly yieldTarget: YieldTarget | null
 }
 
 export type TurnFeedback =
@@ -260,6 +272,7 @@ export type TurnOutcome =
  *  "still working" from "actually idle" must use this instead of checking
  *  Completed+invoke independently. */
 export function outcomeWillChainContinue(outcome: TurnOutcome): boolean {
+  if (outcome._tag === 'Completed' && outcome.completion.yieldTarget !== null) return false
   return (
     (outcome._tag === 'Completed' && outcome.completion.toolCallsCount > 0)
     || outcome._tag === 'ParseFailure'

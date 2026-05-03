@@ -22,3 +22,5 @@ export {
   spawnWorkerTool,
   killWorkerTool,
 } from './task-tools'
+
+export { yieldTool, workerYieldTool } from './yield'

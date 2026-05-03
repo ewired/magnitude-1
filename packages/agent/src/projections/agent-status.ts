@@ -183,7 +183,7 @@ export const AgentStatusProjection = Projection.define<AppEvent, AgentStatusStat
         mode: normalizedMode,
         taskId: normalizedTaskId,
         message: event.message ?? null,
-        status: 'idle',
+        status: 'working',
       }
 
       return {
