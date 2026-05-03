@@ -16,10 +16,8 @@ import type {
   AppEvent,
   ToolDisplay,
   TurnOutcome,
-  ProviderNotReadyDetail,
-  ConnectionFailureDetail,
-  SafetyStopReason,
 } from '../events'
+import { present } from '../errors'
 
 import { AgentRoutingProjection } from './agent-routing'
 import { AgentStatusProjection, getAgentByForkId } from './agent-status'
@@ -398,91 +396,15 @@ function closeThinkBlock(state: DisplayState, timestamp: number): DisplayState {
   }
 }
 
-function describeProviderNotReady(detail: ProviderNotReadyDetail): { message: string; cta?: { readonly label: string; readonly url: string } } {
-  switch (detail._tag) {
-    case 'AuthFailed':
-      return { message: 'Authentication failed. Run /settings to update your API key.' }
-    case 'MagnitudeBilling':
-      switch (detail.reason._tag) {
-        case 'SubscriptionRequired':
-        case 'TrialExpired':
-          return {
-            message: detail.reason.message,
-            cta: {
-              label: 'Upgrade to Pro',
-              url: 'https://app.magnitude.dev'
-            }
-          }
-        case 'UsageLimitExceeded':
-          return {
-            message: detail.reason.message,
-            cta: {
-              label: 'Manage your subscription',
-              url: 'https://app.magnitude.dev'
-            }
-          }
-      }
-  }
-}
-
-function describeConnectionFailure(detail: ConnectionFailureDetail): string {
-  switch (detail._tag) {
-    case 'ProviderError':
-      return `Connection issue with provider (HTTP ${detail.httpStatus}); retrying`
-    case 'TransportError':
-      return detail.httpStatus !== undefined
-        ? `Transport connection issue (HTTP ${detail.httpStatus}); retrying`
-        : 'Transport connection issue; retrying'
-    case 'StreamError':
-      return 'Connection issue while reading response; retrying'
-  }
-}
-
-function describeSafetyStop(reason: SafetyStopReason): string {
-  switch (reason._tag) {
-    case 'IdenticalResponseCircuitBreaker':
-      return `Stopped after ${reason.threshold} identical responses`
-    case 'Other':
-      return reason.message
-  }
-}
-
-function toErrorDisplayMessage(
-  outcome: Extract<TurnOutcome, { _tag: 'SafetyStop' } | { _tag: 'UnexpectedError' } | { _tag: 'ProviderNotReady' } | { _tag: 'OutputTruncated' }>,
-  timestamp: number
-): ErrorDisplayMessage {
-  switch (outcome._tag) {
-    case 'SafetyStop':
-      return {
-        id: generateId(),
-        type: 'error',
-        message: describeSafetyStop(outcome.reason),
-        timestamp,
-      }
-    case 'UnexpectedError':
-      return {
-        id: generateId(),
-        type: 'error',
-        message: outcome.message,
-        timestamp,
-      }
-    case 'ProviderNotReady': {
-      const { message, cta } = describeProviderNotReady(outcome.detail)
-      return {
-        id: generateId(),
-        type: 'error',
-        message,
-        timestamp,
-        cta,
-      }
-    }
-    case 'OutputTruncated':
-      return {
-        id: generateId(),
-        type: 'error',
-        message: 'Response exceeded output limit',
-        timestamp,
-      }
+function toErrorDisplayMessage(outcome: TurnOutcome, timestamp: number): ErrorDisplayMessage | null {
+  const p = present(outcome)
+  if (p.surface !== 'inline') return null
+  return {
+    id: generateId(),
+    type: 'error',
+    message: p.message,
+    timestamp,
+    cta: p.cta,
   }
 }
 
@@ -1016,7 +938,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       return {
         ...closedState,
-        messages: [...closedState.messages, errorMessage],
+        messages: errorMessage ? [...closedState.messages, errorMessage] : closedState.messages,
         currentTurnId: null,
         status: 'idle' as const,
         streamingMessageId: null,

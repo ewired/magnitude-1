@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleProfiles, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot, type RoleProfile } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot, type RoleProfile } from '@magnitudedev/agent'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
 import { JsonChatPersistence, loadSessionSummary } from './persistence'
@@ -368,11 +368,17 @@ function AppInner({
       // Framework errors bypass the event system entirely — render directly in the TUI
       client.onError((error) => {
         if (!mounted) return
+        // Log full cause for debugging; surface a friendly message to the user.
+        logger.error({ tag: error._tag, cause: Cause.pretty(error.cause) }, 'Framework error')
+        const outcome = classifyUnknownError(error.cause)
+        const p = present(outcome)
+        if (p.surface !== 'inline') return
         const errorMsg: ErrorDisplayMessage = {
           id: createId(),
           type: 'error',
-          message: `[${error._tag}] ${Cause.pretty(error.cause)}`,
-          timestamp: Date.now()
+          message: p.message,
+          timestamp: Date.now(),
+          cta: p.cta,
         }
         setDisplay(prev => prev ? { ...prev, messages: [...prev.messages, errorMsg] } : prev)
       })

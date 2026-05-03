@@ -12,6 +12,18 @@ export type { CreateClientOptions } from './coding-agent'
 export { fetchRoleProfiles, type RoleProfile } from './role-profiles'
 export { fetchUsageWindows, type UsageWindowsResponse } from './usage'
 
+// Errors
+export {
+  classifyUnknownError,
+  mapConnectionErrorToOutcome,
+  mapStreamErrorToOutcome,
+  present,
+  type ErrorPresentation,
+  type ErrorSurface,
+  type ErrorSeverity,
+  type ErrorCta,
+} from './errors'
+
 // Events
 export type {
   AppEvent,

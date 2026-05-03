@@ -6,7 +6,8 @@
  */
 
 import { Projection } from '@magnitudedev/event-core'
-import type { AppEvent, StrategyId, ImageAttachment, ProviderNotReadyDetail, ConnectionFailureDetail, SafetyStopReason, ObservationPart } from '../events'
+import type { AppEvent, StrategyId, ImageAttachment, ObservationPart } from '../events'
+import { present } from '../errors'
 import { getAgentByForkId, AgentStatusProjection } from './agent-status'
 import { SubagentActivityProjection } from './subagent-activity'
 import { OutboundMessagesProjection } from './outbound-messages'
@@ -270,37 +271,6 @@ function findTaskForAgent(state: TaskGraphState, args: { agentId: string, forkId
 
 
 
-function describeProviderNotReady(detail: ProviderNotReadyDetail): string {
-  switch (detail._tag) {
-    case 'AuthFailed':
-      return 'Authentication failed. API key may be invalid or expired.'
-    case 'MagnitudeBilling':
-      return detail.reason.message
-  }
-}
-
-function describeConnectionFailure(detail: ConnectionFailureDetail): string {
-  switch (detail._tag) {
-    case 'ProviderError':
-      return `Connection issue with provider (HTTP ${detail.httpStatus}); retrying.`
-    case 'TransportError':
-      return detail.httpStatus !== undefined
-        ? `Transport connection issue (HTTP ${detail.httpStatus}); retrying.`
-        : 'Transport connection issue; retrying.'
-    case 'StreamError':
-      return 'Response stream interrupted; retrying.'
-  }
-}
-
-function describeSafetyStop(reason: SafetyStopReason): string {
-  switch (reason._tag) {
-    case 'IdenticalResponseCircuitBreaker':
-      return `Safety stop: repeated identical responses reached threshold ${reason.threshold}.`
-    case 'Other':
-      return `Safety stop: ${reason.message}`
-  }
-}
-
 export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowState>()({
   name: 'Window',
   reads: [AgentStatusProjection, SubagentActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection, CanonicalTurnProjection] as const,
@@ -431,31 +401,18 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
 
 
         case 'ConnectionFailure':
-          feedback.push({ kind: 'error', message: describeConnectionFailure(outcome.detail) })
-          break
-
         case 'ProviderNotReady':
-          feedback.push({ kind: 'error', message: describeProviderNotReady(outcome.detail) })
-          break
-
         case 'ContextWindowExceeded':
-          feedback.push({ kind: 'error', message: 'Context window exceeded; waiting for compaction or context reduction.' })
-          break
-
         case 'OutputTruncated':
-          feedback.push({ kind: 'error', message: 'Output was truncated. Respond in smaller, more bounded steps.' })
-          break
-
         case 'SafetyStop':
-          feedback.push({ kind: 'error', message: describeSafetyStop(outcome.reason) })
+        case 'UnexpectedError': {
+          const fb = present(outcome).llmFeedback
+          if (fb) feedback.push({ kind: 'error', message: fb })
           break
+        }
 
         case 'Cancelled':
           feedback.push({ kind: 'interrupted' })
-          break
-
-        case 'UnexpectedError':
-          feedback.push({ kind: 'error', message: outcome.message })
           break
 
         case 'SystemError':

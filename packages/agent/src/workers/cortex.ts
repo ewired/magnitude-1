@@ -13,11 +13,11 @@ import { Effect, Stream, Layer } from 'effect'
 import { Worker, AmbientServiceTag } from '@magnitudedev/event-core'
 import { logger } from '@magnitudedev/logger'
 import { createHarness, type ExecuteHookContext, type InterceptorDecision } from '@magnitudedev/harness'
-import type { MagnitudeConnectionError, MagnitudeStreamError } from '@magnitudedev/magnitude-client'
+import type { MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
 import { renderToolDocs } from '../prompts/render-tool-docs'
 
-import type { AppEvent, TurnOutcome } from '../events'
-import type { TurnOutcome as HarnessTurnOutcome } from '@magnitudedev/harness'
+import type { AppEvent } from '../events'
+import { mapConnectionErrorToOutcome, mapStreamErrorToOutcome } from '../errors'
 
 import { WindowProjection } from '../projections/window'
 import { SessionContextProjection } from '../projections/session-context'
@@ -53,53 +53,6 @@ import { Fork } from '@magnitudedev/event-core'
 import * as path from 'path'
 
 const { ForkContext } = Fork
-
-// =============================================================================
-// Error Mapping
-// =============================================================================
-
-function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): TurnOutcome {
-  switch (err._tag) {
-    case 'SubscriptionRequired':
-      return {
-        _tag: 'ProviderNotReady',
-        detail: { _tag: 'MagnitudeBilling', reason: { _tag: 'SubscriptionRequired', message: err.message } },
-      }
-    case 'TrialExpired':
-      return {
-        _tag: 'ProviderNotReady',
-        detail: { _tag: 'MagnitudeBilling', reason: { _tag: 'TrialExpired', message: err.message } },
-      }
-    case 'MagnitudeUsageLimitExceeded':
-      return {
-        _tag: 'ProviderNotReady',
-        detail: { _tag: 'MagnitudeBilling', reason: { _tag: 'UsageLimitExceeded', message: err.message } },
-      }
-    case 'ModelNotGrammarCompatible':
-      return { _tag: 'UnexpectedError', message: err.message, detail: { _tag: 'ProviderDefect' } }
-    case 'RoleNotFound':
-      return { _tag: 'UnexpectedError', message: err.message, detail: { _tag: 'ProviderDefect' } }
-    case 'AuthFailed':
-      return {
-        _tag: 'ProviderNotReady',
-        detail: { _tag: 'AuthFailed' },
-      }
-    case 'RateLimited':
-      return { _tag: 'ConnectionFailure', detail: { _tag: 'TransportError', httpStatus: err.status } }
-    case 'UsageLimitExceeded':
-      return { _tag: 'ConnectionFailure', detail: { _tag: 'ProviderError', httpStatus: err.status } }
-    case 'ContextLimitExceeded':
-      return { _tag: 'ContextWindowExceeded' }
-    case 'InvalidRequest':
-      return { _tag: 'UnexpectedError', message: err.message, detail: { _tag: 'ProviderDefect' } }
-    case 'TransportError':
-      return { _tag: 'ConnectionFailure', detail: { _tag: 'TransportError', httpStatus: err.status ?? undefined } }
-  }
-}
-
-function mapStreamErrorToOutcome(err: MagnitudeStreamError): HarnessTurnOutcome {
-  return { _tag: 'EngineDefect', message: `Stream error: ${err.message ?? 'unknown'}` }
-}
 
 // =============================================================================
 // Worker
