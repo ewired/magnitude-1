@@ -14,7 +14,7 @@ import { ParseResult, Schema } from "effect"
 import { deriveStreamingSchema } from "./streaming-schema"
 import type { JsonValue } from "../prompt/parts"
 import type { ValidationIssue } from "../response/events"
-import { createIncrementalJsonParser } from "./json-parser"
+import { createIncrementalJsonParser } from "./parser"
 import type { FieldEvent, ParsedValue, StreamingPartial } from "./types"
 
 // ---------------------------------------------------------------------------
