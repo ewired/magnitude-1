@@ -53,6 +53,9 @@ import { handleMessageDirective } from '../tasks/operations/message'
 import { Fork } from '@magnitudedev/event-core'
 
 import * as path from 'path'
+import { describeShape, estimateText } from '../truncation'
+import { TRUNCATION_TOKEN_LIMIT } from '../constants'
+import { isImageValue, formatToolResult as defaultFormatToolResult } from '@magnitudedev/harness'
 
 const { ForkContext } = Fork
 
@@ -331,5 +334,40 @@ function buildHarnessHooks(ctx: {
           )
         }
       }),
+
+    formatResult(toolCallId, toolName, _toolKey, result) {
+      // Only truncate successful, non-image, non-undefined outputs
+      if (result._tag !== 'Success' || result.output === undefined) {
+        return defaultFormatToolResult(result)
+      }
+      if (isImageValue(result.output)) {
+        return defaultFormatToolResult(result)
+      }
+
+      // Estimate token count from JSON serialization
+      let serialized: string
+      try {
+        serialized = JSON.stringify(result.output, null, 2)
+      } catch {
+        return defaultFormatToolResult(result)
+      }
+
+      const estimatedTokens = estimateText(serialized)
+      if (estimatedTokens <= TRUNCATION_TOKEN_LIMIT) {
+        return defaultFormatToolResult(result)
+      }
+
+      // Generate truncated representation with structural shape summary
+      const resultPath = `$M/results/${turnId}_${toolCallId}.json`
+      const shapeSummary = describeShape(result.output)
+
+      const text = [
+        `<truncated path="${resultPath}" estimated_tokens="${estimatedTokens}">`,
+        shapeSummary,
+        `</truncated>`,
+      ].join('\n')
+
+      return [{ _tag: 'TextPart' as const, text }]
+    },
   }
 }

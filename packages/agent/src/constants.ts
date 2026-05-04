@@ -12,10 +12,10 @@ export const CHARS_PER_TOKEN_UPPER = 4
 export const CHARS_PER_TOKEN_LOWER = 3
 
 /** Max tokens for a resolved ref in an inspect block */
-export const INSPECT_TOKEN_LIMIT = 25_000
+export const TRUNCATION_TOKEN_LIMIT = 25_000
 
-/** Character equivalent of INSPECT_TOKEN_LIMIT */
-export const INSPECT_CHAR_LIMIT = INSPECT_TOKEN_LIMIT * CHARS_PER_TOKEN_UPPER
+/** Character equivalent of TRUNCATION_TOKEN_LIMIT */
+export const TRUNCATION_CHAR_LIMIT = TRUNCATION_TOKEN_LIMIT * CHARS_PER_TOKEN_UPPER
 
 
 // =============================================================================

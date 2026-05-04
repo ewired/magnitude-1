@@ -23,7 +23,7 @@ export interface HarnessHooks<R = never> {
     readonly toolKey: string
     readonly value: unknown
   }) => Effect.Effect<void, never, R>
-  readonly formatResult?: (toolName: string, toolKey: string, result: ToolResult) => readonly ToolResultPart[]
+  readonly formatResult?: (toolCallId: ToolCallId, toolName: string, toolKey: string, result: ToolResult) => readonly ToolResultPart[]
   readonly formatDecodeFailure?: <TInput>(toolName: string, issue: ValidationIssue, inputSchema: Schema.Schema<TInput, TInput, never>, receivedInput: StreamingPartial<TInput>) => readonly ToolResultPart[]
   readonly onResult?: (ctx: {
     readonly toolCallId: ToolCallId

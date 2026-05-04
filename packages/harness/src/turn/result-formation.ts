@@ -15,7 +15,7 @@ export function formatToolResult<R>(
   hooks: HarnessHooks<R> | undefined,
 ): Effect.Effect<readonly ToolResultPart[], never, R> {
   const parts: readonly ToolResultPart[] = hooks?.formatResult
-    ? hooks.formatResult(toolName, toolKey, result)
+    ? hooks.formatResult(toolCallId, toolName, toolKey, result)
     : defaultFormatResult(result)
 
   const onResult = hooks?.onResult

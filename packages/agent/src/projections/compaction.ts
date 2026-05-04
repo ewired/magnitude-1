@@ -19,7 +19,8 @@ import { SkillsAmbient } from '../ambient/skills-ambient'
 import { ToolkitAmbient } from '../ambient/toolkit-ambient'
 import type { Skill } from '@magnitudedev/skills'
 
-import { estimateContentTokens, estimateCompletedTurn, estimateText } from '../util/token-estimation'
+import { estimateContentTokens, estimateText } from '../truncation/estimate'
+import { estimateCompletedTurn } from '../util/turn-estimation'
 
 import { isRoleId, type RoleId } from '../agents/role-validation'
 import { getAgentDefinition, getForkInfo } from '../agents/registry'
