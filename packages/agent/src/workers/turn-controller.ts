@@ -64,13 +64,11 @@ export const TurnController = Worker.define<AppEvent>()({
         const compactionFork: import('../projections/compaction').CompactionState | undefined = compactionForks.get(forkId)
         const hasDueTrigger = turnFork.triggers.some((t) => isTriggerDue(t, now))
         const isTurnIdle = turnFork._tag === 'idle'
-        const isCompactionIdle = compactionFork === undefined || compactionFork._tag === 'idle'
         const contextLimitBlocked = compactionFork?.contextLimitBlocked === true
 
         const canStart =
           hasDueTrigger &&
           isTurnIdle &&
-          isCompactionIdle &&
           !contextLimitBlocked
 
         if (canStart) {

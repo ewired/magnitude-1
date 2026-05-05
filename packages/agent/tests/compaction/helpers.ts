@@ -5,7 +5,7 @@ import type { AppEvent, SessionContext } from '../../src/events'
 import type { RoleId } from '../../src/agents/role-validation'
 import { CHARS_PER_TOKEN_LOWER } from '../../src/constants'
 import { CompactionProjection } from '../../src/projections/compaction'
-import { WindowProjection } from '../../src/projections/window'
+import { WindowProjection } from '../../src/window'
 import { TurnProjection } from '../../src/projections/turn'
 import { TestHarness } from '../../src/test-harness/harness'
 
@@ -110,6 +110,7 @@ export const mkCompactionFailed = (forkId: string | null = ROOT_FORK_ID, error =
   type: 'compaction_failed',
   forkId,
   error,
+  presentation: null,
 })
 
 export const mkContextLimitHit = (forkId: string | null = ROOT_FORK_ID, error = 'cap hit'): Extract<AppEvent, { type: 'context_limit_hit' }> => ({

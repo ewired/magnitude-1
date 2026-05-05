@@ -105,6 +105,7 @@ export function AppOverlays({
           projectRoot={projectRoot}
           subscribeForkDisplay={(fId, cb) => client.state.display.subscribeFork(fId, cb)}
           subscribeForkCompaction={(fId, cb) => client.state.compaction.subscribeFork(fId, cb)}
+          subscribeForkWindow={(fId, cb) => client.state.memory.subscribeFork(fId, cb)}
           subscribeForkToolState={(fId, cb) => client.state.toolState.subscribeFork(fId, cb)}
         />
 

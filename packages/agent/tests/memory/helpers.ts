@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
 import { SessionContextProjection } from '../../src/projections/session-context'
-import { WindowProjection, type ForkWindowState, type WindowEntry } from '../../src/projections/window'
+import { WindowProjection, type ForkWindowState, type WindowEntry } from '../../src/window'
 import { windowToPrompt } from '../../src/prompts/window-to-prompt'
 import { TestHarness } from '../../src/test-harness/harness'
 import { createId } from '../../src/util/id'

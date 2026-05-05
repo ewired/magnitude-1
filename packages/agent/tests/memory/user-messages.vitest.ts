@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { TestHarness, TestHarnessLive } from '../../src/test-harness/harness'
-import { WindowProjection } from '../../src/projections/window'
+import { WindowProjection } from '../../src/window'
 import { SessionContextProjection } from '../../src/projections/session-context'
 import { windowToPrompt } from '../../src/prompts/window-to-prompt'
 import { getRootMemory, inboxMessages, lastInboxMessage, snapshotMessageRefs, assertPrefixUnchanged, sendUserMessage } from './helpers'

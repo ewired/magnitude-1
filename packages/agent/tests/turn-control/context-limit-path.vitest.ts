@@ -50,7 +50,7 @@ describe('turn control context-limit path', () => {
       yield* h.send(mkTurnStarted({ turnId: 't-cl-3a', chainId: 'c-cl-3' }))
       yield* h.send(mkContextLimitHit())
       yield* h.send(mkTurnOutcomeEventFailure({ turnId: 't-cl-3a', chainId: 'c-cl-3' }))
-      yield* h.send({ type: 'compaction_failed', forkId: null, error: 'cleanup' })
+      yield* h.send({ type: 'compaction_failed', forkId: null, error: 'cleanup', presentation: null })
 
       yield* h.send(mkTurnStarted({ turnId: 't-cl-3b', chainId: 'c-cl-3' }))
       yield* h.send(mkTurnOutcomeEventSuccess({ turnId: 't-cl-3b', chainId: 'c-cl-3' }))
@@ -69,7 +69,7 @@ describe('turn control context-limit path', () => {
         yield* h.send(mkTurnStarted({ turnId: id, chainId: 'c-rep' }))
         yield* h.send(mkContextLimitHit(null, `ctx-${id}`))
         yield* h.send(mkTurnOutcomeEventFailure({ turnId: id, chainId: 'c-rep' }))
-        yield* h.send({ type: 'compaction_failed', forkId: null, error: 'retry' })
+        yield* h.send({ type: 'compaction_failed', forkId: null, error: 'retry', presentation: null })
       }
 
       assertNoTurnIdMismatch(eventsForFork(h, null))

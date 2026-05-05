@@ -1,7 +1,7 @@
 import type { UserPart, AssistantMessage, ToolResultMessage, ImagePart } from '@magnitudedev/ai'
 import type {
   ResolvedMention,
-} from '../events'
+} from '../../events'
 
 
 // ---------------------------------------------------------------------------
@@ -120,23 +120,6 @@ export type TimelineEntry =
       readonly cancelledCount?: number
     })
   | (Timestamped<'observation'> & { readonly parts: readonly UserPart[] })
-
-// ---------------------------------------------------------------------------
-// CompletedTurn / ToolResult / TurnFeedback
-// ---------------------------------------------------------------------------
-
-export type TurnFeedback =
-  | { readonly kind: 'message_ack'; readonly destination: 'parent'; readonly chars: number }
-  | { readonly kind: 'error'; readonly message: string }
-  | { readonly kind: 'interrupted' }
-
-export interface CompletedTurn {
-  readonly turnId: string
-  readonly assistant: AssistantMessage
-  readonly toolResults: readonly ToolResultMessage[]
-  readonly feedback: readonly TurnFeedback[]
-  readonly clean: boolean
-}
 
 // ---------------------------------------------------------------------------
 // QueuedEntry

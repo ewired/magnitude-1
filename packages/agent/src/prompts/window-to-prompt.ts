@@ -11,10 +11,10 @@
  */
 
 import { Prompt, type Message as AiMessage, type TerminalMessages } from '@magnitudedev/ai'
-import type { WindowEntry, ForkWindowState } from '../projections/window'
+import type { WindowEntry, ForkWindowState } from '../window'
 import type { UserPart } from '@magnitudedev/ai'
-import type { TurnFeedback } from '../inbox/types'
-import { renderTimeline } from '../inbox/render'
+import type { TurnFeedback } from '../window/types'
+import { renderTimeline } from '../window/inbox/render'
 import { renderFeedbackText } from './feedback-text'
 
 // ---------------------------------------------------------------------------

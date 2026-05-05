@@ -17,8 +17,6 @@ import type { ToolKey } from '../tools/toolkits'
 import type { ToolResult } from '@magnitudedev/harness'
 import { AgentRoutingProjection } from './agent-routing'
 import { UserMessageResolutionProjection } from './user-message-resolution'
-import { CompactionProjection } from './compaction'
-
 import { createId } from '../util/id'
 
 // =============================================================================
@@ -139,7 +137,6 @@ export const TurnProjection = Projection.defineForked<AppEvent, TurnLifecycleSta
   reads: [
     AgentRoutingProjection,
     UserMessageResolutionProjection,
-    CompactionProjection,
   ] as const,
 
   signals: {

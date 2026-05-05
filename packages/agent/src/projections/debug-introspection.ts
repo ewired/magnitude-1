@@ -11,7 +11,7 @@ import { DisplayProjection } from './display'
 import { AgentRoutingProjection } from './agent-routing'
 import { AgentStatusProjection } from './agent-status'
 import { TurnProjection } from './turn'
-import { WindowProjection } from './window'
+import { WindowProjection } from '../window'
 import { CompactionProjection } from './compaction'
 
 import { SessionContextProjection } from './session-context'
@@ -116,11 +116,11 @@ function buildSnapshot(
       const info = getForkInfo(statusState, forkId)
       const limits = info ? getRoleConfig(configState, info.roleId) : getRoleConfig(configState, 'leader')
       contextUsage = {
-        currentTokens: compactionForkState.tokenEstimate,
+        currentTokens: memoryForkState.tokenEstimate,
         hardCap: limits.hardCap,
         softCap: limits.softCap,
         messageCount: memoryForkState.messages.length,
-        usagePercent: Math.round((compactionForkState.tokenEstimate / limits.hardCap) * 100),
+        usagePercent: Math.round((memoryForkState.tokenEstimate / limits.hardCap) * 100),
         shouldCompact: compactionForkState.shouldCompact,
         isCompacting: compactionForkState._tag !== 'idle',
       }

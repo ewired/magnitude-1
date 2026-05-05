@@ -2,23 +2,23 @@
  * WindowProjection (Forked)
  *
  * LLM conversation history, per-fork.
- * Each fork has independent message history.
+ * Each fork has independent message history and token budget tracking.
  */
 
-import { Projection } from '@magnitudedev/event-core'
+import { Projection, Signal } from '@magnitudedev/event-core'
 import type { AppEvent, StrategyId, ImageAttachment, ObservationPart } from '../events'
 import { present } from '../errors'
-import { getAgentByForkId, AgentStatusProjection } from './agent-status'
-import { SubagentActivityProjection } from './subagent-activity'
-import { OutboundMessagesProjection } from './outbound-messages'
-import { CanonicalTurnProjection } from './canonical-turn'
+import { getAgentByForkId, AgentStatusProjection } from '../projections/agent-status'
+import { SubagentActivityProjection } from '../projections/subagent-activity'
+import { OutboundMessagesProjection } from '../projections/outbound-messages'
+import { CanonicalTurnProjection } from '../projections/canonical-turn'
 import { buildSessionContextContent } from '../prompts/session-context'
-import { compactionSummaryTag } from '../prompts/constants'
 import { TASK_TREE_COMPLETION_REMINDER } from '../prompts/task-tree'
 import { SkillsAmbient } from '../ambient/skills-ambient'
-import { UserPresenceProjection } from './user-presence'
-import { UserMessageResolutionProjection } from './user-message-resolution'
-import { TaskGraphProjection, type TaskGraphState, type TaskRecord } from './task-graph'
+import { ConfigAmbient } from '../ambient/config-ambient'
+import { UserPresenceProjection } from '../projections/user-presence'
+import { UserMessageResolutionProjection } from '../projections/user-message-resolution'
+import { TaskGraphProjection, type TaskGraphState, type TaskRecord } from '../projections/task-graph'
 
 import { formatUserPresence, formatUserReturnedAfterAbsence } from '../prompts/presence'
 import type { UserPart, ImageMediaType } from '@magnitudedev/ai'
@@ -26,12 +26,11 @@ import { textParts } from '../content'
 
 import { EMPTY_RESPONSE_ERROR } from '../prompts/error-states'
 import type {
-  CompletedTurn,
-  TurnFeedback,
   TimelineEntry,
   TimelineAttachment,
   AgentAtom,
-} from '../inbox/types'
+} from './inbox/types'
+import type { CompletedTurn, TurnFeedback } from './types'
 import {
   toTimelineUserMessage,
   toTimelineParentMessage,
@@ -47,44 +46,17 @@ import {
   toTimelineTaskTreeDirty,
   toTimelineTaskTreeView,
   toTimelineTaskUpdate,
-} from '../inbox/compose'
+} from './inbox/compose'
 
-export type WindowEntrySource = 'user' | 'agent' | 'system'
-
-export type WindowEntry =
-  | { readonly type: 'session_context'; readonly source: 'system'; readonly content: UserPart[] }
-  | {
-      readonly type: 'assistant_turn'
-      readonly source: 'agent'
-      readonly turn: CompletedTurn
-      readonly strategyId: StrategyId
-    }
-  | { readonly type: 'compacted'; readonly source: 'system'; readonly content: UserPart[] }
-  | { readonly type: 'fork_context'; readonly source: 'system'; readonly content: UserPart[] }
-  | {
-      readonly type: 'context'
-      readonly source: 'system'
-      readonly timeline: readonly TimelineEntry[]
-    }
-
-export interface ForkWindowState {
-  readonly messages: readonly WindowEntry[]
-  readonly queuedTimeline: readonly QueuedTimelineEntry[]
-  readonly currentTurnId: string | null
-  readonly currentChainId: string | null
-  readonly pendingPresenceText: string | null
-  readonly nextQueueSeq: number
-}
-
-interface QueuedTimelineEntry {
-  readonly timestamp: number
-  readonly seq: number
-  readonly entry: TimelineEntry
-  readonly coalesceKey?: string
-}
-
-
-
+import type { ForkWindowState, WindowEntry, QueuedTimelineEntry } from './types'
+import {
+  estimateContentEntry,
+  estimateTurnEntry,
+  estimateContextEntry,
+  estimateSystemPromptTokens,
+  computeTokenEstimate,
+} from './estimate'
+import { isRoleId } from '../agents/role-validation'
 
 
 function extractText(parts: readonly UserPart[]): string {
@@ -94,9 +66,16 @@ function extractText(parts: readonly UserPart[]): string {
     .join('')
 }
 
-function appendTimeline(messages: readonly WindowEntry[], timeline: readonly TimelineEntry[]): readonly WindowEntry[] {
-  if (timeline.length === 0) return messages
-  return [...messages, { type: 'context', source: 'system', timeline: [...timeline] }]
+function appendTimeline(
+  messages: readonly WindowEntry[],
+  timeline: readonly TimelineEntry[],
+): { messages: readonly WindowEntry[]; addedTokens: number } {
+  if (timeline.length === 0) return { messages, addedTokens: 0 }
+  const estimatedTokens = estimateContextEntry(timeline)
+  return {
+    messages: [...messages, { type: 'context', source: 'system', timeline: [...timeline], estimatedTokens }],
+    addedTokens: estimatedTokens,
+  }
 }
 
 function enqueueTimeline(
@@ -143,10 +122,17 @@ function flushQueue(fork: ForkWindowState, taskGraphState: TaskGraphState): Fork
     }
   }
 
+  const { messages, addedTokens } = appendTimeline(fork.messages, timeline)
+  const messageTokens = fork.messageTokens + addedTokens
   return {
     ...fork,
-    messages: appendTimeline(fork.messages, timeline),
+    messages,
     queuedTimeline: [],
+    messageTokens,
+    tokenEstimate: computeTokenEstimate(
+      fork.systemPromptTokens, messageTokens,
+      fork.lastAnchoredTotal, fork.lastAnchoredMessageTokens,
+    ),
   }
 }
 
@@ -267,15 +253,26 @@ function findTaskForAgent(state: TaskGraphState, args: { agentId: string, forkId
   return null
 }
 
-
-
+/** Emit tokenEstimateChanged signal when tokenEstimate changes between old and new fork state. */
+function emitIfChanged(
+  oldFork: ForkWindowState,
+  newFork: ForkWindowState,
+  forkId: string | null,
+  emit: { tokenEstimateChanged: (v: { forkId: string | null; tokenEstimate: number }) => void },
+): void {
+  if (newFork.tokenEstimate !== oldFork.tokenEstimate) {
+    emit.tokenEstimateChanged({ forkId, tokenEstimate: newFork.tokenEstimate })
+  }
+}
 
 
 export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowState>()({
   name: 'Window',
   reads: [AgentStatusProjection, SubagentActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection, CanonicalTurnProjection] as const,
-  ambients: [SkillsAmbient] as const,
-  signals: {},
+  ambients: [SkillsAmbient, ConfigAmbient] as const,
+  signals: {
+    tokenEstimateChanged: Signal.create<{ forkId: string | null; tokenEstimate: number }>('Window/tokenEstimateChanged'),
+  },
   initialFork: {
     messages: [],
     queuedTimeline: [],
@@ -283,13 +280,35 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
     currentChainId: null,
     pendingPresenceText: null,
     nextQueueSeq: 0,
+    tokenEstimate: 0,
+    messageTokens: 0,
+    systemPromptTokens: 0,
+    lastAnchoredTotal: null,
+    lastAnchoredMessageTokens: null,
   },
 
   eventHandlers: {
-    session_initialized: ({ event, fork }) => {
+    session_initialized: ({ event, fork, emit, ambient }) => {
       const content = buildSessionContextContent(event.context)
-      const sessionMsg: WindowEntry = { type: 'session_context', source: 'system', content: textParts(content) }
-      return { ...fork, messages: [sessionMsg, ...fork.messages] }
+      const contentParts = textParts(content)
+      const entryTokens = estimateContentEntry(contentParts)
+      const sessionMsg: WindowEntry = { type: 'session_context', source: 'system', content: contentParts, estimatedTokens: entryTokens }
+
+      const skills = ambient.get(SkillsAmbient)
+      const configState = ambient.get(ConfigAmbient)
+      const sysPromptTokens = estimateSystemPromptTokens('leader', skills, configState)
+      const messageTokens = fork.messageTokens + entryTokens
+      const tokenEstimate = sysPromptTokens + messageTokens
+
+      const result: ForkWindowState = {
+        ...fork,
+        messages: [sessionMsg, ...fork.messages],
+        messageTokens,
+        systemPromptTokens: sysPromptTokens,
+        tokenEstimate,
+      }
+      emitIfChanged(fork, result, event.forkId, emit)
+      return result
     },
 
     skill_activated: ({ event, fork }) => {
@@ -313,7 +332,7 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
         event.timestamp,
       ),
 
-    turn_started: ({ event, fork, read }) => {
+    turn_started: ({ event, fork, read, emit }) => {
       let nextFork = fork
 
       if (event.forkId === null && nextFork.pendingPresenceText !== null) {
@@ -338,29 +357,33 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
       const flushProducedInbox = messages.length > preFlushMessageCount
       const lastMessage = messages[messages.length - 1]
       if (!flushProducedInbox && lastMessage?.source === 'agent') {
-        messages = [...messages, { type: 'context', source: 'system', timeline: [] }]
+        messages = [...messages, { type: 'context', source: 'system', timeline: [], estimatedTokens: 0 }]
       }
 
-      return {
+      const result: ForkWindowState = {
         ...flushed,
         messages,
         currentTurnId: event.turnId,
         currentChainId: event.chainId,
         pendingPresenceText: null,
       }
+      emitIfChanged(fork, result, event.forkId, emit)
+      return result
     },
 
-    observations_captured: ({ event, fork, read }) => {
+    observations_captured: ({ event, fork, read, emit }) => {
       if (fork.currentTurnId !== event.turnId) return fork
       const nextFork = enqueueTimeline(
         fork,
         toTimelineObservation({ timestamp: event.timestamp, parts: event.parts.map(toUserPartFromObservation) }),
         event.timestamp,
       )
-      return flushQueue(nextFork, read(TaskGraphProjection))
+      const result = flushQueue(nextFork, read(TaskGraphProjection))
+      emitIfChanged(fork, result, event.forkId, emit)
+      return result
     },
 
-    turn_outcome: ({ event, fork, read }) => {
+    turn_outcome: ({ event, fork, read, emit }) => {
       if (fork.currentTurnId !== event.turnId) return fork
 
       const outcome = 'outcome' in event
@@ -374,12 +397,10 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
       const completedTurn = canonical.lastCompleted
 
       // Build feedback from outcome
-      // CanonicalTurn already includes message_acks in completedTurn.feedback
       const feedback: TurnFeedback[] = [...(completedTurn?.feedback ?? [])]
 
       switch (outcome._tag) {
         case 'Completed': {
-          // Check for empty response
           const hasContent = completedTurn && completedTurn.turnId === event.turnId &&
             (completedTurn.assistant.text || completedTurn.assistant.reasoning || completedTurn.assistant.toolCalls?.length || completedTurn.toolResults.length > 0)
 
@@ -392,13 +413,10 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
               case 'InvalidMessageDestination':
                 feedback.push({ kind: 'error', message: fb.message })
                 break
-
             }
           }
           break
         }
-
-
 
         case 'ConnectionFailure':
         case 'ProviderNotReady':
@@ -422,16 +440,19 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
 
       // Build the final CompletedTurn with feedback
       const newMessages: WindowEntry[] = [...fork.messages]
+      let turnEntryTokens = 0
+
       if (completedTurn && completedTurn.turnId === event.turnId) {
         const turn: CompletedTurn = { ...completedTurn, feedback }
+        turnEntryTokens = estimateTurnEntry(turn)
         newMessages.push({
           type: 'assistant_turn',
           source: 'agent',
           turn,
           strategyId: event.strategyId,
+          estimatedTokens: turnEntryTokens,
         })
       } else if (feedback.length > 0) {
-        // No turn from canonical but we have feedback (e.g. connection failure before any output)
         const emptyTurn: CompletedTurn = {
           turnId: event.turnId,
           assistant: { _tag: 'AssistantMessage' as const },
@@ -439,28 +460,85 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
           feedback,
           clean: false,
         }
+        turnEntryTokens = estimateTurnEntry(emptyTurn)
         newMessages.push({
           type: 'assistant_turn',
           source: 'agent',
           turn: emptyTurn,
           strategyId: event.strategyId,
+          estimatedTokens: turnEntryTokens,
         })
       }
 
-      const nextFork: ForkWindowState = { ...fork, messages: newMessages, currentTurnId: null }
-      return flushQueue(nextFork, read(TaskGraphProjection))
+      const messageTokens = fork.messageTokens + turnEntryTokens
+
+      // Apply API anchor if available
+      let nextFork: ForkWindowState
+      if (event.inputTokens != null) {
+        // Anchor: API measured inputTokens for this turn's prompt.
+        // The new turn entry wasn't in the prompt, so anchor total includes it separately.
+        nextFork = {
+          ...fork,
+          messages: newMessages,
+          currentTurnId: null,
+          messageTokens,
+          lastAnchoredTotal: event.inputTokens + turnEntryTokens,
+          lastAnchoredMessageTokens: messageTokens,
+          tokenEstimate: event.inputTokens + turnEntryTokens,
+        }
+      } else {
+        nextFork = {
+          ...fork,
+          messages: newMessages,
+          currentTurnId: null,
+          messageTokens,
+          tokenEstimate: computeTokenEstimate(
+            fork.systemPromptTokens, messageTokens,
+            fork.lastAnchoredTotal, fork.lastAnchoredMessageTokens,
+          ),
+        }
+      }
+
+      // Flush queued entries on top of (possibly anchored) base
+      nextFork = flushQueue(nextFork, read(TaskGraphProjection))
+      emitIfChanged(fork, nextFork, event.forkId, emit)
+      return nextFork
     },
 
     interrupt: ({ fork }) => fork,
 
-    compaction_completed: ({ event, fork }) => {
-      const remainingMessages = fork.messages.slice(1 + event.compactedMessageCount)
+    compaction_completed: ({ event, fork, emit }) => {
       const sessionContext: WindowEntry = event.refreshedContext
-        ? { type: 'session_context', source: 'system', content: textParts(buildSessionContextContent(event.refreshedContext)) }
+        ? (() => {
+            const content = textParts(buildSessionContextContent(event.refreshedContext))
+            return { type: 'session_context' as const, source: 'system' as const, content, estimatedTokens: estimateContentEntry(content) }
+          })()
         : fork.messages[0]
 
-      const summaryMessage: WindowEntry = { type: 'compacted', source: 'system', content: textParts(compactionSummaryTag(event.summary)) }
-      return { ...fork, messages: [sessionContext, summaryMessage, ...remainingMessages], currentChainId: null }
+      const remainingMessages = fork.messages.slice(1 + event.compactedMessageCount)
+
+      const reflectionContent = textParts(`--- REFLECTION START ---\n${event.summary}\n--- REFLECTION END ---`)
+      const reflectionBlock: WindowEntry = {
+        type: 'compacted',
+        source: 'system',
+        content: reflectionContent,
+        estimatedTokens: estimateContentEntry(reflectionContent),
+      }
+
+      const newMessages = [sessionContext, ...remainingMessages, reflectionBlock]
+      const messageTokens = newMessages.reduce((sum, e) => sum + e.estimatedTokens, 0)
+
+      const result: ForkWindowState = {
+        ...fork,
+        messages: newMessages,
+        currentChainId: null,
+        messageTokens,
+        lastAnchoredTotal: null,
+        lastAnchoredMessageTokens: null,
+        tokenEstimate: fork.systemPromptTokens + messageTokens,
+      }
+      emitIfChanged(fork, result, event.forkId, emit)
+      return result
     },
   },
 
@@ -470,15 +548,30 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
       return state
     },
 
-    agent_created: ({ event, state }) => {
+    agent_created: ({ event, state, ambient }) => {
       const { forkId, parentForkId } = event
       const parentState = state.forks.get(parentForkId)
       if (!parentState) throw new Error(`Parent fork ${parentForkId} not found in WindowProjection`)
 
       const normalizedContext = typeof event.context === 'string' ? event.context : ''
       const contextMessage: WindowEntry[] = normalizedContext
-        ? [{ type: 'fork_context', source: 'system', content: textParts(normalizedContext) }]
+        ? (() => {
+            const content = textParts(normalizedContext)
+            return [{ type: 'fork_context' as const, source: 'system' as const, content, estimatedTokens: estimateContentEntry(content) }]
+          })()
         : []
+
+      const entryTokens = contextMessage.reduce((sum, e) => sum + e.estimatedTokens, 0)
+
+      // Seed systemPromptTokens for the child fork
+      const skills = ambient.get(SkillsAmbient)
+      const configState = ambient.get(ConfigAmbient)
+      const sysPromptTokens = isRoleId(event.role)
+        ? estimateSystemPromptTokens(event.role, skills, configState)
+        : 0
+
+      const parentMessageContent = textParts(event.message)
+      const parentMessageEntry = toTimelineParentMessage({ timestamp: event.timestamp, text: event.message })
 
       let newForkState: ForkWindowState = {
         messages: [...contextMessage],
@@ -487,11 +580,16 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
         currentChainId: null,
         pendingPresenceText: null,
         nextQueueSeq: 0,
+        messageTokens: entryTokens,
+        systemPromptTokens: sysPromptTokens,
+        tokenEstimate: sysPromptTokens + entryTokens,
+        lastAnchoredTotal: null,
+        lastAnchoredMessageTokens: null,
       }
 
       newForkState = enqueueTimeline(
         newForkState,
-        toTimelineParentMessage({ timestamp: event.timestamp, text: event.message }),
+        parentMessageEntry,
         event.timestamp,
       )
 
@@ -558,10 +656,8 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
           atoms.push({ kind: 'thought', timestamp: value.timestamp, text: item.prose })
         }
 
-        // Skip empty agent blocks — nothing to show
         if (atoms.length === 0) continue
 
-        // Resolve role from agent registry
         const agentState = read(AgentStatusProjection)
         const agent = agentState.agents.get(item.agentId)
         if (!agent) continue

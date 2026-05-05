@@ -3,7 +3,7 @@ import { Effect } from 'effect'
 import { TestHarness, TestHarnessLive } from '../../src/test-harness/harness'
 import { getRootMemory, lastInboxMessage, sendUserMessage } from './helpers'
 import { windowToPrompt } from '../../src/prompts/window-to-prompt'
-import type { ForkWindowState } from '../../src/projections/window'
+import type { ForkWindowState } from '../../src/window'
 
 function renderedUserTextFromMemory(memory: ForkWindowState): string {
   const prompt = windowToPrompt(memory, '', 'UTC', true)

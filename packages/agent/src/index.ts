@@ -81,9 +81,9 @@ export type { Skill } from '@magnitudedev/skills'
 export * from './workspace'
 
 // Projections
-export { WindowProjection } from './projections/window'
-export type { WindowEntry, WindowEntrySource, ForkWindowState } from './projections/window'
-export type { QueuedEntry } from './inbox/types'
+export { WindowProjection } from './window'
+export type { WindowEntry, WindowEntrySource, ForkWindowState } from './window'
+export type { QueuedEntry } from './window/inbox/types'
 
 export { CompactionProjection } from './projections/compaction'
 export type { CompactionState } from './projections/compaction'

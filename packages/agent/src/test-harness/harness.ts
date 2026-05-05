@@ -12,7 +12,7 @@ import { SessionContextProjection } from '../projections/session-context'
 import { TaskGraphProjection } from '../projections/task-graph'
 import { TurnProjection } from '../projections/turn'
 import { CanonicalTurnProjection } from '../projections/canonical-turn'
-import { WindowProjection } from '../projections/window'
+import { WindowProjection } from '../window'
 import { SubagentActivityProjection } from '../projections/subagent-activity'
 import { DisplayProjection } from '../projections/display'
 import { ToolStateProjection } from '../projections/tool-state'
@@ -33,7 +33,7 @@ import { AgentLifecycle } from '../workers/agent-lifecycle'
 import { LifecycleCoordinator } from '../workers/lifecycle-coordinator'
 import { ApprovalWorker } from '../workers/approval-worker'
 import { Autopilot } from '../workers/autopilot'
-import { CompactionWorker } from '../workers/compaction-worker'
+import { CompactionWorker } from '../compaction/worker'
 import { UserPresenceWorker } from '../workers/user-presence-worker'
 import { FileMentionResolver } from '../workers/file-mention-resolver'
 import { SessionTitleWorker } from '../workers/session-title-worker'
@@ -515,10 +515,9 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
       turns: () => createTurnsBuilder(builtHarness),
       inspect: {
         context: async (forkId: string | null = null): Promise<ContextSnapshot> => {
-          const [memory, sessionContext, compaction] = await Promise.all([
+          const [memory, sessionContext] = await Promise.all([
             client.runEffect(Effect.flatMap(WindowProjection.Tag, (projection) => projection.getFork(forkId))),
             client.runEffect(Effect.flatMap(SessionContextProjection.Tag, (projection) => projection.get)),
-            client.runEffect(Effect.flatMap(CompactionProjection.Tag, (projection) => projection.getFork(forkId))),
           ])
 
           const messages = memory.messages.map((msg) => {
@@ -544,7 +543,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
 
           return {
             messages,
-            tokenEstimate: compaction.tokenEstimate,
+            tokenEstimate: memory.tokenEstimate,
           }
         },
         projections: async (): Promise<Record<string, unknown>> => {

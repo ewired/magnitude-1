@@ -9,13 +9,13 @@ import {
 } from '@magnitudedev/event-core'
 import type { AppEvent } from '../../events'
 import { AgentStatusProjection } from '../agent-status'
-import { WindowProjection, type ForkWindowState } from '../window'
+import { WindowProjection, type ForkWindowState } from '../../window'
 import { SubagentActivityProjection } from '../subagent-activity'
 import { UserPresenceProjection } from '../user-presence'
 import { OutboundMessagesProjection } from '../outbound-messages'
 import { UserMessageResolutionProjection } from '../user-message-resolution'
 import { TaskGraphProjection } from '../task-graph'
-import { renderTimeline } from '../../inbox/render'
+import { renderTimeline } from '../../window/inbox/render'
 
 const ts = (n: number) => 1_700_200_000_000 + n
 

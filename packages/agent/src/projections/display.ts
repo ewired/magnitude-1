@@ -945,6 +945,23 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       }
     },
 
+    compaction_failed: ({ event, fork }) => {
+      if (!event.presentation || event.presentation.surface !== 'inline') return fork
+
+      const errorMsg: ErrorDisplayMessage = {
+        id: generateId(),
+        type: 'error',
+        message: event.presentation.message,
+        timestamp: event.timestamp,
+        cta: event.presentation.cta,
+      }
+
+      return {
+        ...fork,
+        messages: [...fork.messages, errorMsg],
+      }
+    },
+
     interrupt: ({ event, fork, emit, read }) => {
       // Find queued messages before removing them
       const queuedMessages = fork.messages.filter(

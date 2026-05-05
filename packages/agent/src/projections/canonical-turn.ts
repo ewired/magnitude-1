@@ -1,7 +1,7 @@
 import { Projection } from '@magnitudedev/event-core'
 import type { AppEvent } from '../events'
-import type { CompletedTurn, TurnFeedback } from '../inbox/types'
-import type { AssistantMessage, ToolResultMessage, ToolCallPart, ToolCallId, JsonValue } from '@magnitudedev/ai'
+import type { ToolCallPart, ToolCallId, JsonValue } from '@magnitudedev/ai'
+import type { CompletedTurn, TurnFeedback } from '../window/types'
 
 
 export interface CanonicalTurnState {

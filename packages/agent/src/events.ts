@@ -19,6 +19,7 @@ export type ObservationPart =
 import type { Skill } from '@magnitudedev/skills'
 import type { RoleId } from '@magnitudedev/roles'
 import type { TaskAssignee } from './tasks/types'
+import type { ErrorPresentation } from './errors/present'
 
 
 export type Attachment = ImageAttachment | MentionAttachment
@@ -555,6 +556,7 @@ export interface CompactionFailed {
   readonly type: 'compaction_failed'
   readonly forkId: string | null
   readonly error: string
+  readonly presentation: ErrorPresentation | null
 }
 
 /** Context limit hit — LLM returned a context-length error */

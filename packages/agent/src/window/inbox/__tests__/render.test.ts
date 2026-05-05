@@ -5,7 +5,7 @@ import type { TimelineEntry } from '../types'
 import { renderTimeline } from '../render'
 import {
   WORKER_PROGRESS_USER_MESSAGE_REMINDER,
-} from '../../prompts/lead-communication-reminders'
+} from '../../../prompts/lead-communication-reminders'
 
 const TS0 = 1711641600000 // 2024-03-28 16:00:00 UTC
 const TS1 = TS0 + 30_000

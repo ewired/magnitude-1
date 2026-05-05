@@ -28,7 +28,7 @@ import {
   DriverError,
   type Driver,
 } from '@magnitudedev/drivers'
-import type { WindowEntry } from '../../src/projections/window'
+import type { WindowEntry } from '../../src/window'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

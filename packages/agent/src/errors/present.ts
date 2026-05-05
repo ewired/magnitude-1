@@ -12,7 +12,7 @@ import type {
   SafetyStopReason,
   MagnitudeBillingReason,
 } from '../events'
-import type { BillingWindowName } from '@magnitudedev/magnitude-client'
+import type { BillingWindowName, MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
 
 export type ErrorSurface = 'inline' | 'toast' | 'silent'
 export type ErrorSeverity = 'error' | 'warning' | 'info'
@@ -172,6 +172,93 @@ function presentSafetyStop(reason: SafetyStopReason): ErrorPresentation {
     message: userMessage,
     llmFeedback: feedback,
     retryable: false,
+  }
+}
+
+/**
+ * Map a TurnOutcome to its presentation.
+ *
+ * Pure function. Every variant has a single defined behavior here — change
+ * copy or routing in one place and every surface picks it up.
+ */
+/**
+ * Present a MagnitudeConnectionError for user display.
+ * Used by compaction (which doesn't go through TurnOutcome).
+ * Direct switch — no TurnOutcome involvement.
+ */
+export function presentConnectionError(err: MagnitudeConnectionError): ErrorPresentation {
+  switch (err._tag) {
+    case 'SubscriptionRequired':
+    case 'TrialExpired':
+      return {
+        surface: 'inline',
+        severity: 'error',
+        message: err.message,
+        cta: UPGRADE_CTA,
+        llmFeedback: err.message,
+        retryable: false,
+      }
+    case 'MagnitudeUsageLimitExceeded':
+      return {
+        surface: 'inline',
+        severity: 'error',
+        message: err.message,
+        cta: MANAGE_SUB_CTA,
+        llmFeedback: err.message,
+        retryable: false,
+      }
+    case 'AuthFailed':
+      return {
+        surface: 'inline',
+        severity: 'error',
+        message: 'Authentication failed. Run /settings to update your API key.',
+        llmFeedback: 'Authentication failed. API key may be invalid or expired.',
+        retryable: false,
+      }
+    case 'RateLimited':
+      return {
+        surface: 'silent',
+        severity: 'warning',
+        message: '',
+        llmFeedback: `Transport connection issue (HTTP ${err.status}); retrying.`,
+        retryable: true,
+      }
+    case 'TransportError':
+      return {
+        surface: 'silent',
+        severity: 'warning',
+        message: '',
+        llmFeedback: err.status != null
+          ? `Transport connection issue (HTTP ${err.status}); retrying.`
+          : 'Transport connection issue; retrying.',
+        retryable: true,
+      }
+    case 'UsageLimitExceeded':
+      return {
+        surface: 'silent',
+        severity: 'warning',
+        message: '',
+        llmFeedback: `Connection issue with provider (HTTP ${err.status}); retrying.`,
+        retryable: true,
+      }
+    case 'ContextLimitExceeded':
+      return {
+        surface: 'silent',
+        severity: 'warning',
+        message: '',
+        llmFeedback: 'Context window exceeded; waiting for compaction or context reduction.',
+        retryable: false,
+      }
+    case 'InvalidRequest':
+    case 'ModelNotGrammarCompatible':
+    case 'RoleNotFound':
+      return {
+        surface: 'inline',
+        severity: 'error',
+        message: err.message,
+        llmFeedback: err.message,
+        retryable: false,
+      }
   }
 }
 

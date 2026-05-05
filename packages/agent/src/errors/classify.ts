@@ -63,6 +63,21 @@ export function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): Turn
 }
 
 /**
+ * Whether a MagnitudeConnectionError is retryable (transient).
+ * Direct switch — no TurnOutcome involvement.
+ */
+export function isRetryableConnectionError(err: MagnitudeConnectionError): boolean {
+  switch (err._tag) {
+    case 'RateLimited':
+    case 'TransportError':
+    case 'UsageLimitExceeded':
+      return true
+    default:
+      return false
+  }
+}
+
+/**
  * Map a stream-time error into a HarnessTurnOutcome.
  */
 export function mapStreamErrorToOutcome(err: MagnitudeStreamError): HarnessTurnOutcome {

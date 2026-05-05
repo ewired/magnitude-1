@@ -24,6 +24,7 @@ interface ForkDetailOverlayProps {
   projectRoot: string
   subscribeForkDisplay: (forkId: string, cb: (state: DisplayState) => void) => () => void
   subscribeForkCompaction: (forkId: string, cb: (state: CompactionState) => void) => () => void
+  subscribeForkWindow: (forkId: string, cb: (state: { tokenEstimate: number }) => void) => () => void
   subscribeForkToolState: (forkId: string, cb: (state: ToolStateProjectionState) => void) => () => void
 }
 
@@ -57,6 +58,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
   projectRoot,
   subscribeForkDisplay,
   subscribeForkCompaction,
+  subscribeForkWindow,
   subscribeForkToolState,
 }: ForkDetailOverlayProps) {
   const theme = useTheme()
@@ -64,8 +66,6 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
   const [display, setDisplay] = useState<DisplayState | null>(null)
   const [toolState, setToolState] = useState<ToolStateProjectionState | null>(null)
   const [tokenEstimate, setTokenEstimate] = useState(0)
-  const [lastActualInputTokens, setLastActualInputTokens] = useState<number | null>(null)
-  const [hasCompletedTurn, setHasCompletedTurn] = useState(false)
   const [isCompacting, setIsCompacting] = useState(false)
 
   const scrollboxRef = useRef<any>(null)
@@ -89,13 +89,17 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
 
   useEffect(() => {
     const unsubscribe = subscribeForkCompaction(forkId, (state) => {
-      setTokenEstimate(state.tokenEstimate)
-      setLastActualInputTokens(state.lastActualInputTokens)
-      setHasCompletedTurn(state.hasCompletedTurn)
       setIsCompacting(state._tag !== 'idle')
     })
     return unsubscribe
   }, [forkId, subscribeForkCompaction])
+
+  useEffect(() => {
+    const unsubscribe = subscribeForkWindow(forkId, (state) => {
+      setTokenEstimate(state.tokenEstimate)
+    })
+    return unsubscribe
+  }, [forkId, subscribeForkWindow])
 
   useEffect(() => {
     const unsubscribe = subscribeForkToolState(forkId, (state) => {
@@ -126,7 +130,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
     () => scrollboxRef.current?.scrollTo(Number.MAX_SAFE_INTEGER),
   ), [])
 
-  const tokenUsage = lastActualInputTokens ?? (hasCompletedTurn ? tokenEstimate : null)
+  const tokenUsage = tokenEstimate > 0 ? tokenEstimate : null
 
   return (
     <box style={{ flexDirection: 'column', height: '100%' }}>

@@ -1,4 +1,4 @@
-import type { CompletedTurn } from '../inbox/types'
+import type { CompletedTurn } from '../window/types'
 import { renderFeedbackText } from '../prompts/feedback-text'
 import { estimateText, estimateImageTokens, DEFAULT_IMAGE_TOKENS } from '../truncation/estimate'
 

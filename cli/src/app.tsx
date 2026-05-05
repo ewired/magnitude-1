@@ -156,8 +156,7 @@ function AppInner({
 
   const [forkDisplay, setForkDisplay] = useState<DisplayState | null>(null)
   const [forkTokenEstimate, setForkTokenEstimate] = useState(0)
-  const [forkLastActualInputTokens, setForkLastActualInputTokens] = useState<number | null>(null)
-  const [forkHasCompletedTurn, setForkHasCompletedTurn] = useState(false)
+
   const [forkIsCompacting, setForkIsCompacting] = useState(false)
 
   const [systemMessages, setSystemMessages] = useState<Array<{ id: string; text: string; timestamp: number }>>([])
@@ -177,14 +176,12 @@ function AppInner({
   const [composerHasContent, setComposerHasContent] = useState(false)
   const [restoredQueuedInputText, setRestoredQueuedInputText] = useState<string | null>(null)
   const [tokenEstimate, setTokenEstimate] = useState(0)
-  const [lastActualInputTokens, setLastActualInputTokens] = useState<number | null>(null)
-  const [hasCompletedTurn, setHasCompletedTurn] = useState(false)
   const [isCompacting, setIsCompacting] = useState(false)
   const turnStartTimeRef = useRef<number | null>(null)
   const hasAnimatedRef = useRef(skipAnimation)
 
   const formatFooterTokens = formatTokensCompact
-  const tokenUsage = lastActualInputTokens ?? (hasCompletedTurn ? tokenEstimate : null)
+  const tokenUsage = tokenEstimate > 0 ? tokenEstimate : null
   const contextPercent = (tokenUsage != null && contextHardCap) ? Math.round((tokenUsage / contextHardCap) * 100) : null
   const contextDisplayText = tokenUsage == null
     ? '-'
@@ -500,19 +497,24 @@ function AppInner({
   useEffect(() => {
     if (!client) return
 
-    const unsubscribe = client.state.compaction.subscribeFork(null, (state: CompactionState) => {
+    const unsubWindow = client.state.memory.subscribeFork(null, (state) => {
       setTokenEstimate(state.tokenEstimate)
-      setLastActualInputTokens(state.lastActualInputTokens)
-      setHasCompletedTurn(state.hasCompletedTurn)
+    })
+    const unsubCompaction = client.state.compaction.subscribeFork(null, (state: CompactionState) => {
       setIsCompacting(state._tag !== 'idle')
     })
 
-    return unsubscribe
+    return () => { unsubWindow(); unsubCompaction() }
   }, [client])
 
   const subscribeForkCompaction = useCallback((forkId: string, cb: (state: CompactionState) => void) => {
     if (!client) return () => {}
     return client.state.compaction.subscribeFork(forkId, cb)
+  }, [client])
+
+  const subscribeForkWindow = useCallback((forkId: string, cb: (state: { tokenEstimate: number }) => void) => {
+    if (!client) return () => {}
+    return client.state.memory.subscribeFork(forkId, cb)
   }, [client])
 
   // Subscribe to tool state for file panel streaming support
@@ -548,18 +550,16 @@ function AppInner({
   useEffect(() => {
     if (!client || !selectedForkId) {
       setForkTokenEstimate(0)
-      setForkLastActualInputTokens(null)
-      setForkHasCompletedTurn(false)
       setForkIsCompacting(false)
       return
     }
-    const unsubscribe = client.state.compaction.subscribeFork(selectedForkId, (state: CompactionState) => {
+    const unsubWindow = client.state.memory.subscribeFork(selectedForkId, (state) => {
       setForkTokenEstimate(state.tokenEstimate)
-      setForkLastActualInputTokens(state.lastActualInputTokens)
-      setForkHasCompletedTurn(state.hasCompletedTurn)
+    })
+    const unsubCompaction = client.state.compaction.subscribeFork(selectedForkId, (state: CompactionState) => {
       setForkIsCompacting(state._tag !== 'idle')
     })
-    return unsubscribe
+    return () => { unsubWindow(); unsubCompaction() }
   }, [client, selectedForkId])
 
   // Subscribe to debug stream when debug mode is enabled and panel is visible
@@ -1302,8 +1302,8 @@ function AppInner({
               modelsConfigured: true,
               modelSummary: activeModelSummary,
               tokenUsage: selectedForkId
-                ? (forkLastActualInputTokens ?? (forkHasCompletedTurn ? forkTokenEstimate : null))
-                : (lastActualInputTokens ?? (hasCompletedTurn ? tokenEstimate : null)),
+                ? (forkTokenEstimate > 0 ? forkTokenEstimate : null)
+                : tokenUsage,
               contextHardCap,
               isCompacting: selectedForkId ? forkIsCompacting : isCompacting,
               theme,
@@ -1387,6 +1387,7 @@ function AppInner({
             pushForkOverlay={pushForkOverlay}
             roleProfiles={roleProfiles}
             subscribeForkCompaction={subscribeForkCompaction}
+            subscribeForkWindow={subscribeForkWindow}
             selectedFileOpen={isFilePanelOpen}
             onCloseFilePanel={closeFilePanel}
             onApprove={handleApprove}

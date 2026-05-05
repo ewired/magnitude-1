@@ -162,6 +162,7 @@ export function ChatController(props: ChatControllerProps) {
     pushForkOverlay,
     roleProfiles,
     subscribeForkCompaction,
+    subscribeForkWindow,
     isBlockingOverlayActive,
     selectedFileOpen,
     onCloseFilePanel,
@@ -544,6 +545,7 @@ export function ChatController(props: ChatControllerProps) {
           pushForkOverlay={pushForkOverlay}
           roleProfiles={roleProfiles}
           subscribeForkCompaction={subscribeForkCompaction}
+          subscribeForkWindow={subscribeForkWindow}
         />
         <box style={{ borderStyle: 'single', border: ['left'], borderColor: env.bashMode ? orange[400] : env.modeColor, customBorderChars: { ...BOX_CHARS, vertical: '┃' } }}>
           <box style={{ backgroundColor: env.theme.inputBg, paddingTop: 1, paddingLeft: 1, paddingRight: 2, flexDirection: 'column', flexGrow: 1 }}>

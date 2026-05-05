@@ -9,17 +9,17 @@
  *  - createHarnessAdapter to translate HarnessEvent → AppEvent
  */
 
-import { Effect, Stream, Layer } from 'effect'
+import { Effect, Stream } from 'effect'
 import { Worker, AmbientServiceTag } from '@magnitudedev/event-core'
 import { logger } from '@magnitudedev/logger'
-import { createHarness, type ExecuteHookContext, type InterceptorDecision } from '@magnitudedev/harness'
+import { createHarness } from '@magnitudedev/harness'
 import type { MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
 import { renderToolDocs } from '../prompts/render-tool-docs'
 
 import type { AppEvent } from '../events'
 import { mapConnectionErrorToOutcome, mapStreamErrorToOutcome } from '../errors'
 
-import { WindowProjection } from '../projections/window'
+import { WindowProjection } from '../window'
 import { SessionContextProjection } from '../projections/session-context'
 import { AgentStatusProjection } from '../projections/agent-status'
 import { TurnProjection } from '../projections/turn'
@@ -47,15 +47,11 @@ function toObservationPart(part: ObservablePart): ObservationPart {
   }
 }
 import { isToolKey, type ToolKey } from '../tools/toolkits'
-import { persistResult } from '../runtime/result-persistence'
-import { PolicyContextProviderTag } from '../agents/types'
+
 import { handleMessageDirective } from '../tasks/operations/message'
 import { Fork } from '@magnitudedev/event-core'
 
-import * as path from 'path'
-import { describeShape, estimateText } from '../truncation'
-import { TRUNCATION_TOKEN_LIMIT } from '../constants'
-import { isImageValue, formatToolResult as defaultFormatToolResult } from '@magnitudedev/harness'
+import { buildStandardHooks } from '../execution/harness-hooks'
 
 const { ForkContext } = Fork
 
@@ -154,7 +150,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
           toolkit,
           mapStreamError: mapStreamErrorToOutcome,
           layer: forkLayer,
-          hooks: buildHarnessHooks({
+          hooks: buildStandardHooks({
             forkId,
             turnId,
             agentDef,
@@ -298,76 +294,4 @@ export const Cortex = Worker.defineForked<AppEvent>()({
   },
 })
 
-// =============================================================================
-// Harness Hooks
-// =============================================================================
 
-function buildHarnessHooks(ctx: {
-  readonly forkId: string | null
-  readonly turnId: string
-  readonly agentDef: ReturnType<typeof getAgentDefinition>
-  readonly workspacePath: string
-}): import('@magnitudedev/harness').HarnessHooks<PolicyContextProviderTag> {
-  const { forkId, turnId, agentDef, workspacePath } = ctx
-  const resultsDir = path.join(workspacePath, 'results')
-
-  return {
-    beforeExecute: (hookCtx: ExecuteHookContext) =>
-      Effect.gen(function* () {
-        const policyCtxProvider = yield* PolicyContextProviderTag
-        const policyContext = yield* policyCtxProvider.get
-
-        for (const rule of agentDef.policy) {
-          const decision = yield* rule({ ...hookCtx, policyContext })
-          if (decision !== null) return decision
-        }
-        return { _tag: 'Proceed' as const } satisfies InterceptorDecision
-      }),
-
-    afterExecute: (hookCtx: ExecuteHookContext & { readonly result: import('@magnitudedev/harness').ToolResult }) =>
-      Effect.gen(function* () {
-        if (hookCtx.result._tag === 'Success') {
-          yield* persistResult(hookCtx.result.output, turnId, hookCtx.toolCallId, resultsDir).pipe(
-            Effect.catchAll((e) => Effect.gen(function* () {
-              logger.warn({ forkId, turnId, toolCallId: hookCtx.toolCallId, e }, '[Cortex] persistResult failed')
-            })),
-          )
-        }
-      }),
-
-    formatResult(toolCallId, toolName, _toolKey, result) {
-      // Only truncate successful, non-image, non-undefined outputs
-      if (result._tag !== 'Success' || result.output === undefined) {
-        return defaultFormatToolResult(result)
-      }
-      if (isImageValue(result.output)) {
-        return defaultFormatToolResult(result)
-      }
-
-      // Estimate token count from JSON serialization
-      let serialized: string
-      try {
-        serialized = JSON.stringify(result.output, null, 2)
-      } catch {
-        return defaultFormatToolResult(result)
-      }
-
-      const estimatedTokens = estimateText(serialized)
-      if (estimatedTokens <= TRUNCATION_TOKEN_LIMIT) {
-        return defaultFormatToolResult(result)
-      }
-
-      // Generate truncated representation with structural shape summary
-      const resultPath = `$M/results/${turnId}_${toolCallId}.json`
-      const shapeSummary = describeShape(result.output)
-
-      const text = [
-        `<truncated path="${resultPath}" estimated_tokens="${estimatedTokens}">`,
-        shapeSummary,
-        `</truncated>`,
-      ].join('\n')
-
-      return [{ _tag: 'TextPart' as const, text }]
-    },
-  }
-}

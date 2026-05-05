@@ -1,13 +1,13 @@
-import { ContentBuilder } from '../content'
+import { ContentBuilder } from '../../content'
 import type { UserPart } from '@magnitudedev/ai'
 import {
   USER_MESSAGE_RESPONSE_REMINDER,
   WORKER_PROGRESS_USER_MESSAGE_REMINDER,
-} from '../prompts/lead-communication-reminders'
+} from '../../prompts/lead-communication-reminders'
 import type { AgentAtom, TimelineEntry } from './types'
 import { renderCompactToolCall } from './render-tool-call'
 
-import { taskIdleReminder, taskCompleteReminder } from '../prompts/tasks/index'
+import { taskIdleReminder, taskCompleteReminder } from '../../prompts/tasks/index'
 
 export interface RenderTimelineInput {
   timeline: readonly TimelineEntry[]
