@@ -226,10 +226,11 @@ export interface ParseFailureEvent {
 export type MagnitudeBillingReason =
   | { readonly _tag: 'SubscriptionRequired'; readonly message: string }
   | { readonly _tag: 'TrialExpired'; readonly message: string }
-  | { readonly _tag: 'UsageLimitExceeded'; readonly message: string }
+  | { readonly _tag: 'UsageLimitExceeded'; readonly message: string; readonly details?: import('@magnitudedev/magnitude-client').UsageLimitDetails }
 
 export type ProviderNotReadyDetail =
   | { readonly _tag: 'AuthFailed' }
+  | { readonly _tag: 'OutOfSync' }
   | { readonly _tag: 'MagnitudeBilling'; readonly reason: MagnitudeBillingReason }
 
 export type ConnectionFailureDetail =

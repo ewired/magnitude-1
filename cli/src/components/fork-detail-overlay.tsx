@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef } from 'react'
 import { TextAttributes, type KeyEvent } from '@opentui/core'
 import { useKeyboard } from '@opentui/react'
-import type { CompactionState, DisplayState, DisplayMessage, ToolStateProjectionState } from '@magnitudedev/agent'
+import type { CompactionState, DisplayState, DisplayMessage, ToolStateProjectionState, ActionId } from '@magnitudedev/agent'
 import { useTheme } from '../hooks/use-theme'
 import { useFilePanel } from '../hooks/use-file-panel'
 import { Button } from './button'
@@ -17,6 +17,7 @@ interface ForkDetailOverlayProps {
   forkRole: string
   onClose: () => void
   onForkExpand?: (forkId: string) => void
+  onErrorAction?: (actionId: ActionId) => void
   modelSummary: { role: string; model: string } | null
   contextHardCap: number | null
   workspacePath: string | null
@@ -49,6 +50,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
 
   onClose,
   onForkExpand,
+  onErrorAction,
   modelSummary,
   contextHardCap,
   workspacePath,
@@ -210,6 +212,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
                     onToggleCollapse={msg.type === 'think_block' ? () => toggleCollapse(msg.id) : undefined}
                     onForkExpand={onForkExpand}
                     onFileClick={openFile}
+                    onErrorAction={onErrorAction}
                   />
                 )
               })

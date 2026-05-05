@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot, type RoleProfile } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot, type RoleProfile, type ActionId } from '@magnitudedev/agent'
+import { matchKeyToChord } from './utils/chord'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
 import { JsonChatPersistence, loadSessionSummary } from './persistence'
@@ -789,6 +790,17 @@ function AppInner({
     setUsageOpen(true)
   }, [])
 
+  const dispatchErrorAction = useCallback((actionId: ActionId) => {
+    switch (actionId) {
+      case 'open-settings':
+        openSettings()
+        return
+      case 'open-usage':
+        openUsage()
+        return
+    }
+  }, [openSettings, openUsage])
+
   const onUsageClose = useCallback(() => {
     setUsageOpen(false)
   }, [])
@@ -907,6 +919,33 @@ function AppInner({
         }
       },
       [composerHasContent, debugMode, activeDisplay, display, canToggleRecentChatsWithCtrlR],
+    ),
+  )
+
+  // Find the most recent inline error with an action CTA — its chord is the
+  // active shortcut. Older actionable errors are still clickable via mouse,
+  // but their chord is shadowed by the most recent.
+  const latestActionableErrorCta = useMemo(() => {
+    const messages = (activeDisplay ?? display)?.messages ?? []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (m.type === 'error' && m.cta?.kind === 'action') return m.cta
+    }
+    return null
+  }, [activeDisplay, display])
+
+  useKeyboard(
+    useCallback(
+      (key: KeyEvent) => {
+        if (key.defaultPrevented) return
+        if (activeOverlayKind !== 'none') return
+        if (!latestActionableErrorCta) return
+        const chord = matchKeyToChord(key)
+        if (chord !== latestActionableErrorCta.chord) return
+        key.preventDefault()
+        dispatchErrorAction(latestActionableErrorCta.actionId)
+      },
+      [activeOverlayKind, latestActionableErrorCta, dispatchErrorAction],
     ),
   )
 
@@ -1085,6 +1124,7 @@ function AppInner({
       showCopiedToast={clipboardToast}
       usageVisible={usageOpen}
       onUsageClose={onUsageClose}
+      onErrorAction={dispatchErrorAction}
     />
   )
 
@@ -1187,6 +1227,7 @@ function AppInner({
                     inputHasText={composerHasContent}
                     onFileClick={openFile}
                     onForkExpand={pushForkOverlay}
+                    onErrorAction={dispatchErrorAction}
                   />
                 </ErrorBoundary>
               )

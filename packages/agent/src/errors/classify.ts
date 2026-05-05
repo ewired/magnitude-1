@@ -28,12 +28,15 @@ export function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): Turn
     case 'MagnitudeUsageLimitExceeded':
       return {
         _tag: 'ProviderNotReady',
-        detail: { _tag: 'MagnitudeBilling', reason: { _tag: 'UsageLimitExceeded', message: err.message } },
+        detail: {
+          _tag: 'MagnitudeBilling',
+          reason: { _tag: 'UsageLimitExceeded', message: err.message, details: err.details },
+        },
       }
     case 'ModelNotGrammarCompatible':
-      return { _tag: 'UnexpectedError', message: err.message, detail: { _tag: 'ProviderDefect' } }
+      return { _tag: 'ProviderNotReady', detail: { _tag: 'OutOfSync' } }
     case 'RoleNotFound':
-      return { _tag: 'UnexpectedError', message: err.message, detail: { _tag: 'ProviderDefect' } }
+      return { _tag: 'ProviderNotReady', detail: { _tag: 'OutOfSync' } }
     case 'AuthFailed':
       return {
         _tag: 'ProviderNotReady',
@@ -53,7 +56,7 @@ export function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): Turn
     case 'ContextLimitExceeded':
       return { _tag: 'ContextWindowExceeded' }
     case 'InvalidRequest':
-      return { _tag: 'UnexpectedError', message: err.message, detail: { _tag: 'ProviderDefect' } }
+      return { _tag: 'ProviderNotReady', detail: { _tag: 'OutOfSync' } }
     case 'TransportError':
       return { _tag: 'ConnectionFailure', detail: { _tag: 'TransportError', httpStatus: err.status ?? undefined } }
   }

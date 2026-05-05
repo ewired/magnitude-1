@@ -2,7 +2,7 @@ import { RecentChatsOverlay } from './recent-chats-overlay'
 import { ForkDetailOverlay } from './fork-detail-overlay'
 import { SettingsOverlay } from './settings-overlay'
 import { UsageOverlay } from './usage-overlay'
-import type { AgentStatusState } from '@magnitudedev/agent'
+import type { AgentStatusState, ActionId } from '@magnitudedev/agent'
 import type { RecentChat } from '../data/recent-chats'
 import type { MagnitudeAuthState } from '../hooks/use-magnitude-auth'
 import { createCodingAgentClient } from '@magnitudedev/agent'
@@ -41,6 +41,8 @@ export type AppOverlaysProps = {
 
   usageVisible: boolean
   onUsageClose: () => void
+
+  onErrorAction?: (actionId: ActionId) => void
 }
 
 export function AppOverlays({
@@ -66,6 +68,7 @@ export function AppOverlays({
   showCopiedToast,
   usageVisible,
   onUsageClose,
+  onErrorAction,
 }: AppOverlaysProps) {
   const theme = useTheme()
 
@@ -95,6 +98,7 @@ export function AppOverlays({
           forkRole={agent?.role ?? 'agent'}
           onClose={popForkOverlay}
           onForkExpand={pushForkOverlay}
+          onErrorAction={onErrorAction}
           modelSummary={forkModelSummary}
           contextHardCap={forkContextHardCap}
           workspacePath={workspacePath}

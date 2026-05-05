@@ -41,6 +41,9 @@ import { AgentLifecycle } from './workers/agent-lifecycle'
 import { LifecycleCoordinator } from './workers/lifecycle-coordinator'
 import { RetryController } from './workers/retry-controller'
 
+// Runtime
+import { EffectLoggerLayer } from './runtime/effect-logger'
+
 import { Autopilot } from './workers/autopilot'
 import { CompactionWorker } from './workers/compaction-worker'
 import { ApprovalWorker } from './workers/approval-worker'
@@ -246,6 +249,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     disableCwdSafeguards: options.disableCwdSafeguards ?? false,
   })
   const baseLayer = Layer.mergeAll(
+    EffectLoggerLayer,
     Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
 
     Layer.provide(AgentModelResolverLive(), magnitudeClientLayer),

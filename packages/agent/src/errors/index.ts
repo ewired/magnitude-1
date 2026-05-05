@@ -10,4 +10,6 @@ export {
   type ErrorSurface,
   type ErrorSeverity,
   type ErrorCta,
+  type ActionId,
+  type UsageLimitInline,
 } from './present'

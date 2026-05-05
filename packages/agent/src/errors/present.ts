@@ -12,13 +12,23 @@ import type {
   SafetyStopReason,
   MagnitudeBillingReason,
 } from '../events'
+import type { BillingWindowName } from '@magnitudedev/magnitude-client'
 
 export type ErrorSurface = 'inline' | 'toast' | 'silent'
 export type ErrorSeverity = 'error' | 'warning' | 'info'
 
-export interface ErrorCta {
-  readonly label: string
-  readonly url: string
+/** Action IDs the CLI knows how to dispatch when the user invokes an action CTA. */
+export type ActionId = 'open-settings' | 'open-usage'
+
+export type ErrorCta =
+  | { readonly kind: 'url'; readonly label: string; readonly url: string }
+  | { readonly kind: 'action'; readonly label: string; readonly actionId: ActionId; readonly chord: string }
+
+/** Extra data shown beneath usage-limit errors (live "Resets in X" countdown). */
+export interface UsageLimitInline {
+  /** Wall-clock timestamp when the violated window resets, ms epoch. */
+  readonly resetsAt: number
+  readonly window: BillingWindowName
 }
 
 export interface ErrorPresentation {
@@ -27,16 +37,21 @@ export interface ErrorPresentation {
   readonly severity: ErrorSeverity
   /** User-facing copy. Empty when surface is 'silent'. */
   readonly message: string
-  /** Optional link CTA shown beneath the message. */
+  /** Optional CTA shown beneath the message. */
   readonly cta?: ErrorCta
   /** Text to feed back to the model as observation. Omit for none. */
   readonly llmFeedback?: string
   /** Whether the underlying condition is auto-retried by the agent loop. */
   readonly retryable: boolean
+  /** When set, render a "Resets in X" countdown line beneath the message. */
+  readonly usageLimit?: UsageLimitInline
 }
 
-const UPGRADE_CTA: ErrorCta = { label: 'Upgrade to Pro', url: 'https://app.magnitude.dev' }
-const MANAGE_SUB_CTA: ErrorCta = { label: 'Manage your subscription', url: 'https://app.magnitude.dev' }
+const UPGRADE_CTA: ErrorCta = { kind: 'url', label: 'Upgrade to Pro', url: 'https://app.magnitude.dev' }
+const START_TRIAL_CTA: ErrorCta = { kind: 'url', label: 'Start free trial', url: 'https://app.magnitude.dev' }
+const UPDATE_MAGNITUDE_CTA: ErrorCta = { kind: 'url', label: 'Update Magnitude', url: 'https://docs.magnitude.dev/get-started' }
+const OPEN_SETTINGS_CTA: ErrorCta = { kind: 'action', label: 'Open settings', actionId: 'open-settings', chord: 'ctrl+s' }
+const VIEW_USAGE_CTA: ErrorCta = { kind: 'action', label: 'View usage', actionId: 'open-usage', chord: 'ctrl+u' }
 
 const SILENT: ErrorPresentation = {
   surface: 'silent',
@@ -48,6 +63,14 @@ const SILENT: ErrorPresentation = {
 function presentMagnitudeBilling(reason: MagnitudeBillingReason): ErrorPresentation {
   switch (reason._tag) {
     case 'SubscriptionRequired':
+      return {
+        surface: 'inline',
+        severity: 'error',
+        message: reason.message,
+        cta: START_TRIAL_CTA,
+        llmFeedback: reason.message,
+        retryable: false,
+      }
     case 'TrialExpired':
       return {
         surface: 'inline',
@@ -57,15 +80,23 @@ function presentMagnitudeBilling(reason: MagnitudeBillingReason): ErrorPresentat
         llmFeedback: reason.message,
         retryable: false,
       }
-    case 'UsageLimitExceeded':
+    case 'UsageLimitExceeded': {
+      const d = reason.details
       return {
         surface: 'inline',
         severity: 'error',
         message: reason.message,
-        cta: MANAGE_SUB_CTA,
+        cta: VIEW_USAGE_CTA,
         llmFeedback: reason.message,
         retryable: false,
+        usageLimit: d
+          ? {
+              resetsAt: Date.parse(d.violatedBudget.windowEnd),
+              window: d.violatedWindow,
+            }
+          : undefined,
       }
+    }
   }
 }
 
@@ -75,8 +106,18 @@ function presentProviderNotReady(detail: ProviderNotReadyDetail): ErrorPresentat
       return {
         surface: 'inline',
         severity: 'error',
-        message: 'Authentication failed. Run /settings to update your API key.',
+        message: 'Authentication failed. API key may be invalid or expired.',
+        cta: OPEN_SETTINGS_CTA,
         llmFeedback: 'Authentication failed. API key may be invalid or expired.',
+        retryable: false,
+      }
+    case 'OutOfSync':
+      return {
+        surface: 'inline',
+        severity: 'error',
+        message: 'Magnitude is out of sync with the server. Try updating to the latest version.',
+        cta: UPDATE_MAGNITUDE_CTA,
+        llmFeedback: 'Out-of-sync error from server. The CLI may need to be updated.',
         retryable: false,
       }
     case 'MagnitudeBilling':

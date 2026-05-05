@@ -17,7 +17,7 @@ import type {
   ToolDisplay,
   TurnOutcome,
 } from '../events'
-import { present } from '../errors'
+import { present, type ErrorCta, type UsageLimitInline } from '../errors'
 
 import { AgentRoutingProjection } from './agent-routing'
 import { AgentStatusProjection, getAgentByForkId } from './agent-status'
@@ -170,10 +170,8 @@ export interface ErrorDisplayMessage {
   readonly type: 'error'
   readonly message: string
   readonly timestamp: number
-  readonly cta?: {
-    readonly label: string
-    readonly url: string
-  }
+  readonly cta?: ErrorCta
+  readonly usageLimit?: UsageLimitInline
 }
 
 export interface ForkResultMessage {
@@ -405,6 +403,7 @@ function toErrorDisplayMessage(outcome: TurnOutcome, timestamp: number): ErrorDi
     message: p.message,
     timestamp,
     cta: p.cta,
+    usageLimit: p.usageLimit,
   }
 }
 
