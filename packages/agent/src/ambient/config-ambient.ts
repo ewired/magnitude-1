@@ -16,6 +16,7 @@ import {
 } from '@magnitudedev/storage'
 
 import { ROLE_IDS, type RoleId } from '../agents/role-validation'
+import { OUTPUT_TOKEN_RESERVE } from '../constants'
 
 export interface RoleConfig {
   readonly modelId: string
@@ -48,7 +49,7 @@ export function buildConfigState(
     const catalogEntry = catalogModels?.find(m => m.roles.includes(roleId))
     const profile = catalogEntry ? toModelProfile(catalogEntry) : FALLBACK_PROFILE
     const modelId = `role/${roleId}`
-    const hardCap = profile.contextWindow - profile.maxOutputTokens
+    const hardCap = profile.contextWindow - OUTPUT_TOKEN_RESERVE
     const { softCap } = computeContextLimits(hardCap, policy)
     byRole[roleId] = { modelId, profile, hardCap, softCap }
   }
