@@ -9,7 +9,7 @@
  *  - createHarnessAdapter to translate HarnessEvent → AppEvent
  */
 
-import { Effect, Stream } from 'effect'
+import { Effect, Layer, Stream } from 'effect'
 import { Worker, AmbientServiceTag } from '@magnitudedev/event-core'
 import { logger } from '@magnitudedev/logger'
 import { createHarness } from '@magnitudedev/harness'
@@ -52,6 +52,7 @@ import { handleMessageDirective } from '../tasks/operations/message'
 import { Fork } from '@magnitudedev/event-core'
 
 import { buildStandardHooks } from '../execution/harness-hooks'
+import { TurnContextTag } from '../engine/turn-context'
 
 const { ForkContext } = Fork
 
@@ -137,6 +138,9 @@ export const Cortex = Worker.defineForked<AppEvent>()({
           return
         }
 
+        const turnContextLayer = Layer.succeed(TurnContextTag, { turnId, forkId })
+        const turnLayer = Layer.merge(forkLayer, turnContextLayer)
+
         // ──────────────────────────────────────────────────────────────────────
         // 5. Build system prompt
         // ──────────────────────────────────────────────────────────────────────
@@ -149,7 +153,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
           model: agentModel.model,
           toolkit,
           mapStreamError: mapStreamErrorToOutcome,
-          layer: forkLayer,
+          layer: turnLayer,
           hooks: buildStandardHooks({
             forkId,
             turnId,
