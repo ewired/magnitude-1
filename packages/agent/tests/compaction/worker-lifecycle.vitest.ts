@@ -50,7 +50,7 @@ describe('compaction/worker-lifecycle', () => {
       yield* h.send({ ...largeUserMessage, messageId: 'w1' })
       yield* h.send(mkContextLimitHit())
       const ready = yield* h.wait.event('compaction_ready', (e) => e.forkId === null)
-      expect(ready.summary.length).toBeGreaterThan(0)
+      expect(ready.turn.assistant.text.length).toBeGreaterThan(0)
     }).pipe(Effect.provide(workerLayer)))
 
   it.effect('worker finalizes to compaction_completed and clears gates', () =>
@@ -61,7 +61,7 @@ describe('compaction/worker-lifecycle', () => {
       yield* h.wait.event('compaction_ready', (e) => e.forkId === null)
       yield* sendTurnOutcomeIfNeeded(h)
       const completed = yield* h.wait.event('compaction_completed', (e) => e.forkId === null)
-      expect(completed.tokensSaved).toBeGreaterThanOrEqual(0)
+      expect(completed.turn.assistant.text.length).toBeGreaterThan(0)
       const compaction = yield* getCompaction(h)
       expect(compaction._tag).toBe('idle')
       expect(compaction.contextLimitBlocked).toBe(false)
@@ -130,8 +130,8 @@ describe('compaction/worker-lifecycle', () => {
       const events = h.events()
       const readyIndex = events.findIndex((e) => e.type === 'compaction_ready' && e.forkId === null)
       const completedIndex = events.findIndex((e) => e.type === 'compaction_completed' && e.forkId === null)
-      expect(ready.summary.length).toBeGreaterThan(0)
-      expect(completed.summary).toBe(ready.summary)
+      expect(ready.turn.assistant.text.length).toBeGreaterThan(0)
+      expect(completed.turn.assistant.text).toBe(ready.turn.assistant.text)
       expect(readyIndex).toBeGreaterThanOrEqual(0)
       expect(completedIndex).toBeGreaterThan(readyIndex)
     }).pipe(Effect.provide(workerLayer)))

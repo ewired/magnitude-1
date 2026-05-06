@@ -8,6 +8,7 @@
 
 import { Data } from 'effect'
 import { Projection, Signal, FSM } from '@magnitudedev/event-core'
+import type { CompletedTurn } from '../window/types'
 const { defineFSM } = FSM
 
 import type { AppEvent, SessionContext } from '../events'
@@ -59,9 +60,10 @@ export class Compacting extends Data.TaggedClass('compacting')<AmbientCompaction
 }> {}
 
 export class PendingFinalization extends Data.TaggedClass('pendingFinalization')<AmbientCompactionFields & {
-  readonly summary: string
+  readonly turn: CompletedTurn
   readonly compactedMessageCount: number
-  readonly originalTokenEstimate: number
+  readonly inputTokens: number | null
+  readonly outputTokens: number | null
   readonly refreshedContext: SessionContext | null
 }> {}
 
@@ -124,6 +126,7 @@ function recomputePolicy(
   tokenEstimate: number,
   limits: RoleConfig,
 ): CompactionState {
+  console.log('[COMPACTION] recomputePolicy:', { _tag: fork._tag, tokenEstimate, softCap: limits.softCap, hardCap: limits.hardCap })
   // During active compaction, preserve contextLimitBlocked so compaction_failed
   // can determine retry intent. isCompactionBlocking(_tag) governs system
   // blocking during compaction; contextLimitBlocked is only actionable when idle.
@@ -181,9 +184,10 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
       // Preserve contextLimitBlocked through the transition for the same reason
       // as compaction_started — compaction_failed needs it to determine retry intent.
       const nextState = CompactionLifecycle.transition(fork, 'pendingFinalization', {
-        summary: event.summary,
+        turn: event.turn,
         compactedMessageCount: event.compactedMessageCount,
-        originalTokenEstimate: event.originalTokenEstimate,
+        inputTokens: event.inputTokens,
+        outputTokens: event.outputTokens,
         refreshedContext: event.refreshedContext,
         shouldCompact: false,
         contextLimitBlocked: fork.contextLimitBlocked,

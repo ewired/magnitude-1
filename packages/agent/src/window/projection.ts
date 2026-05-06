@@ -517,15 +517,16 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
 
       const remainingMessages = fork.messages.slice(1 + event.compactedMessageCount)
 
-      const reflectionContent = textParts(`--- REFLECTION START ---\n${event.summary}\n--- REFLECTION END ---`)
-      const reflectionBlock: WindowEntry = {
-        type: 'compacted',
-        source: 'system',
-        content: reflectionContent,
-        estimatedTokens: estimateContentEntry(reflectionContent),
+      // Insert the compaction turn as a proper assistant_turn entry
+      const compactionEntry: WindowEntry = {
+        type: 'assistant_turn',
+        source: 'agent',
+        turn: event.turn,
+        strategyId: 'native',
+        estimatedTokens: estimateTurnEntry(event.turn),
       }
 
-      const newMessages = [sessionContext, ...remainingMessages, reflectionBlock]
+      const newMessages = [sessionContext, ...remainingMessages, compactionEntry]
       const messageTokens = newMessages.reduce((sum, e) => sum + e.estimatedTokens, 0)
 
       const result: ForkWindowState = {

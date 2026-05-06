@@ -79,18 +79,26 @@ export const mkTurnOutcomeEvent = (overrides: Partial<Extract<AppEvent, { type: 
 
 export const mkTurnCompleted = mkTurnOutcomeEvent
 
-export const mkCompactionStarted = (forkId: string | null = ROOT_FORK_ID): Extract<AppEvent, { type: 'compaction_started' }> => ({
+export const mkCompactionStarted = (overrides: Partial<Extract<AppEvent, { type: 'compaction_started' }>> = {}): Extract<AppEvent, { type: 'compaction_started' }> => ({
   type: 'compaction_started',
-  forkId,
+  forkId: ROOT_FORK_ID,
   compactedMessageCount: 0,
+  ...overrides,
 })
 
 export const mkCompactionReady = (overrides: Partial<Extract<AppEvent, { type: 'compaction_ready' }>> = {}): Extract<AppEvent, { type: 'compaction_ready' }> => ({
   type: 'compaction_ready',
   forkId: ROOT_FORK_ID,
-  summary: 'summary',
+  turn: {
+    turnId: 'compaction-test',
+    assistant: { _tag: 'AssistantMessage', text: 'compaction summary', toolCalls: [] },
+    toolResults: [],
+    feedback: [],
+    clean: true,
+  },
   compactedMessageCount: 1,
-  originalTokenEstimate: 500,
+  inputTokens: null,
+  outputTokens: null,
   refreshedContext: null,
   ...overrides,
 })
@@ -98,10 +106,16 @@ export const mkCompactionReady = (overrides: Partial<Extract<AppEvent, { type: '
 export const mkCompactionCompleted = (overrides: Partial<Extract<AppEvent, { type: 'compaction_completed' }>> = {}): Extract<AppEvent, { type: 'compaction_completed' }> => ({
   type: 'compaction_completed',
   forkId: ROOT_FORK_ID,
-  summary: 'summary',
+  turn: {
+    turnId: 'compaction-test',
+    assistant: { _tag: 'AssistantMessage', text: 'compaction summary', toolCalls: [] },
+    toolResults: [],
+    feedback: [],
+    clean: true,
+  },
   compactedMessageCount: 1,
-  tokensSaved: 50,
-  preservedVariables: [],
+  inputTokens: null,
+  outputTokens: null,
   refreshedContext: null,
   ...overrides,
 })
@@ -151,7 +165,7 @@ export const expectStableWorkingState = (h: Harness, forkId: string | null = ROO
 
 export const startReadyCompaction = (h: Harness, forkId: string | null = ROOT_FORK_ID, readyOverrides: Partial<Extract<AppEvent, { type: 'compaction_ready' }>> = {}) =>
   Effect.gen(function* () {
-    yield* h.send(mkCompactionStarted(forkId))
+    yield* h.send(mkCompactionStarted({ forkId }))
     yield* h.send(mkCompactionReady({ forkId, ...readyOverrides }))
   })
 

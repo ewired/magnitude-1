@@ -20,6 +20,7 @@ import type { Skill } from '@magnitudedev/skills'
 import type { RoleId } from '@magnitudedev/roles'
 import type { TaskAssignee } from './tasks/types'
 import type { ErrorPresentation } from './errors/present'
+import type { CompletedTurn } from './window/types'
 
 
 export type Attachment = ImageAttachment | MentionAttachment
@@ -534,20 +535,21 @@ export interface CompactionStarted {
 export interface CompactionReady {
   readonly type: 'compaction_ready'
   readonly forkId: string | null
-  readonly summary: string
+  readonly turn: CompletedTurn
   readonly compactedMessageCount: number
-  readonly originalTokenEstimate: number  // Token estimate of compacted messages (for tokensSaved calc)
+  readonly inputTokens: number | null
+  readonly outputTokens: number | null
   readonly refreshedContext: SessionContext | null
 }
 
-/** Compaction completed - summary replaces old messages */
+/** Compaction completed - turn replaces old messages */
 export interface CompactionCompleted {
   readonly type: 'compaction_completed'
   readonly forkId: string | null
-  readonly summary: string
+  readonly turn: CompletedTurn
   readonly compactedMessageCount: number
-  readonly tokensSaved: number
-  readonly preservedVariables: readonly string[]
+  readonly inputTokens: number | null
+  readonly outputTokens: number | null
   readonly refreshedContext: SessionContext | null  // Fresh session context to replace stale original
 }
 

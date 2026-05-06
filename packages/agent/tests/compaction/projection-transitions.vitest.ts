@@ -99,7 +99,7 @@ describe('window/estimation', () => {
       // Compact first message (index 1, after session_context at 0)
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady({ compactedMessageCount: 1 }))
-      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 1, tokensSaved: 100, summary: 'compacted summary' }))
+      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 1 }))
 
       const after = yield* getMemory(h)
       // Should have fewer messages + reflection block
@@ -164,16 +164,20 @@ describe('compaction/fsm-policy', () => {
       const h = yield* TestHarness
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady({
-        summary: 'test summary',
+        turn: {
+          turnId: 'compaction-test',
+          assistant: { _tag: 'AssistantMessage' as const, text: 'test summary', toolCalls: [] },
+          toolResults: [],
+          feedback: [],
+          clean: true,
+        },
         compactedMessageCount: 2,
-        originalTokenEstimate: 500,
       }))
       const state = yield* getCompaction(h)
       expect(state._tag).toBe('pendingFinalization')
       if (state._tag === 'pendingFinalization') {
-        expect(state.summary).toBe('test summary')
+        expect(state.turn.assistant.text).toBe('test summary')
         expect(state.compactedMessageCount).toBe(2)
-        expect(state.originalTokenEstimate).toBe(500)
       }
     }).pipe(Effect.provide(TestHarnessLive())))
 

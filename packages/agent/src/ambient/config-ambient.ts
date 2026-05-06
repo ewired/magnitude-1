@@ -76,9 +76,11 @@ export function publishConfigFromCatalog(storage: StorageClient) {
     )
 
     const policy = yield* Effect.promise(() => storage.config.getContextLimitPolicy())
+    const newState = buildConfigState(models, policy)
+    console.log('[CONFIG-AMBIENT] publishConfigFromCatalog:', JSON.stringify({ policy, leaderSoftCap: newState.byRole.leader?.softCap }))
     yield* ambientService.update(
       ConfigAmbient,
-      buildConfigState(models, policy),
+      newState,
     )
   })
 }

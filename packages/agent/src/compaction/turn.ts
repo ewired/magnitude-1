@@ -13,6 +13,7 @@ import type { AppEvent } from '../events'
 import { mapStreamErrorToOutcome } from '../errors/classify'
 
 import type { ForkWindowState } from '../window'
+import type { CompletedTurn } from '../window/types'
 import { SessionContextProjection } from '../projections/session-context'
 import { AgentModelResolver } from '../model/model-resolver'
 import { getAgentDefinition } from '../agents/registry'
@@ -25,13 +26,19 @@ import { SkillsAmbient } from '../ambient/skills-ambient'
 import { buildStandardHooks } from '../execution/harness-hooks'
 import type { RoleId } from '../agents/role-validation'
 
+export interface CompactionTurnResult {
+  readonly turn: CompletedTurn
+  readonly inputTokens: number | null
+  readonly outputTokens: number | null
+}
+
 export function runCompactionTurn(
   forkId: string | null,
   roleId: RoleId,
   windowState: ForkWindowState,
   publish: (event: AppEvent) => Effect.Effect<void>,
   read: any,
-): Effect.Effect<string, any, any> {
+): Effect.Effect<CompactionTurnResult, any, any> {
   return Effect.gen(function* () {
     const agentDef = getAgentDefinition(roleId)
 
@@ -83,16 +90,27 @@ export function runCompactionTurn(
     // Drain events (tools execute automatically via harness)
     yield* Stream.runForEach(liveTurn.events, () => Effect.void)
 
-    // Extract assistant response text from canonical turn state
+    // Build CompletedTurn from canonical turn state
     const canonical = yield* Ref.get(liveTurn.canonicalTurn)
-    const responseText = canonical.assistantMessage.text ?? ''
+    const hasContent = (canonical.assistantMessage.text && canonical.assistantMessage.text.trim().length > 0)
+      || (canonical.assistantMessage.toolCalls && canonical.assistantMessage.toolCalls.length > 0)
 
-    if (!responseText || responseText.trim().length === 0) {
+    if (!hasContent) {
       return yield* Effect.fail(new Error('Empty compaction response'))
     }
 
-    return responseText
+    const completed: CompletedTurn = {
+      turnId: compactionTurnId,
+      assistant: canonical.assistantMessage,
+      toolResults: [...canonical.toolResults],
+      feedback: [],
+      clean: true,
+    }
+
+    return {
+      turn: completed,
+      inputTokens: canonical.usage?.inputTokens ?? null,
+      outputTokens: canonical.usage?.outputTokens ?? null,
+    }
   })
 }
-
-

@@ -158,7 +158,7 @@ describe('compaction/lifecycle-timing', () => {
 
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady())
-      yield* h.send(mkCompactionCompleted({ summary: 'fallback summary', tokensSaved: 0 }))
+      yield* h.send(mkCompactionCompleted())
 
       const after = yield* getCompaction(h)
       expect(after._tag).toBe('idle')

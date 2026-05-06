@@ -12,28 +12,36 @@ const sendAssistantText = (h: Effect.Effect.Success<typeof TestHarness>, turnId:
   })
 
 describe('compaction/memory-rewrite', () => {
-  it.effect('compaction_completed rewrites as [session_context, ...remaining, reflection]', () =>
+  it.effect('compaction_completed rewrites as [session_context, ...remaining, assistant_turn]', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send(mkUserMessage({ text: 'first message' }))
       yield* h.send(mkUserMessage({ text: 'second message' }))
-      yield* h.send(mkCompactionCompleted({ summary: 'compacted summary', compactedMessageCount: 2, tokensSaved: 20 }))
+      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 2 }))
       const memory = yield* getMemory(h)
       expect(memory.messages[0]?.type).toBe('session_context')
-      expect(memory.messages[memory.messages.length - 1]?.type).toBe('compacted')
+      expect(memory.messages[memory.messages.length - 1]?.type).toBe('assistant_turn')
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('compacted message content preserves summary text exactly', () =>
+  it.effect('compaction turn text preserves assistant message content', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       const summary = 'line 1\nline 2\nline 3'
-      yield* h.send(mkCompactionCompleted({ summary, compactedMessageCount: 0 }))
+      yield* h.send(mkCompactionCompleted({
+        turn: {
+          turnId: 'compaction-custom',
+          assistant: { _tag: 'AssistantMessage' as const, text: summary, toolCalls: [] },
+          toolResults: [],
+          feedback: [],
+          clean: true,
+        },
+        compactedMessageCount: 0,
+      }))
       const memory = yield* getMemory(h)
       const last = memory.messages[memory.messages.length - 1]
-      expect(last?.type).toBe('compacted')
-      if (last?.type === 'compacted') {
-        const text = last.content.map((p) => (p._tag === 'TextPart' ? p.text : '')).join('')
-        expect(text).toBe(`--- REFLECTION START ---\n${summary}\n--- REFLECTION END ---`)
+      expect(last?.type).toBe('assistant_turn')
+      if (last?.type === 'assistant_turn') {
+        expect(last.turn.assistant.text).toBe(summary)
       }
     }).pipe(Effect.provide(TestHarnessLive())))
 
@@ -48,11 +56,11 @@ describe('compaction/memory-rewrite', () => {
       }
       const before = yield* getMemory(h)
       const compactedMessageCount = 2
-      yield* h.send(mkCompactionCompleted({ summary: 's', compactedMessageCount }))
+      yield* h.send(mkCompactionCompleted({ compactedMessageCount }))
       const after = yield* getMemory(h)
 
       const beforeSuffix = before.messages.slice(1 + compactedMessageCount)
-      // After rewrite: [session_context, ...remaining, reflection]
+      // After rewrite: [session_context, ...remaining, assistant_turn]
       const afterSuffix = after.messages.slice(1, -1)
       expect(afterSuffix.length).toBe(beforeSuffix.length)
       for (let i = 0; i < beforeSuffix.length; i++) {
@@ -102,14 +110,22 @@ describe('compaction/memory-rewrite', () => {
       expect(sessionCtx?.estimatedTokens).toBeGreaterThan(0)
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('reflection block has non-zero estimatedTokens', () =>
+  it.effect('compaction assistant_turn entry has non-zero estimatedTokens', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
-      yield* h.send(mkCompactionCompleted({ summary: 'important reflection about the work done so far' }))
+      yield* h.send(mkCompactionCompleted({
+        turn: {
+          turnId: 'compaction-et',
+          assistant: { _tag: 'AssistantMessage' as const, text: 'important reflection about the work done so far', toolCalls: [] },
+          toolResults: [],
+          feedback: [],
+          clean: true,
+        },
+      }))
       const memory = yield* getMemory(h)
-      const reflection = memory.messages[memory.messages.length - 1]
-      expect(reflection?.type).toBe('compacted')
-      expect(reflection?.estimatedTokens).toBeGreaterThan(0)
+      const compactionEntry = memory.messages[memory.messages.length - 1]
+      expect(compactionEntry?.type).toBe('assistant_turn')
+      expect(compactionEntry?.estimatedTokens).toBeGreaterThan(0)
     }).pipe(Effect.provide(TestHarnessLive())))
 
   it.effect('messageTokens equals sum of entry estimatedTokens after compaction', () =>
@@ -117,7 +133,7 @@ describe('compaction/memory-rewrite', () => {
       const h = yield* TestHarness
       yield* h.send(mkUserMessage({ text: 'first message' }))
       yield* h.send(mkUserMessage({ text: 'second message' }))
-      yield* h.send(mkCompactionCompleted({ summary: 'compacted summary', compactedMessageCount: 2, tokensSaved: 20 }))
+      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 2 }))
       const memory = yield* getMemory(h)
       const sumOfEntries = memory.messages.reduce((acc, entry) => acc + entry.estimatedTokens, 0)
       expect(memory.messageTokens).toBe(sumOfEntries)
@@ -131,7 +147,16 @@ describe('compaction/memory-rewrite', () => {
       const before = yield* getMemory(h)
       const tokensBefore = before.tokenEstimate
 
-      yield* h.send(mkCompactionCompleted({ summary: 'short', compactedMessageCount: 2, tokensSaved: 20 }))
+      yield* h.send(mkCompactionCompleted({
+        turn: {
+          turnId: 'compaction-te',
+          assistant: { _tag: 'AssistantMessage' as const, text: 'short', toolCalls: [] },
+          toolResults: [],
+          feedback: [],
+          clean: true,
+        },
+        compactedMessageCount: 2,
+      }))
       const after = yield* getMemory(h)
 
       // tokenEstimate should reflect the new smaller window
@@ -173,7 +198,13 @@ describe('compaction/memory-rewrite', () => {
       yield* h.send(mkCompactionReady({ compactedMessageCount: beforeCompaction.messages.length - 1 }))
       yield* h.send(mkCompactionCompleted({
         compactedMessageCount: beforeCompaction.messages.length - 1,
-        summary: 'compacted everything before re-anchor',
+        turn: {
+          turnId: 'compaction-anchor',
+          assistant: { _tag: 'AssistantMessage' as const, text: 'compacted everything before re-anchor', toolCalls: [] },
+          toolResults: [],
+          feedback: [],
+          clean: true,
+        },
       }))
       const afterCompaction = yield* getMemory(h)
 

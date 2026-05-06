@@ -7,6 +7,7 @@ import {
   expectStableWorkingState,
   getCompaction,
   getTurn,
+  mkCompactionCompleted,
   mkCompactionFailed,
   mkCompactionReady,
   mkCompactionStarted,
@@ -21,7 +22,7 @@ describe('compaction/working-state-gating', () => {
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send(mkUserMessage({ text: 'wake up' }))
-      yield* h.send(mkCompactionStarted(null))
+      yield* h.send(mkCompactionStarted({ forkId: null }))
       yield* h.send(mkCompactionReady())
       const compaction = yield* getCompaction(h)
       expect(compaction._tag).toBe('pendingFinalization')
@@ -42,15 +43,7 @@ describe('compaction/working-state-gating', () => {
       yield* h.send(mkContextLimitHit())
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady())
-      yield* h.send({
-        type: 'compaction_completed',
-        forkId: null,
-        summary: 'summary',
-        compactedMessageCount: 1,
-        tokensSaved: 5,
-        preservedVariables: [],
-        refreshedContext: null,
-      })
+      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 1 }))
       yield* expectCompactionUnblocked(h)
     }).pipe(Effect.provide(TestHarnessLive())))
 
@@ -70,15 +63,7 @@ describe('compaction/working-state-gating', () => {
       const h = yield* TestHarness
       yield* h.send(mkContextLimitHit())
       yield* startReadyCompaction(h)
-      yield* h.send({
-        type: 'compaction_completed',
-        forkId: null,
-        summary: 'summary',
-        compactedMessageCount: 1,
-        tokensSaved: 5,
-        preservedVariables: [],
-        refreshedContext: null,
-      })
+      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 1 }))
       const compaction = yield* getCompaction(h)
       expect(compaction.contextLimitBlocked).toBe(false)
       expect(compaction._tag).toBe('idle')

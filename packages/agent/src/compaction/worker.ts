@@ -20,14 +20,14 @@ import { TurnProjection } from '../projections/turn'
 
 import { getForkInfo } from '../agents/registry'
 import { ConfigAmbient, getRoleConfig } from '../ambient/config-ambient'
-import { estimateText } from '../truncation/estimate'
 
 import { isRetryableConnectionError } from '../errors/classify'
 import { presentConnectionError } from '../errors/present'
 import { MAX_RETRIES, BASE_DELAY_MS, MAX_DELAY_MS } from '../util/retry-backoff'
 
 import { computeCompactionSizing } from './estimate'
-import { runCompactionTurn } from './turn'
+import { runCompactionTurn, type CompactionTurnResult } from './turn'
+import type { CompletedTurn } from '../window/types'
 
 // =============================================================================
 // Retry schedule — same constants as Cortex
@@ -58,22 +58,20 @@ function isRetryable(error: unknown): boolean {
 
 function finalizeCompaction(
   forkId: string | null,
-  summary: string,
+  turn: CompletedTurn,
   compactedMessageCount: number,
-  originalTokenEstimate: number,
+  inputTokens: number | null,
+  outputTokens: number | null,
   publish: (event: AppEvent) => Effect.Effect<void>,
 ): Effect.Effect<void> {
   return Effect.gen(function* () {
-    const summaryTokens = estimateText(summary)
-    const tokensSaved = Math.max(0, originalTokenEstimate - summaryTokens)
-
     yield* publish({
       type: 'compaction_completed',
       forkId,
-      summary,
+      turn,
       compactedMessageCount,
-      tokensSaved,
-      preservedVariables: [],
+      inputTokens,
+      outputTokens,
       refreshedContext: null,
     })
   })
@@ -115,7 +113,7 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
         const roleConfig = getRoleConfig(configState, roleId)
 
         // 3. Compute compaction sizing
-        const { compactedMessageCount, keptTailTokens } = computeCompactionSizing(
+        const { compactedMessageCount } = computeCompactionSizing(
           windowState.messages,
           roleConfig.softCap,
         )
@@ -128,14 +126,8 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
           compactedMessageCount,
         })
 
-        // 5. Compute pre-compaction token estimate
-        let originalTokenEstimate = 0
-        for (let i = 1; i <= compactedMessageCount; i++) {
-          originalTokenEstimate += windowState.messages[i].estimatedTokens
-        }
-
-        // 6. Run agentic compaction turn with retry
-        const summary = yield* runCompactionTurn(forkId, roleId, windowState, publish, read).pipe(
+        // 5. Run agentic compaction turn with retry
+        const result: CompactionTurnResult = yield* runCompactionTurn(forkId, roleId, windowState, publish, read).pipe(
           Effect.retry({
             schedule: retrySchedule,
             while: (err) => {
@@ -146,20 +138,21 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
           }),
         )
 
-        // 7. Emit compaction_ready
+        // 6. Emit compaction_ready
         yield* publish({
           type: 'compaction_ready',
           forkId,
-          summary,
+          turn: result.turn,
           compactedMessageCount,
-          originalTokenEstimate,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
           refreshedContext: null,
         })
 
-        // 8. Check if we can finalize immediately
+        // 7. Check if we can finalize immediately
         const turnState = yield* read(TurnProjection, forkId)
         if (!turnState || turnState._tag === 'idle') {
-          yield* finalizeCompaction(forkId, summary, compactedMessageCount, originalTokenEstimate, publish)
+          yield* finalizeCompaction(forkId, result.turn, compactedMessageCount, result.inputTokens, result.outputTokens, publish)
         }
       }).pipe(
         Effect.onInterrupt(() => Effect.gen(function* () {
@@ -200,9 +193,10 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
 
         yield* finalizeCompaction(
           forkId,
-          compactionState.summary,
+          compactionState.turn,
           compactionState.compactedMessageCount,
-          compactionState.originalTokenEstimate,
+          compactionState.inputTokens,
+          compactionState.outputTokens,
           publish,
         )
       }),

@@ -11,6 +11,11 @@ import {
   mkTurnOutcomeEventSuccess,
   mkTurnStarted,
 } from './helpers'
+import {
+  mkCompactionCompleted,
+  mkCompactionReady,
+  mkCompactionStarted,
+} from '../compaction/helpers'
 
 describe('turn control compaction gating interaction', () => {
   it.live('context_limit_hit blocks triggering while gate is active', () =>
@@ -49,15 +54,8 @@ describe('turn control compaction gating interaction', () => {
     Effect.gen(function* () {
       const h = yield* TestHarness
 
-      yield* h.send({ type: 'compaction_started', forkId: null, compactedMessageCount: 4 })
-      yield* h.send({
-        type: 'compaction_ready',
-        forkId: null,
-        summary: 'summary',
-        compactedMessageCount: 4,
-        originalTokenEstimate: 5000,
-        refreshedContext: null,
-      })
+      yield* h.send(mkCompactionStarted())
+      yield* h.send(mkCompactionReady({ compactedMessageCount: 4 }))
 
       const compactionState = yield* h.projectionFork(CompactionProjection.Tag, null)
       expect(compactionState._tag !== 'idle').toBe(true)
@@ -86,15 +84,7 @@ describe('turn control compaction gating interaction', () => {
       yield* h.send(mkTurnStarted({ turnId: 't-g2-old', chainId: 'c-g2' }))
       yield* h.send(mkContextLimitHit())
       yield* h.send(mkTurnOutcomeEventFailure({ turnId: 't-g2-old', chainId: 'c-g2' }))
-      yield* h.send({
-        type: 'compaction_completed',
-        forkId: null,
-        summary: 'done',
-        compactedMessageCount: 3,
-        tokensSaved: 1000,
-        preservedVariables: [],
-        refreshedContext: null,
-      })
+      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 3 }))
 
       yield* h.send(mkTurnStarted({ turnId: 't-g2-new', chainId: 'c-g2' }))
       yield* h.send(mkTurnOutcomeEventSuccess({ turnId: 't-g2-new', chainId: 'c-g2' }))
@@ -112,24 +102,9 @@ describe('turn control compaction gating interaction', () => {
       yield* h.send(mkTurnStarted({ turnId: 't-g3', chainId: 'c-g3' }))
       yield* h.send(mkContextLimitHit())
       yield* h.send(mkTurnOutcomeEventFailure({ turnId: 't-g3', chainId: 'c-g3' }))
-      yield* h.send({ type: 'compaction_started', forkId: null, compactedMessageCount: 1 })
-      yield* h.send({
-        type: 'compaction_ready',
-        forkId: null,
-        summary: 's',
-        compactedMessageCount: 1,
-        originalTokenEstimate: 1234,
-        refreshedContext: null,
-      })
-      yield* h.send({
-        type: 'compaction_completed',
-        forkId: null,
-        summary: 's',
-        compactedMessageCount: 1,
-        tokensSaved: 900,
-        preservedVariables: [],
-        refreshedContext: null,
-      })
+      yield* h.send(mkCompactionStarted({ compactedMessageCount: 1 }))
+      yield* h.send(mkCompactionReady({ compactedMessageCount: 1 }))
+      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 1 }))
 
       yield* h.send(mkTurnStarted({ turnId: 't-g3-next', chainId: 'c-g3' }))
       yield* h.send(mkTurnOutcomeEventSuccess({ turnId: 't-g3-next', chainId: 'c-g3' }))
@@ -145,24 +120,9 @@ describe('turn control compaction gating interaction', () => {
       yield* h.send(mkTurnStarted({ turnId: 't-g4-1', chainId: 'c-g4' }))
       yield* h.send(mkContextLimitHit())
       yield* h.send(mkTurnOutcomeEventFailure({ turnId: 't-g4-1', chainId: 'c-g4' }))
-      yield* h.send({ type: 'compaction_started', forkId: null, compactedMessageCount: 2 })
-      yield* h.send({
-        type: 'compaction_ready',
-        forkId: null,
-        summary: 'sum',
-        compactedMessageCount: 2,
-        originalTokenEstimate: 6000,
-        refreshedContext: null,
-      })
-      yield* h.send({
-        type: 'compaction_completed',
-        forkId: null,
-        summary: 'sum',
-        compactedMessageCount: 2,
-        tokensSaved: 2000,
-        preservedVariables: [],
-        refreshedContext: null,
-      })
+      yield* h.send(mkCompactionStarted({ compactedMessageCount: 2 }))
+      yield* h.send(mkCompactionReady({ compactedMessageCount: 2 }))
+      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 2 }))
       yield* h.send(mkTurnStarted({ turnId: 't-g4-2', chainId: 'c-g4' }))
       yield* h.send(mkTurnOutcomeEventSuccess({ turnId: 't-g4-2', chainId: 'c-g4' }))
 
