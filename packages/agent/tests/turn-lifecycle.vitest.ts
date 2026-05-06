@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
-import { YIELD_USER, YIELD_INVOKE } from '@magnitudedev/xml-act'
+import { YIELD_USER } from '@magnitudedev/xml-act'
 import { TestHarness, TestHarnessLive } from '../src/test-harness/harness'
 import { IDENTICAL_RESPONSE_BREAKER_THRESHOLD } from '../src/execution/execution-manager'
 
@@ -81,7 +81,7 @@ describe('turn lifecycle', () => {
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.script.next({ xml: '' })
-      yield* h.script.next({ xml: YIELD_USER })
+      yield* h.script.next({ xml: '<magnitude:message to="user">recovered</magnitude:message>' })
 
       yield* h.user('trigger empty response')
       const first = yield* h.wait.turnCompleted(null)
@@ -144,7 +144,7 @@ describe('turn lifecycle', () => {
 
       const N = IDENTICAL_RESPONSE_BREAKER_THRESHOLD
       // Invalid tool call body forces turn continue with tool parse error.
-      const repeated = `<magnitude:message to="user">repeat</magnitude:message>\n${YIELD_INVOKE}`
+      const repeated = `<magnitude:message to="user">repeat</magnitude:message>\n<magnitude:invoke tool="shell"><magnitude:parameter name="command">echo ok</magnitude:parameter></magnitude:invoke>`
       for (let i = 0; i < N; i++) {
         yield* h.script.next({ xml: repeated })
       }
@@ -182,8 +182,8 @@ describe('turn lifecycle', () => {
     Effect.gen(function* () {
       const h = yield* TestHarness
 
-      const a = `<magnitude:message to="user">foo</magnitude:message>\n${YIELD_INVOKE}`
-      const b = `<magnitude:message to="user">bar</magnitude:message>\n${YIELD_INVOKE}`
+      const a = `<magnitude:message to="user">foo</magnitude:message>\n<magnitude:invoke tool="shell"><magnitude:parameter name="command">echo ok</magnitude:parameter></magnitude:invoke>`
+      const b = `<magnitude:message to="user">bar</magnitude:message>\n<magnitude:invoke tool="shell"><magnitude:parameter name="command">echo ok</magnitude:parameter></magnitude:invoke>`
       yield* h.script.next({ xml: a })
       yield* h.script.next({ xml: a })
       yield* h.script.next({ xml: b })
@@ -216,13 +216,13 @@ describe('turn lifecycle', () => {
     Effect.gen(function* () {
       const h = yield* TestHarness
 
-      const a = `<magnitude:message to="user">foo</magnitude:message>\n${YIELD_INVOKE}`
+      const a = `<magnitude:message to="user">foo</magnitude:message>\n<magnitude:invoke tool="shell"><magnitude:parameter name="command">echo ok</magnitude:parameter></magnitude:invoke>`
       const idleWithMessage = `<magnitude:message to="user">boundary</magnitude:message>\n${YIELD_USER}`
       yield* h.script.next({ xml: a })                 // continue
       yield* h.script.next({ xml: a })                 // continue
       yield* h.script.next({ xml: idleWithMessage })   // idle boundary (reset)
       yield* h.script.next({ xml: a })                 // continue after reset
-      yield* h.script.next({ xml: YIELD_USER })              // stop
+      yield* h.script.next({ xml: '<magnitude:message to="user">done</magnitude:message>' })  // stop
 
       yield* h.user('trigger reset on idle boundary sequence')
 

@@ -22,6 +22,7 @@ import { mapConnectionErrorToOutcome, mapStreamErrorToOutcome } from '../errors'
 import { WindowProjection } from '../window'
 import { SessionContextProjection } from '../projections/session-context'
 import { AgentStatusProjection } from '../projections/agent-status'
+import { HarnessStateProjection } from '../projections/harness-state'
 import { TurnProjection } from '../projections/turn'
 import { MAX_RETRIES, TERMINAL_RETRY_EXHAUSTED_MESSAGE } from '../util/retry-backoff'
 
@@ -89,10 +90,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         const sessionCtx   = yield* read(SessionContextProjection)
         const agentState   = yield* read(AgentStatusProjection)
         const windowState  = yield* read(WindowProjection, forkId)
-        // TODO(Phase 3E): Pass replay state to harness for crash recovery.
-        // ReplayProjection uses turn-engine EngineState; harness uses its own EngineState.
-        // Needs type migration before it can be wired through.
-        // const replayState = yield* read(ReplayProjection, forkId)
+        const harnessState = yield* read(HarnessStateProjection, forkId)
 
         const forkInfo = getForkInfo(agentState, forkId)
         if (!forkInfo) return
@@ -149,11 +147,17 @@ export const Cortex = Worker.defineForked<AppEvent>()({
 
         const workspacePath = sessionCtx.context?.workspacePath ?? process.cwd()
 
+        // Pass engine state for crash recovery — allows the harness to skip
+        // tools that already executed before the process crashed.
+        const engineState = harnessState?.engine
+        const hasRecoverableState = engineState && engineState.toolOutcomes.size > 0
+
         const harness = createHarness({
           model: agentModel.model,
           toolkit,
           mapStreamError: mapStreamErrorToOutcome,
           layer: turnLayer,
+          initialState: hasRecoverableState ? engineState : undefined,
           hooks: buildStandardHooks({
             forkId,
             turnId,

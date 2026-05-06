@@ -91,7 +91,8 @@ export function runCompactionTurn(
     yield* Stream.runForEach(liveTurn.events, () => Effect.void)
 
     // Build CompletedTurn from canonical turn state
-    const canonical = yield* Ref.get(liveTurn.canonicalTurn)
+    const state = yield* Ref.get(liveTurn.state)
+    const canonical = state.canonical
     const hasContent = (canonical.assistantMessage.text && canonical.assistantMessage.text.trim().length > 0)
       || (canonical.assistantMessage.toolCalls && canonical.assistantMessage.toolCalls.length > 0)
 

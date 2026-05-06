@@ -11,16 +11,16 @@ import { createId } from '../util/id'
 import { SessionContextProjection } from '../projections/session-context'
 import { TaskGraphProjection } from '../projections/task-graph'
 import { TurnProjection } from '../projections/turn'
-import { CanonicalTurnProjection } from '../projections/canonical-turn'
+import { HarnessStateProjection } from '../projections/harness-state'
 import { WindowProjection } from '../window'
 import { SubagentActivityProjection } from '../projections/subagent-activity'
 import { DisplayProjection } from '../projections/display'
-import { ToolStateProjection } from '../projections/tool-state'
+
 import { TaskWorkerProjection } from '../projections/task-worker'
 import { AgentRoutingProjection } from '../projections/agent-routing'
 import { AgentStatusProjection } from '../projections/agent-status'
 import { CompactionProjection } from '../projections/compaction'
-import { ReplayProjection } from '../projections/replay'
+
 import { ConversationProjection } from '../projections/conversation'
 import { UserPresenceProjection } from '../projections/user-presence'
 import { OutboundMessagesProjection } from '../projections/outbound-messages'
@@ -47,7 +47,7 @@ import type { TestModelConfig } from './test-model'
 
 // Testing services
 import { InMemoryChatPersistenceTag, makeInMemoryChatPersistenceLayer } from './in-memory-persistence'
-import { MockCortex } from './mock-cortex'
+import { MockCortex, ForkTrackersLive } from './mock-cortex'
 import { MockTurnScriptTag, MockTurnScriptLive, createScriptGate, type MockTurnResponse, type MockTurnScriptResolver, type ScriptGate } from './turn-script'
 import { response as standaloneResponse } from './response-builder'
 import { createTurnsBuilder } from './scenario-builder'
@@ -98,6 +98,7 @@ export interface HarnessOptions {
   }
   workers?: {
     turnController?: boolean
+    cortex?: boolean
     autopilot?: boolean
     compaction?: boolean
     userPresence?: boolean
@@ -221,7 +222,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
   try {
     const workers = [
       ...(options.workers?.turnController !== false ? [TurnController] : []),
-      MockCortex,
+      ...(options.workers?.cortex !== false ? [MockCortex] : []),
       AgentLifecycle,
       LifecycleCoordinator,
       ApprovalWorker,
@@ -242,13 +243,12 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
         CompactionProjection,
         TaskGraphProjection,
         TurnProjection,
-        CanonicalTurnProjection,
+        HarnessStateProjection,
 
-        ReplayProjection,
         SubagentActivityProjection,
         OutboundMessagesProjection,
         UserMessageResolutionProjection,
-        ToolStateProjection,
+
         TaskWorkerProjection,
         WindowProjection,
         DisplayProjection,
@@ -262,7 +262,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
         },
         state: {
           display: DisplayProjection,
-          toolState: ToolStateProjection,
+          toolState: HarnessStateProjection,
           taskWorker: TaskWorkerProjection,
           turn: TurnProjection,
           memory: WindowProjection,
@@ -323,6 +323,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
       testModelResolverLayer,
       fsLayer,
       MockTurnScriptLive,
+      ForkTrackersLive,
       basePersistenceLayer,
       faultWrappedPersistenceLayer,
       ...(fakeClock ? [fakeClock.layer] : []),
@@ -331,6 +332,11 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
     const client = await TestCodingAgent.createClient(runtimeLayer)
 
     await client.runEffect(registerApprovalBridge)
+
+    // Publish toolkit ambient so HarnessStateProjection can create tool handles
+    const { publishToolkit } = await import('../ambient/toolkit-ambient')
+    const { leaderToolkit } = await import('../tools/toolkits')
+    await client.runEffect(publishToolkit(leaderToolkit))
 
     const transcript: AppEvent[] = []
     const listeners = new Set<(e: AppEvent) => void>()

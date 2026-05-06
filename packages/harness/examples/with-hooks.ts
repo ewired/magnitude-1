@@ -115,7 +115,8 @@ const program = Effect.gen(function* () {
     }),
   )
 
-  const canonical = yield* Ref.get(turn.canonicalTurn)
+  const state = yield* Ref.get(turn.state)
+  const canonical = state.canonical
   console.log(`\nTool results: ${canonical.toolResults.length}`)
   console.log(`Outcome: ${canonical.outcome?._tag}`)
 })

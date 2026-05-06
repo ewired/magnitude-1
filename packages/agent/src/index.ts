@@ -88,8 +88,8 @@ export type { QueuedEntry } from './window/inbox/types'
 export { CompactionProjection } from './projections/compaction'
 export type { CompactionState } from './projections/compaction'
 
-export { ToolStateProjection } from './projections/tool-state'
-export type { ToolStateProjectionState } from './projections/tool-state'
+export { HarnessStateProjection, getToolHandlesRecord } from './projections/harness-state'
+export type { TurnState } from '@magnitudedev/harness'
 
 export { TaskWorkerProjection } from './projections/task-worker'
 export type {
@@ -122,7 +122,6 @@ export type {
   PendingInboundCommunicationDisplay,
 } from './projections/display'
 
-export { ReplayProjection } from './projections/replay'
 export { TurnProjection } from './projections/turn'
 export type { ToolCall, TurnTrigger, PendingInboundCommunication, ForkTurnState } from './projections/turn'
 
@@ -211,7 +210,7 @@ export {
 export type { SerializedEvent } from './serialization'
 
 // Debug Introspection
-// debug-introspection service removed (depends on ReplayProjection — scheduled rewrite)
+
 // Types are still exported for CLI debug panel
 export type { DebugSnapshot, ProjectionSnapshot, ContextUsage } from './projections/debug-introspection'
 

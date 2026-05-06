@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef } from 'react'
 import { TextAttributes, type KeyEvent } from '@opentui/core'
 import { useKeyboard } from '@opentui/react'
-import type { CompactionState, DisplayState, DisplayMessage, ToolStateProjectionState, ActionId } from '@magnitudedev/agent'
+import type { CompactionState, DisplayState, DisplayMessage, TurnState, ActionId } from '@magnitudedev/agent'
 import { useTheme } from '../hooks/use-theme'
 import { useFilePanel } from '../hooks/use-file-panel'
 import { Button } from './button'
@@ -25,7 +25,7 @@ interface ForkDetailOverlayProps {
   subscribeForkDisplay: (forkId: string, cb: (state: DisplayState) => void) => () => void
   subscribeForkCompaction: (forkId: string, cb: (state: CompactionState) => void) => () => void
   subscribeForkWindow: (forkId: string, cb: (state: { tokenEstimate: number }) => void) => () => void
-  subscribeForkToolState: (forkId: string, cb: (state: ToolStateProjectionState) => void) => () => void
+  subscribeForkHarnessState: (forkId: string, cb: (state: TurnState) => void) => () => void
 }
 
 function capitalize(s: string): string {
@@ -59,12 +59,12 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
   subscribeForkDisplay,
   subscribeForkCompaction,
   subscribeForkWindow,
-  subscribeForkToolState,
+  subscribeForkHarnessState,
 }: ForkDetailOverlayProps) {
   const theme = useTheme()
   const [closeHover, setCloseHover] = useState(false)
   const [display, setDisplay] = useState<DisplayState | null>(null)
-  const [toolState, setToolState] = useState<ToolStateProjectionState | null>(null)
+  const [toolState, setToolState] = useState<TurnState | null>(null)
   const [tokenEstimate, setTokenEstimate] = useState(0)
   const [isCompacting, setIsCompacting] = useState(false)
 
@@ -102,11 +102,11 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
   }, [forkId, subscribeForkWindow])
 
   useEffect(() => {
-    const unsubscribe = subscribeForkToolState(forkId, (state) => {
+    const unsubscribe = subscribeForkHarnessState(forkId, (state) => {
       setToolState(state)
     })
     return unsubscribe
-  }, [forkId, subscribeForkToolState])
+  }, [forkId, subscribeForkHarnessState])
 
   const messages = display?.messages ?? EMPTY_MESSAGES
   const isStreaming = display?.status === 'streaming'

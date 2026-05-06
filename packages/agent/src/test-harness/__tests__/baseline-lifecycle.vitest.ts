@@ -38,7 +38,7 @@ describe('baseline harness lifecycle', () => {
     Effect.gen(function* () {
       const harness = yield* TestHarness
       yield* harness.script.next({ xml: '<magnitude:invoke tool="shell">\n<magnitude:parameter name="command">echo chain</magnitude:parameter>\n</magnitude:invoke>' })
-      yield* harness.script.next({ xml: '<magnitude:yield_user/>' })
+      yield* harness.script.next({ xml: '<magnitude:message to="user">done</magnitude:message>' })
 
       yield* harness.user('run chain')
 

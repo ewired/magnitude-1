@@ -47,7 +47,7 @@ describe('turn control compaction gating interaction', () => {
 
       const compactionAfter = yield* h.projectionFork(CompactionProjection.Tag, null)
       expect(compactionAfter._tag).toBe('idle')
-    }).pipe(Effect.provide(TestHarnessLive({ workers: { compaction: true } })))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false, compaction: true } })))
   )
 
   it.live('compaction_ready pending finalization keeps triggering gated', () =>
@@ -74,7 +74,7 @@ describe('turn control compaction gating interaction', () => {
       })
       const startedAfter = eventsForFork(h, null).filter((e) => e.type === 'turn_started').length
       expect(startedAfter).toBe(startedBefore)
-    }).pipe(Effect.provide(TestHarnessLive({ workers: { compaction: true } })))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false, compaction: true } })))
   )
 
   it.live('unblock transition allows exactly one next turn with fresh ID', () =>
@@ -92,7 +92,7 @@ describe('turn control compaction gating interaction', () => {
       const starts = eventsForFork(h, null).filter((e) => e.type === 'turn_started')
       expect(starts.filter((s) => s.turnId === 't-g2-new')).toHaveLength(1)
       assertNoTurnIdMismatch(eventsForFork(h, null))
-    }).pipe(Effect.provide(TestHarnessLive({ workers: { compaction: true } })))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false, compaction: true } })))
   )
 
   it.live('completion around gate transitions remains mapped to active turn', () =>
@@ -110,7 +110,7 @@ describe('turn control compaction gating interaction', () => {
       yield* h.send(mkTurnOutcomeEventSuccess({ turnId: 't-g3-next', chainId: 'c-g3' }))
 
       assertNoTurnIdMismatch(eventsForFork(h, null))
-    }).pipe(Effect.provide(TestHarnessLive({ workers: { compaction: true } })))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false, compaction: true } })))
   )
 
   it.live('end-to-end blocked/pending/unblock sequence preserves global invariant', () =>
@@ -127,6 +127,6 @@ describe('turn control compaction gating interaction', () => {
       yield* h.send(mkTurnOutcomeEventSuccess({ turnId: 't-g4-2', chainId: 'c-g4' }))
 
       assertNoTurnIdMismatch(eventsForFork(h, null))
-    }).pipe(Effect.provide(TestHarnessLive({ workers: { compaction: true } })))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false, compaction: true } })))
   )
 })

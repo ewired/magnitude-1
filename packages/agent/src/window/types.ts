@@ -39,6 +39,9 @@ export interface ForkWindowState {
   readonly currentChainId: string | null
   readonly pendingPresenceText: string | null
   readonly nextQueueSeq: number
+  // Parent message tracking (for feedback)
+  readonly _activeMessageIsParent: boolean
+  readonly _parentChars: number
   // Budget tracking
   readonly tokenEstimate: number
   readonly messageTokens: number

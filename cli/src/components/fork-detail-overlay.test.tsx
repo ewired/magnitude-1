@@ -111,7 +111,7 @@ function propsWithDisplay(display: DisplayState) {
       cb({ tokenEstimate: 0, messageTokens: 0, systemPromptTokens: 0, lastAnchoredTotal: null, lastAnchoredMessageTokens: null, messages: [], queuedTimeline: [], currentTurnId: null, currentChainId: null, pendingPresenceText: null, nextQueueSeq: 0 })
       return noop
     },
-    subscribeForkToolState: (_forkId: string, cb: (state: any) => void) => {
+    subscribeForkHarnessState: (_forkId: string, cb: (state: any) => void) => {
       cb({ toolHandles: {} })
       return noop
     },

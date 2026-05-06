@@ -294,14 +294,39 @@ export const EngineStateReducer: Reducer<EngineState> = {
   step: engineStateStep,
 }
 
-// ── ToolHandleState ──────────────────────────────────────────────────
+// ── TurnState (unified) ──────────────────────────────────────────────
+
+export interface TurnState {
+  /** @internal — reducer bookkeeping, do not read */
+  readonly _accumulator: CanonicalAccumulator
+  readonly canonical: CanonicalTurnState
+  readonly engine: EngineState
+  readonly handles: ToolHandleState
+}
+
+export function createTurnReducer(toolkit: Toolkit): Reducer<TurnState> {
+  const toolHandleReducer = createToolHandleReducer(toolkit)
+
+  const initial: TurnState = {
+    _accumulator: CanonicalAccumulatorReducer.initial,
+    canonical: projectCanonical(CanonicalAccumulatorReducer.initial),
+    engine: EngineStateReducer.initial,
+    handles: toolHandleReducer.initial,
+  }
+
+  function step(state: TurnState, event: HarnessEvent): TurnState {
+    const _accumulator = CanonicalAccumulatorReducer.step(state._accumulator, event)
+    const canonical = projectCanonical(_accumulator)
+    const engine = EngineStateReducer.step(state.engine, event)
+    const handles = toolHandleReducer.step(state.handles, event)
+    return { _accumulator, canonical, engine, handles }
+  }
+
+  return { initial, step }
+}
 
 export interface ToolHandleState {
   readonly handles: ReadonlyMap<string, ToolHandle>
-}
-
-const toolHandleInitial: ToolHandleState = {
-  handles: new Map(),
 }
 
 export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleState> {
@@ -313,6 +338,8 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
       stateModels.set(key, entry.state)
     }
   }
+
+  const initial: ToolHandleState = { handles: new Map() }
 
   function step(state: ToolHandleState, event: HarnessEvent): ToolHandleState {
     if (event._tag === "ToolInputStarted") {
@@ -358,5 +385,5 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
     return state
   }
 
-  return { initial: toolHandleInitial, step }
+  return { initial, step }
 }

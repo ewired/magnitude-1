@@ -17,17 +17,17 @@ import type { DebugSnapshot } from './projections/debug-introspection'
 // Projections
 import { SessionContextProjection } from './projections/session-context'
 import { TurnProjection } from './projections/turn'
-import { CanonicalTurnProjection } from './projections/canonical-turn'
+import { HarnessStateProjection } from './projections/harness-state'
 import { WindowProjection } from './window'
 import { SubagentActivityProjection } from './projections/subagent-activity'
 import { DisplayProjection } from './projections/display'
-import { ToolStateProjection } from './projections/tool-state'
+
 import { AgentRoutingProjection } from './projections/agent-routing'
 import { AgentStatusProjection } from './projections/agent-status'
 import { TaskGraphProjection } from './projections/task-graph'
 import { TaskWorkerProjection } from './projections/task-worker'
 import { CompactionProjection } from './projections/compaction'
-import { ReplayProjection } from './projections/replay'
+
 import { ConversationProjection } from './projections/conversation'
 import { UserPresenceProjection } from './projections/user-presence'
 import { OutboundMessagesProjection } from './projections/outbound-messages'
@@ -98,13 +98,12 @@ export const CodingAgent = Agent.define<AppEvent>()({
     TaskGraphProjection,
     CompactionProjection,
     TurnProjection,
-    CanonicalTurnProjection,
+    HarnessStateProjection,
 
-    ReplayProjection,
     SubagentActivityProjection,
     OutboundMessagesProjection,
     UserMessageResolutionProjection,
-    ToolStateProjection,
+
     WindowProjection,
     TaskWorkerProjection,
     DisplayProjection,
@@ -139,7 +138,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
     },
     state: {
       display: DisplayProjection,
-      toolState: ToolStateProjection,
+      harnessState: HarnessStateProjection,
       turn: TurnProjection,
       memory: WindowProjection,
       compaction: CompactionProjection,
@@ -392,7 +391,6 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
             turnId: forkTurnState.turnId,
             chainId: forkTurnState.chainId,
             strategyId: 'native',
-
             outcome: { _tag: 'Cancelled', reason: { _tag: 'WorkerKilled' } },
             inputTokens: null,
             outputTokens: null,
@@ -400,6 +398,14 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
             cacheWriteTokens: null,
             providerId: null,
             modelId: null,
+          }))
+
+          // Re-trigger the fork so TurnController picks it up and retries the turn.
+          // Engine state is preserved (WorkerKilled path) so the harness can skip
+          // tools that already executed before the crash.
+          yield* Effect.promise(() => client.send({
+            type: 'wake',
+            forkId: agent.forkId,
           }))
         }
       }
@@ -420,6 +426,12 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
           cacheWriteTokens: null,
           providerId: null,
           modelId: null,
+        }))
+
+        // Re-trigger root fork for crash recovery
+        yield* Effect.promise(() => client.send({
+          type: 'wake',
+          forkId: null,
         }))
       }
 

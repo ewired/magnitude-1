@@ -51,8 +51,8 @@ export type {
 export type { ExecuteHookContext, InterceptorDecision, HarnessHooks } from "./hooks"
 
 // Reducers
-export type { Reducer, CanonicalTurnState, CanonicalAccumulator, EngineState, ToolOutcome, ToolHandleState } from "./turn/reducers"
-export { CanonicalAccumulatorReducer, EngineStateReducer, createToolHandleReducer, projectCanonical } from "./turn/reducers"
+export type { Reducer, TurnState, CanonicalTurnState, EngineState, ToolOutcome, ToolHandleState } from "./turn/reducers"
+export { createTurnReducer } from "./turn/reducers"
 
 // Dispatcher
 export type { DispatchConfig } from "./turn/dispatcher"

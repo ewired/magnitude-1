@@ -11,7 +11,7 @@ import { present } from '../errors'
 import { getAgentByForkId, AgentStatusProjection } from '../projections/agent-status'
 import { SubagentActivityProjection } from '../projections/subagent-activity'
 import { OutboundMessagesProjection } from '../projections/outbound-messages'
-import { CanonicalTurnProjection } from '../projections/canonical-turn'
+import { HarnessStateProjection } from '../projections/harness-state'
 import { buildSessionContextContent } from '../prompts/session-context'
 import { TASK_TREE_COMPLETION_REMINDER } from '../prompts/task-tree'
 import { SkillsAmbient } from '../ambient/skills-ambient'
@@ -268,7 +268,7 @@ function emitIfChanged(
 
 export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowState>()({
   name: 'Window',
-  reads: [AgentStatusProjection, SubagentActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection, CanonicalTurnProjection] as const,
+  reads: [AgentStatusProjection, SubagentActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection, HarnessStateProjection] as const,
   ambients: [SkillsAmbient, ConfigAmbient] as const,
   signals: {
     tokenEstimateChanged: Signal.create<{ forkId: string | null; tokenEstimate: number }>('Window/tokenEstimateChanged'),
@@ -280,6 +280,8 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
     currentChainId: null,
     pendingPresenceText: null,
     nextQueueSeq: 0,
+    _activeMessageIsParent: false,
+    _parentChars: 0,
     tokenEstimate: 0,
     messageTokens: 0,
     systemPromptTokens: 0,
@@ -333,7 +335,7 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
       ),
 
     turn_started: ({ event, fork, read, emit }) => {
-      let nextFork = fork
+      let nextFork = { ...fork, _activeMessageIsParent: false, _parentChars: 0 }
 
       if (event.forkId === null && nextFork.pendingPresenceText !== null) {
         nextFork = enqueueTimeline(
@@ -383,6 +385,22 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
       return result
     },
 
+    message_start: ({ event, fork }) => {
+      if (fork.currentTurnId !== event.turnId) return fork
+      return { ...fork, _activeMessageIsParent: event.destination.kind === 'parent' }
+    },
+
+    message_chunk: ({ event, fork }) => {
+      if (fork.currentTurnId !== event.turnId) return fork
+      if (!fork._activeMessageIsParent) return fork
+      return { ...fork, _parentChars: fork._parentChars + event.text.length }
+    },
+
+    message_end: ({ event, fork }) => {
+      if (fork.currentTurnId !== event.turnId) return fork
+      return { ...fork, _activeMessageIsParent: false }
+    },
+
     turn_outcome: ({ event, fork, read, emit }) => {
       if (fork.currentTurnId !== event.turnId) return fork
 
@@ -392,18 +410,23 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
           ? (event as any).result
           : { _tag: 'SystemError' as const, message: (event as any).message ?? 'Unknown error' }
 
-      // Read the completed turn from CanonicalTurnProjection
-      const canonical = read(CanonicalTurnProjection)
-      const completedTurn = canonical.lastCompleted
+      // Read the harness state to build CompletedTurn
+      const harness = read(HarnessStateProjection)
+      const canonicalState = harness.canonical
 
-      // Build feedback from outcome
-      const feedback: TurnFeedback[] = [...(completedTurn?.feedback ?? [])]
+      // Build feedback
+      const feedback: TurnFeedback[] = []
+      if (fork._parentChars > 0) {
+        feedback.push({ kind: 'message_ack', destination: 'parent', chars: fork._parentChars })
+      }
+
+      const hasContent = canonicalState.assistantMessage.text
+        || canonicalState.assistantMessage.reasoning
+        || canonicalState.assistantMessage.toolCalls?.length
+        || canonicalState.toolResults.length > 0
 
       switch (outcome._tag) {
         case 'Completed': {
-          const hasContent = completedTurn && completedTurn.turnId === event.turnId &&
-            (completedTurn.assistant.text || completedTurn.assistant.reasoning || completedTurn.assistant.toolCalls?.length || completedTurn.toolResults.length > 0)
-
           if (!hasContent) {
             feedback.push({ kind: 'error', message: EMPTY_RESPONSE_ERROR })
           }
@@ -438,33 +461,24 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
           break
       }
 
-      // Build the final CompletedTurn with feedback
+      // Build CompletedTurn from harness canonical state
+      const completedTurn: CompletedTurn = {
+        turnId: event.turnId,
+        assistant: canonicalState.assistantMessage,
+        toolResults: [...canonicalState.toolResults],
+        feedback,
+        clean: outcome._tag === 'Completed',
+      }
+
       const newMessages: WindowEntry[] = [...fork.messages]
       let turnEntryTokens = 0
 
-      if (completedTurn && completedTurn.turnId === event.turnId) {
-        const turn: CompletedTurn = { ...completedTurn, feedback }
-        turnEntryTokens = estimateTurnEntry(turn)
+      if (hasContent || feedback.length > 0) {
+        turnEntryTokens = estimateTurnEntry(completedTurn)
         newMessages.push({
           type: 'assistant_turn',
           source: 'agent',
-          turn,
-          strategyId: event.strategyId,
-          estimatedTokens: turnEntryTokens,
-        })
-      } else if (feedback.length > 0) {
-        const emptyTurn: CompletedTurn = {
-          turnId: event.turnId,
-          assistant: { _tag: 'AssistantMessage' as const },
-          toolResults: [],
-          feedback,
-          clean: false,
-        }
-        turnEntryTokens = estimateTurnEntry(emptyTurn)
-        newMessages.push({
-          type: 'assistant_turn',
-          source: 'agent',
-          turn: emptyTurn,
+          turn: completedTurn,
           strategyId: event.strategyId,
           estimatedTokens: turnEntryTokens,
         })
@@ -581,6 +595,8 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
         currentChainId: null,
         pendingPresenceText: null,
         nextQueueSeq: 0,
+        _activeMessageIsParent: false,
+        _parentChars: 0,
         messageTokens: entryTokens,
         systemPromptTokens: sysPromptTokens,
         tokenEstimate: sysPromptTokens + entryTokens,

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type ToolStateProjectionState, type DebugSnapshot, type RoleProfile, type ActionId } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId } from '@magnitudedev/agent'
 import { matchKeyToChord } from './utils/chord'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
@@ -145,7 +145,7 @@ function AppInner({
   const { client, workspacePath, send: clientSend, ensureReady: ensureClientReady, setFactory: setClientFactory, setClient: setLazyClient } = useLazyClient()
 
   const [display, setDisplay] = useState<DisplayState | null>(null)
-  const [toolState, setToolState] = useState<ToolStateProjectionState | null>(null)
+  const [toolState, setToolState] = useState<TurnState | null>(null)
   const [agentStatusState, setAgentStatusState] = useState<AgentStatusState | null>(null)
   const [expandedForkStack, setExpandedForkStack] = useState<string[]>([])
   const expandedForkId = expandedForkStack.length > 0 ? expandedForkStack[expandedForkStack.length - 1] : null
@@ -521,7 +521,7 @@ function AppInner({
   useEffect(() => {
     if (!client) return
 
-    const unsubscribe = client.state.toolState.subscribeFork(null, (state) => {
+    const unsubscribe = client.state.harnessState.subscribeFork(null, (state) => {
       setToolState(state)
     })
 

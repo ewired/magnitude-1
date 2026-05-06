@@ -31,7 +31,7 @@ describe('prompt caching consistency', () => {
 
       expect(afterRendered).toContain(beforeRendered)
       assertPrefixUnchanged(before, afterMemory)
-    }).pipe(Effect.provide(TestHarnessLive()))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false } })))
   )
 
   it.live('observations append new inbox and preserve prefix', () =>
@@ -62,7 +62,7 @@ describe('prompt caching consistency', () => {
       expect(afterRendered).toContain(beforeRendered)
       expect(afterRendered).toContain('observation note')
       assertPrefixUnchanged(before, afterMemory)
-    }).pipe(Effect.provide(TestHarnessLive()))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false } })))
   )
 
   it.live('turn unexpected error appends new inbox and preserves prefix', () =>
@@ -101,7 +101,7 @@ describe('prompt caching consistency', () => {
       expect(afterRendered).toContain(beforeRendered)
       expect(afterRendered).toContain('fatal failure')
       assertPrefixUnchanged(before, afterMemory)
-    }).pipe(Effect.provide(TestHarnessLive()))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false } })))
   )
 
   it.live('queue coalescing rewrites queue only and flushes latest update', () =>
@@ -150,7 +150,7 @@ describe('prompt caching consistency', () => {
 
       const afterRendered = yield* getRenderedUserText(h)
       expect(afterRendered).toContain('latest only')
-    }).pipe(Effect.provide(TestHarnessLive()))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false } })))
   )
 
   it.live('flush appends one inbox without rewriting prior messages', () =>
@@ -168,7 +168,7 @@ describe('prompt caching consistency', () => {
       const afterMemory = yield* getRootMemory(h)
       expect(afterRendered).toContain(beforeRendered)
       assertPrefixUnchanged(before, afterMemory)
-    }).pipe(Effect.provide(TestHarnessLive()))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false } })))
   )
 
   it.live('compaction is explicit exception and rewrites history', () =>
@@ -198,6 +198,6 @@ describe('prompt caching consistency', () => {
       expect(beforeRendered).toContain('before compaction')
       expect(afterRendered).toContain('summary block')
       expect(afterRendered).toContain('<session_context>')
-    }).pipe(Effect.provide(TestHarnessLive()))
+    }).pipe(Effect.provide(TestHarnessLive({ workers: { cortex: false } })))
   )
 })

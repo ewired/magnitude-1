@@ -33,7 +33,7 @@ import { createId } from '../util/id'
 import { finalizeOpenToolStepsAsInterruptedInSteps } from './display-interrupt'
 import { type ToolKey, HIDDEN_TOOLS } from '../tools/toolkits'
 import type { ToolState } from '../models/index'
-import { ToolStateProjection } from './tool-state'
+import { HarnessStateProjection, getToolHandlesRecord } from './harness-state'
 
 // =============================================================================
 // Types
@@ -559,7 +559,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
   ambients: [],
 
-  reads: [AgentRoutingProjection, AgentStatusProjection, UserMessageResolutionProjection, TurnProjection, ToolStateProjection] as const,
+  reads: [AgentRoutingProjection, AgentStatusProjection, UserMessageResolutionProjection, TurnProjection, HarnessStateProjection] as const,
 
   initialFork: {
     status: 'idle',
@@ -751,7 +751,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
     tool_event: ({ event, fork, read, emit }) => {
       const inner = event.event
-      const toolStateFork = read(ToolStateProjection) ?? { toolHandles: {} }
+      const harnessState = read(HarnessStateProjection)
+      const toolStateFork = { toolHandles: harnessState ? getToolHandlesRecord(harnessState) : {} }
       switch (inner._tag) {
         case 'ToolInputStarted': {
           // Emit signal for parent fork activity tracking (before any early returns)
@@ -977,7 +978,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       }
 
       // Finalize any still-open tool steps as interrupted before closing think block
-      const toolStateFork = read(ToolStateProjection) ?? { toolHandles: {} }
+      const harnessState = read(HarnessStateProjection)
+      const toolStateFork = { toolHandles: harnessState ? getToolHandlesRecord(harnessState) : {} }
       const interruptedState = finalizeOpenToolStepsAsInterrupted(fork, toolStateFork)
 
       // Close think block and remove queued messages

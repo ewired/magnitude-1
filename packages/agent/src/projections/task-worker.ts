@@ -13,9 +13,10 @@ import {
   type TaskRecord,
   type TaskStatus,
 } from './task-graph'
-import { ToolStateProjection, type ToolStateProjectionState } from './tool-state'
-import type { ToolHandle } from '../tools/tool-handle'
+import { HarnessStateProjection, getToolHandlesRecord } from './harness-state'
+import type { ToolHandle } from '@magnitudedev/harness'
 import type { ToolState } from '../models'
+import type { TurnState } from '@magnitudedev/harness'
 
 export type WorkerState =
   | { readonly status: 'unassigned' }
@@ -110,8 +111,9 @@ function isActiveWorkerTool(handle: ToolHandle): boolean {
   return ACTIVE_TOOL_PHASES.has(handle.state.phase as 'streaming' | 'executing')
 }
 
-function getRootToolHandles(toolState: { forks: ReadonlyMap<string | null, ToolStateProjectionState> }): Record<string, ToolHandle> {
-  return toolState.forks.get(null)?.toolHandles ?? {}
+function getRootToolHandles(toolState: { forks: ReadonlyMap<string | null, TurnState> }): Record<string, ToolHandle> {
+  const rootFork = toolState.forks.get(null)
+  return rootFork ? getToolHandlesRecord(rootFork) : {}
 }
 
 function findActiveToolCallId(
@@ -200,7 +202,7 @@ function deriveTaskWorkerAssignee(task: TaskRecord): TaskWorkerAssignee {
 function recomputeState(args: {
   taskGraph: TaskGraphState
   agentState: AgentStatusState
-  toolState: { forks: ReadonlyMap<string | null, ToolStateProjectionState> }
+  toolState: { forks: ReadonlyMap<string | null, TurnState> }
   workerActivityByForkId: ReadonlyMap<string, WorkerActivity>
 }): Pick<TaskWorkerState, 'orderedTaskIds' | 'snapshots'> {
   const { orderedTaskIds, depthByTaskId } = flattenTaskTree(args.taskGraph)
@@ -322,7 +324,7 @@ function removeWorkerActivity(
 type TaskWorkerReads = readonly [
   typeof TaskGraphProjection,
   typeof AgentStatusProjection,
-  typeof ToolStateProjection
+  typeof HarnessStateProjection
 ]
 
 function rebuild({
@@ -336,7 +338,7 @@ function rebuild({
 }): TaskWorkerState {
   const taskGraph = read(TaskGraphProjection)
   const agentState = read(AgentStatusProjection)
-  const toolState = read(ToolStateProjection)
+  const toolState = read(HarnessStateProjection)
 
   const next = recomputeState({
     taskGraph,
@@ -355,7 +357,7 @@ function rebuild({
 export const TaskWorkerProjection = Projection.define<AppEvent, TaskWorkerState>()({
   name: 'TaskWorker',
 
-  reads: [TaskGraphProjection, AgentStatusProjection, ToolStateProjection] as const,
+  reads: [TaskGraphProjection, AgentStatusProjection, HarnessStateProjection] as const,
 
   initial: {
     orderedTaskIds: [],

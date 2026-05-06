@@ -221,7 +221,7 @@ export interface ParseFailureEvent {
   readonly toolCallId: string
   readonly toolName: string
   readonly issue: ValidationIssue
-  readonly inputSchema: Schema.Schema.Any
+  readonly inputSchema: Schema.Schema.AnyNoContext
   readonly receivedInput: StreamingPartial<any>
 }
 
