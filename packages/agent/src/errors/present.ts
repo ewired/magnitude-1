@@ -10,9 +10,8 @@ import type {
   ProviderNotReadyDetail,
   ConnectionFailureDetail,
   SafetyStopReason,
-  MagnitudeBillingReason,
 } from '../events'
-import type { BillingWindowName, MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
+import type { MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
 
 export type ErrorSurface = 'inline' | 'toast' | 'silent'
 export type ErrorSeverity = 'error' | 'warning' | 'info'
@@ -23,13 +22,6 @@ export type ActionId = 'open-settings' | 'open-usage'
 export type ErrorCta =
   | { readonly kind: 'url'; readonly label: string; readonly url: string }
   | { readonly kind: 'action'; readonly label: string; readonly actionId: ActionId; readonly chord: string }
-
-/** Extra data shown beneath usage-limit errors (live "Resets in X" countdown). */
-export interface UsageLimitInline {
-  /** Wall-clock timestamp when the violated window resets, ms epoch. */
-  readonly resetsAt: number
-  readonly window: BillingWindowName
-}
 
 export interface ErrorPresentation {
   /** Where this should appear, if anywhere. */
@@ -43,12 +35,9 @@ export interface ErrorPresentation {
   readonly llmFeedback?: string
   /** Whether the underlying condition is auto-retried by the agent loop. */
   readonly retryable: boolean
-  /** When set, render a "Resets in X" countdown line beneath the message. */
-  readonly usageLimit?: UsageLimitInline
 }
 
-const UPGRADE_CTA: ErrorCta = { kind: 'url', label: 'Upgrade to Pro', url: 'https://app.magnitude.dev' }
-const START_TRIAL_CTA: ErrorCta = { kind: 'url', label: 'Start free trial', url: 'https://app.magnitude.dev' }
+const TOP_UP_CTA: ErrorCta = { kind: 'url', label: 'Top up credits', url: 'https://app.magnitude.dev/billing' }
 const UPDATE_MAGNITUDE_CTA: ErrorCta = { kind: 'url', label: 'Update Magnitude', url: 'https://docs.magnitude.dev/get-started' }
 const OPEN_SETTINGS_CTA: ErrorCta = { kind: 'action', label: 'Open settings', actionId: 'open-settings', chord: 'ctrl+s' }
 const VIEW_USAGE_CTA: ErrorCta = { kind: 'action', label: 'View usage', actionId: 'open-usage', chord: 'ctrl+u' }
@@ -60,44 +49,12 @@ const SILENT: ErrorPresentation = {
   retryable: false,
 }
 
-function presentMagnitudeBilling(reason: MagnitudeBillingReason): ErrorPresentation {
-  switch (reason._tag) {
-    case 'SubscriptionRequired':
-      return {
-        surface: 'inline',
-        severity: 'error',
-        message: reason.message,
-        cta: START_TRIAL_CTA,
-        llmFeedback: reason.message,
-        retryable: false,
-      }
-    case 'TrialExpired':
-      return {
-        surface: 'inline',
-        severity: 'error',
-        message: reason.message,
-        cta: UPGRADE_CTA,
-        llmFeedback: reason.message,
-        retryable: false,
-      }
-    case 'UsageLimitExceeded': {
-      const d = reason.details
-      return {
-        surface: 'inline',
-        severity: 'error',
-        message: reason.message,
-        cta: VIEW_USAGE_CTA,
-        llmFeedback: reason.message,
-        retryable: false,
-        usageLimit: d
-          ? {
-              resetsAt: Date.parse(d.violatedBudget.windowEnd),
-              window: d.violatedWindow,
-            }
-          : undefined,
-      }
-    }
-  }
+function formatDollars(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`
+}
+
+function insufficientCreditsMessage(balanceCents: number, requiredCents: number): string {
+  return `Insufficient credits. Balance: ${formatDollars(balanceCents)}. This request needs: ${formatDollars(requiredCents)}.`
 }
 
 function presentProviderNotReady(detail: ProviderNotReadyDetail): ErrorPresentation {
@@ -106,9 +63,9 @@ function presentProviderNotReady(detail: ProviderNotReadyDetail): ErrorPresentat
       return {
         surface: 'inline',
         severity: 'error',
-        message: 'Authentication failed. API key may be invalid or expired.',
+        message: 'Authentication failed. API key may be invalid or revoked.',
         cta: OPEN_SETTINGS_CTA,
-        llmFeedback: 'Authentication failed. API key may be invalid or expired.',
+        llmFeedback: 'Authentication failed. API key may be invalid or revoked.',
         retryable: false,
       }
     case 'OutOfSync':
@@ -120,8 +77,17 @@ function presentProviderNotReady(detail: ProviderNotReadyDetail): ErrorPresentat
         llmFeedback: 'Out-of-sync error from server. The CLI may need to be updated.',
         retryable: false,
       }
-    case 'MagnitudeBilling':
-      return presentMagnitudeBilling(detail.reason)
+    case 'InsufficientCredits': {
+      const message = insufficientCreditsMessage(detail.balanceCents, detail.requiredCents)
+      return {
+        surface: 'inline',
+        severity: 'error',
+        message,
+        cta: TOP_UP_CTA,
+        llmFeedback: message,
+        retryable: false,
+      }
+    }
   }
 }
 
@@ -176,43 +142,29 @@ function presentSafetyStop(reason: SafetyStopReason): ErrorPresentation {
 }
 
 /**
- * Map a TurnOutcome to its presentation.
- *
- * Pure function. Every variant has a single defined behavior here — change
- * copy or routing in one place and every surface picks it up.
- */
-/**
  * Present a MagnitudeConnectionError for user display.
  * Used by compaction (which doesn't go through TurnOutcome).
- * Direct switch — no TurnOutcome involvement.
  */
 export function presentConnectionError(err: MagnitudeConnectionError): ErrorPresentation {
   switch (err._tag) {
-    case 'SubscriptionRequired':
-    case 'TrialExpired':
+    case 'InsufficientCredits': {
+      const message = insufficientCreditsMessage(err.details.balanceCents, err.details.requiredCents)
       return {
         surface: 'inline',
         severity: 'error',
-        message: err.message,
-        cta: UPGRADE_CTA,
-        llmFeedback: err.message,
+        message,
+        cta: TOP_UP_CTA,
+        llmFeedback: message,
         retryable: false,
       }
-    case 'MagnitudeUsageLimitExceeded':
-      return {
-        surface: 'inline',
-        severity: 'error',
-        message: err.message,
-        cta: MANAGE_SUB_CTA,
-        llmFeedback: err.message,
-        retryable: false,
-      }
+    }
     case 'AuthFailed':
       return {
         surface: 'inline',
         severity: 'error',
         message: 'Authentication failed. Run /settings to update your API key.',
-        llmFeedback: 'Authentication failed. API key may be invalid or expired.',
+        cta: OPEN_SETTINGS_CTA,
+        llmFeedback: 'Authentication failed. API key may be invalid or revoked.',
         retryable: false,
       }
     case 'RateLimited':
@@ -220,7 +172,7 @@ export function presentConnectionError(err: MagnitudeConnectionError): ErrorPres
         surface: 'silent',
         severity: 'warning',
         message: '',
-        llmFeedback: `Transport connection issue (HTTP ${err.status}); retrying.`,
+        llmFeedback: `Rate limited by provider (HTTP ${err.status}); retrying.`,
         retryable: true,
       }
     case 'TransportError':
@@ -250,12 +202,16 @@ export function presentConnectionError(err: MagnitudeConnectionError): ErrorPres
         retryable: false,
       }
     case 'InvalidRequest':
+    case 'ModelNotAllowed':
+    case 'ModelNotFound':
+    case 'ModelNotMultimodal':
     case 'ModelNotGrammarCompatible':
     case 'RoleNotFound':
       return {
         surface: 'inline',
         severity: 'error',
         message: err.message,
+        cta: VIEW_USAGE_CTA,
         llmFeedback: err.message,
         retryable: false,
       }

@@ -101,7 +101,7 @@ export const MessageView = memo(function MessageView({
       }
 
       case 'error':
-        return <ErrorMessage message={message.message} timestamp={message.timestamp} cta={message.cta} usageLimit={message.usageLimit} onAction={onErrorAction} />
+        return <ErrorMessage message={message.message} timestamp={message.timestamp} cta={message.cta} onAction={onErrorAction} />
 
       case 'fork_activity':
         return (

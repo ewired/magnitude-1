@@ -2,7 +2,7 @@ import { Context, Effect, Duration } from "effect"
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
 import { Auth, type AuthApplicator } from "@magnitudedev/ai"
-import type { RoleId, UsageWindowsResponse } from "./contract"
+import type { BalanceResponse, RoleId, UsagePeriod } from "./contract"
 import { createModelCatalog, type ModelCatalog } from "./catalog"
 import { createRoleSpec, type MagnitudeCallOptions, type MagnitudeStreamError } from "./models"
 import type { MagnitudeConnectionError } from "./errors"
@@ -41,6 +41,12 @@ export interface RoleOptions {
   readonly imagePlaceholders?: ImagePlaceholderConfig
 }
 
+export interface BalanceQuery {
+  readonly period?: UsagePeriod
+  readonly days?: number
+  readonly tz?: string
+}
+
 export interface MagnitudeClientShape {
   readonly auth: AuthApplicator
   readonly catalog: ModelCatalog
@@ -49,7 +55,7 @@ export interface MagnitudeClientShape {
     query: string,
     schema?: Record<string, unknown>
   ) => Effect.Effect<WebSearchResult, WebSearchError, HttpClient.HttpClient>
-  readonly usage: Effect.Effect<UsageWindowsResponse, Error, HttpClient.HttpClient>
+  readonly balance: (query?: BalanceQuery) => Effect.Effect<BalanceResponse, Error, HttpClient.HttpClient>
 }
 
 export class MagnitudeClient extends Context.Tag("MagnitudeClient")<
@@ -78,31 +84,38 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
       return spec.bind({ auth, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
     },
 
-    /** Fetch current usage windows for the authenticated user */
-    usage: Effect.gen(function* () {
+    /** Fetch balance + usage summary for the authenticated user */
+    balance: (query?: BalanceQuery) => Effect.gen(function* () {
       const http = yield* HttpClient.HttpClient
       const headers = new Headers()
       auth(headers)
       const headerRecord: Record<string, string> = {}
       headers.forEach((value, key) => { headerRecord[key] = value })
 
-      const request = HttpClientRequest.get(`${endpoint}/usage`).pipe(
+      const params = new URLSearchParams()
+      if (query?.period) params.set("period", query.period)
+      if (query?.days != null) params.set("days", String(query.days))
+      if (query?.tz) params.set("tz", query.tz)
+      const qs = params.toString()
+      const url = `${endpoint}/balance${qs ? `?${qs}` : ""}`
+
+      const request = HttpClientRequest.get(url).pipe(
         HttpClientRequest.setHeaders(headerRecord),
       )
       const response = yield* http.execute(request).pipe(
-        Effect.mapError((err) => new Error(`Failed to fetch usage: ${err.message}`)),
+        Effect.mapError((err) => new Error(`Failed to fetch balance: ${err.message}`)),
       )
       if (response.status < 200 || response.status >= 300) {
         const body = yield* response.text.pipe(Effect.orElseSucceed(() => ""))
-        return yield* Effect.fail(new Error(`Failed to fetch usage: HTTP ${response.status} — ${body}`))
+        return yield* Effect.fail(new Error(`Failed to fetch balance: HTTP ${response.status} — ${body}`))
       }
       const text = yield* response.text.pipe(
-        Effect.mapError((err) => new Error(`Failed to read usage response: ${err}`)),
+        Effect.mapError((err) => new Error(`Failed to read balance response: ${err}`)),
       )
       try {
-        return JSON.parse(text) as UsageWindowsResponse
+        return JSON.parse(text) as BalanceResponse
       } catch {
-        return yield* Effect.fail(new Error(`Failed to parse usage response: ${text.slice(0, 200)}`))
+        return yield* Effect.fail(new Error(`Failed to parse balance response: ${text.slice(0, 200)}`))
       }
     }),
 

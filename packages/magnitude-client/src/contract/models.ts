@@ -4,7 +4,7 @@
 
 import type { RoleId } from "./roles"
 
-export type EffortLevel = "low" | "medium" | "high"
+export type EffortLevel = "low" | "medium" | "high" | "max"
 
 export type ReasoningCapability =
   | { readonly type: "none" }

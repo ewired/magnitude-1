@@ -4,24 +4,21 @@ import { Button } from './button'
 import { useTheme } from '../hooks/use-theme'
 import { writeTextToClipboard } from '../utils/clipboard'
 import { formatShortTimestamp } from '../utils/strings'
-import { formatRemaining } from '../utils/format-duration'
 import { formatChord } from '../utils/chord'
 import { BOX_CHARS } from '../utils/ui-constants'
-import type { ActionId, ErrorCta, UsageLimitInline } from '@magnitudedev/agent'
+import type { ActionId, ErrorCta } from '@magnitudedev/agent'
 
 const COPY_FEEDBACK_RESET_MS = 2000
-const COUNTDOWN_TICK_MS = 1000
 
 interface ErrorMessageProps {
   tag?: string | null
   message: string
   timestamp: number
   cta?: ErrorCta
-  usageLimit?: UsageLimitInline
   onAction?: (actionId: ActionId) => void
 }
 
-export const ErrorMessage = memo(function ErrorMessage({ tag, message, timestamp, cta, usageLimit, onAction }: ErrorMessageProps) {
+export const ErrorMessage = memo(function ErrorMessage({ tag, message, timestamp, cta, onAction }: ErrorMessageProps) {
   const theme = useTheme()
   const [isHovered, setIsHovered] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
@@ -35,14 +32,6 @@ export const ErrorMessage = memo(function ErrorMessage({ tag, message, timestamp
 
   // Action-button hover state
   const [actionHovered, setActionHovered] = useState(false)
-
-  // Live countdown for usage-limit reset
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!usageLimit) return
-    const id = setInterval(() => setNow(Date.now()), COUNTDOWN_TICK_MS)
-    return () => clearInterval(id)
-  }, [usageLimit])
 
   const showLinkCopied = useCallback(() => {
     setLinkCopied(true)
@@ -126,12 +115,6 @@ export const ErrorMessage = memo(function ErrorMessage({ tag, message, timestamp
         <text style={{ fg: theme.error }}>
           {fullError}
         </text>
-
-        {usageLimit && (
-          <text style={{ fg: theme.muted }}>
-            {`Resets in ${formatRemaining(usageLimit.resetsAt - now)}`}
-          </text>
-        )}
 
         {cta && cta.kind === 'url' && (
           <box style={{ flexDirection: 'row' }}>

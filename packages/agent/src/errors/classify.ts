@@ -15,33 +15,24 @@ import type { TurnOutcome as HarnessTurnOutcome } from '@magnitudedev/harness'
  */
 export function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): TurnOutcome {
   switch (err._tag) {
-    case 'SubscriptionRequired':
-      return {
-        _tag: 'ProviderNotReady',
-        detail: { _tag: 'MagnitudeBilling', reason: { _tag: 'SubscriptionRequired', message: err.message } },
-      }
-    case 'TrialExpired':
-      return {
-        _tag: 'ProviderNotReady',
-        detail: { _tag: 'MagnitudeBilling', reason: { _tag: 'TrialExpired', message: err.message } },
-      }
-    case 'MagnitudeUsageLimitExceeded':
+    case 'InsufficientCredits':
       return {
         _tag: 'ProviderNotReady',
         detail: {
-          _tag: 'MagnitudeBilling',
-          reason: { _tag: 'UsageLimitExceeded', message: err.message, details: err.details },
+          _tag: 'InsufficientCredits',
+          message: err.message,
+          balanceCents: err.details.balanceCents,
+          requiredCents: err.details.requiredCents,
         },
       }
+    case 'ModelNotAllowed':
+    case 'ModelNotFound':
+    case 'ModelNotMultimodal':
     case 'ModelNotGrammarCompatible':
-      return { _tag: 'ProviderNotReady', detail: { _tag: 'OutOfSync' } }
     case 'RoleNotFound':
       return { _tag: 'ProviderNotReady', detail: { _tag: 'OutOfSync' } }
     case 'AuthFailed':
-      return {
-        _tag: 'ProviderNotReady',
-        detail: { _tag: 'AuthFailed' },
-      }
+      return { _tag: 'ProviderNotReady', detail: { _tag: 'AuthFailed' } }
     case 'RateLimited':
       return {
         _tag: 'ConnectionFailure',
@@ -52,6 +43,7 @@ export function mapConnectionErrorToOutcome(err: MagnitudeConnectionError): Turn
         },
       }
     case 'UsageLimitExceeded':
+      // Generic AI-layer transient 429-ish; retried as a connection failure.
       return { _tag: 'ConnectionFailure', detail: { _tag: 'ProviderError', httpStatus: err.status } }
     case 'ContextLimitExceeded':
       return { _tag: 'ContextWindowExceeded' }
