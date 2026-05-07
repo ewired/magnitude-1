@@ -98,7 +98,23 @@ export function modelDefine<
                 classifyStreamError: config.classifyStreamError,
               }),
             ),
-            Effect.mapError(config.classifyConnectionError),
+            Effect.mapError((failure) => ({
+              classified: config.classifyConnectionError(failure),
+              raw: failure,
+            })),
+            Effect.tapError(({ classified, raw }) => {
+              const ce = classified as ConnectionError
+              return ce._tag === 'AuthFailed'
+                ? Effect.logError('[AuthDiagnostic] Connection classified as AuthFailed', {
+                    httpStatus: raw.status,
+                    responseBody: raw.body,
+                    classifiedMessage: ce.message,
+                    modelId: config.modelId,
+                    url,
+                  })
+                : Effect.void
+            }),
+            Effect.mapError(({ classified }) => classified),
           )
         }
 
@@ -140,8 +156,21 @@ export function modelDefine<
               connectionError: connectionError as ConnectionError,
             }
             listener.onTrace(trace)
-            return connectionError
+            return { classified: connectionError, raw: failure }
           }),
+          Effect.tapError(({ classified, raw }) => {
+            const ce = classified as ConnectionError
+            return ce._tag === 'AuthFailed'
+              ? Effect.logError('[AuthDiagnostic] Connection classified as AuthFailed', {
+                  httpStatus: raw.status,
+                  responseBody: raw.body,
+                  classifiedMessage: ce.message,
+                  modelId: config.modelId,
+                  url,
+                })
+              : Effect.void
+          }),
+          Effect.mapError(({ classified }) => classified),
         )
 
         // Wrap the event stream to accumulate trace data
