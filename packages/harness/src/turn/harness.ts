@@ -19,6 +19,11 @@ import {
   type EngineState,
 } from "./reducers"
 
+// ── Sentinel for end-of-stream ───────────────────────────────────────
+
+const END = Symbol('END')
+type QueueItem = HarnessEvent | typeof END
+
 // ── Config ───────────────────────────────────────────────────────────
 
 export interface HarnessConfig<
@@ -110,7 +115,7 @@ export function createHarness<
 
   function makeFeedEvent(
     stateRef: Ref.Ref<TurnState>,
-    eventQueue?: Queue.Queue<HarnessEvent>,
+    eventQueue?: Queue.Queue<QueueItem>,
   ): (event: HarnessEvent) => Effect.Effect<void> {
     return (event: HarnessEvent): Effect.Effect<void> =>
       Effect.gen(function* () {
@@ -160,7 +165,7 @@ export function createHarness<
       const stateRef = yield* makeStateRef(
         config.initialState ? { engine: config.initialState } : undefined,
       )
-      const eventQueue = yield* Queue.unbounded<HarnessEvent>()
+      const eventQueue = yield* Queue.unbounded<QueueItem>()
       const emitEvent = makeFeedEvent(stateRef, eventQueue)
 
       // Build dispatch — delegates all event processing and tool execution
@@ -175,16 +180,19 @@ export function createHarness<
         mapStreamError: config.mapStreamError as (error: unknown) => TurnOutcome,
       })
 
-      // Fork the dispatch processing and ensure queue shutdown on completion
+      // Fork the dispatch processing; enqueue END sentinel on completion.
+      // Queue.shutdown is intentionally omitted — Stream.fromQueue +
+      // takeWhile(END) handles termination.  Shutdown would race with
+      // the consumer and discard buffered items.
       yield* Effect.fork(
         processing.pipe(
-          Effect.ensuring(Queue.shutdown(eventQueue)),
+          Effect.ensuring(Queue.offer(eventQueue, END)),
         ),
       )
 
-      // Build event stream from queue, ending at TurnEnd
+      // Build event stream from queue, ending at END sentinel
       const eventStream: Stream.Stream<HarnessEvent> = Stream.fromQueue(eventQueue).pipe(
-        Stream.takeUntil((event) => event._tag === "TurnEnd"),
+        Stream.takeWhile((item): item is HarnessEvent => item !== END),
       )
 
       return {
