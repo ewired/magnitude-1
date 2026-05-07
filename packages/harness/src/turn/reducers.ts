@@ -196,8 +196,8 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
 
     case "TurnEnd": {
       let assistantMessage = state.assistantMessage
-      // On interrupt, assemble partial inputs for tool calls that never got ToolInputReady
-      if (event.outcome._tag === "Interrupted") {
+      // On interrupt or tool execution error, assemble partial inputs for tool calls that never got ToolInputReady
+      if (event.outcome._tag === "Interrupted" || event.outcome._tag === "ToolExecutionError") {
         const toolCalls: readonly ToolCallPart[] = (assistantMessage.toolCalls ?? []).map((tc): ToolCallPart => {
           if (state.readyToolCalls.has(tc.id)) return tc
           const chunks = state.toolCallInputChunks.get(tc.id)
@@ -353,7 +353,7 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
       return { handles }
     }
 
-    if (event._tag === "TurnEnd" && event.outcome._tag === "Interrupted") {
+    if (event._tag === "TurnEnd" && (event.outcome._tag === "Interrupted" || event.outcome._tag === "ToolExecutionError")) {
       const handles = new Map(state.handles)
       for (const [id, handle] of handles) {
         if (handle.state.phase !== "completed" && handle.state.phase !== "error" && handle.state.phase !== "rejected") {

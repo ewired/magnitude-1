@@ -61,7 +61,7 @@ export type ToolInputDecodeFailure<TInput = never> =
 // ── Turn Outcome ─────────────────────────────────────────────────────
 
 interface TurnOutcomeBase {
-  readonly _tag: "Completed" | "OutputTruncated" | "ContentFiltered" | "SafetyStop" | "ToolInputDecodeFailure" | "GateRejected" | "EngineDefect" | "Interrupted"
+  readonly _tag: "Completed" | "OutputTruncated" | "ContentFiltered" | "SafetyStop" | "ToolInputDecodeFailure" | "ToolExecutionError" | "GateRejected" | "EngineDefect" | "Interrupted"
 }
 
 type TurnOutcomeConcrete<TInput> =
@@ -70,6 +70,7 @@ type TurnOutcomeConcrete<TInput> =
   | { readonly _tag: "ContentFiltered" }
   | { readonly _tag: "SafetyStop"; readonly reason: SafetyStopReason }
   | ToolInputDecodeFailure<TInput>
+  | { readonly _tag: "ToolExecutionError"; readonly toolCallId: ToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: ToolError }
   | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
   | { readonly _tag: "Interrupted" }
@@ -80,6 +81,7 @@ type TurnOutcomeErased =
   | { readonly _tag: "ContentFiltered" }
   | { readonly _tag: "SafetyStop"; readonly reason: SafetyStopReason }
   | ToolInputDecodeFailure
+  | { readonly _tag: "ToolExecutionError"; readonly toolCallId: ToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: ToolError }
   | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
   | { readonly _tag: "Interrupted" }

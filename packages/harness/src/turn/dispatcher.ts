@@ -1,4 +1,4 @@
-import { Effect, Cause, Layer, Stream, Schema } from "effect"
+import { Effect, Cause, Data, Layer, Stream, Schema } from "effect"
 import type { ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason, ValidationIssue } from "@magnitudedev/ai"
 import type { StreamingPartial } from "@magnitudedev/ai"
 import type { HarnessEvent, ToolError, ToolResult, TurnOutcome } from "../events"
@@ -8,6 +8,23 @@ import type { HarnessToolErased, ToolContext, StreamHook } from "../tool/tool"
 import type { EngineState, ToolOutcome } from "./reducers"
 import { formatDecodeFailure } from "../formatting/format-decode-failure"
 import { formatToolResult } from "./result-formation"
+
+// ── TurnAbort — planned abort control flow ────────────────────────────
+
+/**
+ * Typed error used to abort the dispatch event loop.
+ *
+ * When the dispatcher detects a terminal condition during tool execution
+ * (error, rejection, defect), it emits all relevant lifecycle events first,
+ * then fails with TurnAbort carrying the terminal outcome. Stream.runForEach
+ * stops consuming — no more events are processed. The outer catch handler
+ * extracts the outcome and emits TurnEnd.
+ *
+ * This is a planned abort, not a crash. It never crosses package boundaries.
+ */
+export class TurnAbort extends Data.TaggedError("TurnAbort")<{
+  readonly outcome: TurnOutcome
+}> {}
 
 // ── Config ───────────────────────────────────────────────────────────
 
@@ -58,7 +75,6 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
   // Mutable dispatch state (scoped to this dispatch invocation)
   const accumulators = new Map<ToolCallId, ToolCallAccumulator>()
-  let terminalOverride: TurnOutcome | null = null
   let toolCallCount = 0
 
   // ── Provide layer to erased effect ───────────────────────────────
@@ -90,11 +106,10 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
     toolName: string,
     toolKey: string,
     input: Record<string, unknown>,
-  ): Effect.Effect<void> {
+  ): Effect.Effect<void, TurnAbort> {
     const lookup = toolKeyToEntry.get(toolKey)
     if (!lookup) {
-      terminalOverride = { _tag: "EngineDefect", message: `Unknown tool key: ${toolKey}` }
-      return Effect.void
+      return Effect.fail(new TurnAbort({ outcome: { _tag: "EngineDefect", message: `Unknown tool key: ${toolKey}` } }))
     }
     const { tool } = lookup
 
@@ -115,6 +130,13 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         })
         const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, cached.result, hooks))
         yield* emit({ _tag: "ToolResultFormatted", toolCallId, toolName, toolKey, parts })
+
+        // Fast-fail on cached error outcomes
+        if (cached.result._tag === "Error") {
+          return yield* Effect.fail(new TurnAbort({
+            outcome: { _tag: "ToolExecutionError", toolCallId, toolName, toolKey, error: cached.result.error },
+          }))
+        }
       })
     }
 
@@ -137,11 +159,10 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         yield* emit({ _tag: "ToolExecutionEnded", toolCallId, toolName, toolKey, result })
         const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, result, hooks))
         yield* emit({ _tag: "ToolResultFormatted", toolCallId, toolName, toolKey, parts })
-        terminalOverride = { _tag: "GateRejected", toolCallId, toolName }
-        return
+        return yield* Effect.fail(new TurnAbort({ outcome: { _tag: "GateRejected", toolCallId, toolName } }))
       }
 
-      const effectiveInput = (decision.modifiedInput ?? input) as Record<string, unknown>
+      const effectiveInput = (decision._tag === "Proceed" && decision.modifiedInput !== undefined ? decision.modifiedInput : input) as Record<string, unknown>
 
       yield* emit({
         _tag: "ToolExecutionStarted",
@@ -181,12 +202,19 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
       // Format result
       const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, result, hooks))
       yield* emit({ _tag: "ToolResultFormatted", toolCallId, toolName, toolKey, parts })
+
+      // Fast-fail on tool execution errors
+      if (result._tag === "Error") {
+        return yield* Effect.fail(new TurnAbort({
+          outcome: { _tag: "ToolExecutionError", toolCallId, toolName, toolKey, error: result.error },
+        }))
+      }
     })
   }
 
   // ── Stream event processing ──────────────────────────────────────
 
-  function processEvent(event: ResponseStreamEvent<TStreamError>): Effect.Effect<void> {
+  function processEvent(event: ResponseStreamEvent<TStreamError>): Effect.Effect<void, TurnAbort> {
     switch (event._tag) {
       case "thought_start":
         return emit({ _tag: "ThoughtStart", level: event.level })
@@ -209,13 +237,11 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
       case "tool_call_start": {
         const toolKey = toolNameToKey.get(event.toolName)
         if (!toolKey) {
-          terminalOverride = { _tag: "EngineDefect", message: `Unknown tool name: ${event.toolName}` }
-          return Effect.void
+          return Effect.fail(new TurnAbort({ outcome: { _tag: "EngineDefect", message: `Unknown tool name: ${event.toolName}` } }))
         }
         const entry = toolKeyToEntry.get(toolKey)
         if (!entry) {
-          terminalOverride = { _tag: "EngineDefect", message: `No entry for tool key: ${toolKey}` }
-          return Effect.void
+          return Effect.fail(new TurnAbort({ outcome: { _tag: "EngineDefect", message: `No entry for tool key: ${toolKey}` } }))
         }
         toolCallCount++
 
@@ -301,8 +327,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
         const parser = config.parsers.get(event.toolCallId)
         if (!parser || parser.decoded === null) {
-          terminalOverride = { _tag: "EngineDefect", message: `No decoded input for ${event.toolCallId}` }
-          return Effect.void
+          return Effect.fail(new TurnAbort({ outcome: { _tag: "EngineDefect", message: `No decoded input for ${event.toolCallId}` } }))
         }
 
         return Effect.gen(function* () {
@@ -322,7 +347,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
           switch (event.reason._tag) {
             case "completed": {
-              outcome = terminalOverride ?? mapFinishReasonToOutcome(event.reason.finishReason, toolCallCount)
+              outcome = mapFinishReasonToOutcome(event.reason.finishReason, toolCallCount)
               break
             }
             case "validation_failure": {
@@ -354,7 +379,6 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
                 parts: decodeFailureParts,
               })
 
-              yield* interruptAllTools()
               outcome = {
                 _tag: "ToolInputDecodeFailure",
                 toolCallId: event.reason.toolCallId,
@@ -366,7 +390,6 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
               break
             }
             case "error": {
-              yield* interruptAllTools()
               outcome = config.mapStreamError(event.reason.error)
               break
             }
@@ -387,20 +410,16 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
     }
   }
 
-  // ── Main processing with error/interrupt handling ────────────────
-
-  function interruptAllTools(): Effect.Effect<void> {
-    // With inline execution, no detached tool fibers exist to interrupt.
-    // Stream errors/validation failures can only occur between tool executions.
-    return Effect.void
-  }
+  // ── Main processing ──────────────────────────────────────────────
 
   return Stream.runForEach(config.events, processEvent).pipe(
+    // Planned abort — emit TurnEnd with the abort's outcome
+    Effect.catchTag("TurnAbort", (abort) =>
+      emit({ _tag: "TurnEnd", outcome: abort.outcome, usage: null }),
+    ),
+    // Crash / defect / fiber interruption — emit TurnEnd with Interrupted
     Effect.catchAllCause(() =>
-      Effect.gen(function* () {
-        yield* interruptAllTools()
-        yield* emit({ _tag: "TurnEnd", outcome: { _tag: "Interrupted" }, usage: null })
-      }),
+      emit({ _tag: "TurnEnd", outcome: { _tag: "Interrupted" }, usage: null }),
     ),
   )
 }

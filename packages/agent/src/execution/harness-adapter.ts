@@ -364,6 +364,13 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
               break
             }
 
+            case 'ToolExecutionError': {
+              // Tool execution failed — chain-continue so the model can respond to the error.
+              // The formatted error result is already in the canonical messages.
+              executionResult = completed(toolsCalledKeys.length)
+              break
+            }
+
             case 'EngineDefect': {
               executionResult = {
                 _tag: 'UnexpectedError',
