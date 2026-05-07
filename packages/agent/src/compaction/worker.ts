@@ -27,7 +27,6 @@ import { MAX_RETRIES, BASE_DELAY_MS, MAX_DELAY_MS } from '../util/retry-backoff'
 
 import { computeCompactionSizing } from './estimate'
 import { runCompactionTurn, type CompactionTurnResult } from './turn'
-import type { CompletedTurn } from '../window/types'
 
 // =============================================================================
 // Retry schedule — same constants as Cortex
@@ -56,24 +55,13 @@ function isRetryable(error: unknown): boolean {
 // Finalization
 // =============================================================================
 
-function finalizeCompaction(
+function injectCompaction(
   forkId: string | null,
-  turn: CompletedTurn,
-  compactedMessageCount: number,
-  inputTokens: number | null,
-  outputTokens: number | null,
   publish: (event: AppEvent) => Effect.Effect<void>,
 ): Effect.Effect<void> {
-  return Effect.gen(function* () {
-    yield* publish({
-      type: 'compaction_completed',
-      forkId,
-      turn,
-      compactedMessageCount,
-      inputTokens,
-      outputTokens,
-      refreshedContext: null,
-    })
+  return publish({
+    type: 'compaction_injected',
+    forkId,
   })
 }
 
@@ -127,7 +115,7 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
         })
 
         // 5. Run agentic compaction turn with retry
-        const result: CompactionTurnResult = yield* runCompactionTurn(forkId, roleId, windowState, publish, read).pipe(
+        const result: CompactionTurnResult = yield* runCompactionTurn(forkId, roleId, windowState, roleConfig.softCap, publish, read).pipe(
           Effect.retry({
             schedule: retrySchedule,
             while: (err) => {
@@ -138,11 +126,12 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
           }),
         )
 
-        // 6. Emit compaction_ready
+        // 6. Emit compaction_prepared
         yield* publish({
-          type: 'compaction_ready',
+          type: 'compaction_prepared',
           forkId,
           turn: result.turn,
+          ...result.compactionOutcome,
           compactedMessageCount,
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
@@ -152,7 +141,7 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
         // 7. Check if we can finalize immediately
         const turnState = yield* read(TurnProjection, forkId)
         if (!turnState || turnState._tag === 'idle') {
-          yield* finalizeCompaction(forkId, result.turn, compactedMessageCount, result.inputTokens, result.outputTokens, publish)
+          yield* injectCompaction(forkId, publish)
         }
       }).pipe(
         Effect.onInterrupt(() => Effect.gen(function* () {
@@ -189,16 +178,9 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
       Effect.gen(function* () {
         const forkId = event.forkId
         const compactionState = yield* read(CompactionProjection, forkId)
-        if (!compactionState || compactionState._tag !== 'pendingFinalization') return
+        if (!compactionState || compactionState._tag !== 'pendingInjection') return
 
-        yield* finalizeCompaction(
-          forkId,
-          compactionState.turn,
-          compactionState.compactedMessageCount,
-          compactionState.inputTokens,
-          compactionState.outputTokens,
-          publish,
-        )
+        yield* injectCompaction(forkId, publish)
       }),
   },
 })

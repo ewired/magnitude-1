@@ -9,13 +9,14 @@ import { Projection, Signal } from '@magnitudedev/event-core'
 import type { AppEvent, StrategyId, ImageAttachment, ObservationPart } from '../events'
 import { present } from '../errors'
 import { getAgentByForkId, AgentStatusProjection } from '../projections/agent-status'
+import { getForkInfo } from '../agents/registry'
 import { SubagentActivityProjection } from '../projections/subagent-activity'
 import { OutboundMessagesProjection } from '../projections/outbound-messages'
 import { HarnessStateProjection } from '../projections/harness-state'
 import { buildSessionContextContent } from '../prompts/session-context'
 import { TASK_TREE_COMPLETION_REMINDER } from '../prompts/task-tree'
 import { SkillsAmbient } from '../ambient/skills-ambient'
-import { ConfigAmbient } from '../ambient/config-ambient'
+import { ConfigAmbient, getRoleConfig } from '../ambient/config-ambient'
 import { UserPresenceProjection } from '../projections/user-presence'
 import { UserMessageResolutionProjection } from '../projections/user-message-resolution'
 import { TaskGraphProjection, type TaskGraphState, type TaskRecord } from '../projections/task-graph'
@@ -57,6 +58,8 @@ import {
   computeTokenEstimate,
 } from './estimate'
 import { isRoleId } from '../agents/role-validation'
+import { COMPACTION_FALLBACK_KEEP_RATIO } from '../constants'
+import { compactionSignals } from '../projections/compaction-signals'
 
 
 function extractText(parts: readonly UserPart[]): string {
@@ -521,40 +524,7 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
 
     interrupt: ({ fork }) => fork,
 
-    compaction_completed: ({ event, fork, emit }) => {
-      const sessionContext: WindowEntry = event.refreshedContext
-        ? (() => {
-            const content = textParts(buildSessionContextContent(event.refreshedContext))
-            return { type: 'session_context' as const, source: 'system' as const, content, estimatedTokens: estimateContentEntry(content) }
-          })()
-        : fork.messages[0]
 
-      const remainingMessages = fork.messages.slice(1 + event.compactedMessageCount)
-
-      // Insert the compaction turn as a proper assistant_turn entry
-      const compactionEntry: WindowEntry = {
-        type: 'assistant_turn',
-        source: 'agent',
-        turn: event.turn,
-        strategyId: 'native',
-        estimatedTokens: estimateTurnEntry(event.turn),
-      }
-
-      const newMessages = [sessionContext, ...remainingMessages, compactionEntry]
-      const messageTokens = newMessages.reduce((sum, e) => sum + e.estimatedTokens, 0)
-
-      const result: ForkWindowState = {
-        ...fork,
-        messages: newMessages,
-        currentChainId: null,
-        messageTokens,
-        lastAnchoredTotal: null,
-        lastAnchoredMessageTokens: null,
-        tokenEstimate: fork.systemPromptTokens + messageTokens,
-      }
-      emitIfChanged(fork, result, event.forkId, emit)
-      return result
-    },
   },
 
   globalEventHandlers: {
@@ -933,6 +903,89 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
         ...state,
         forks: new Map(state.forks).set(null, nextLead),
       }
+    }),
+
+    on(compactionSignals.compactionInjected, ({ value, state, emit, ambient, read }) => {
+      const fork = state.forks.get(value.forkId)
+      if (!fork) return state
+
+      const sessionContext: WindowEntry = value.refreshedContext
+        ? (() => {
+            const content = textParts(buildSessionContextContent(value.refreshedContext))
+            return { type: 'session_context' as const, source: 'system' as const, content, estimatedTokens: estimateContentEntry(content) }
+          })()
+        : fork.messages[0]
+
+      const remainingMessages = fork.messages.slice(1 + value.compactedMessageCount)
+
+      let newMessages: readonly WindowEntry[]
+
+      if (!value.compactionOutcome.isFallback) {
+        // Structured compaction → compacted UserMessage
+        const result = value.compactionOutcome.compactResult
+        let text = '<compaction_summary>\n'
+        text += `## Summary\n${result.summary}\n\n`
+        text += `## Reflection\n${result.reflection}`
+
+        if (result.files.length > 0) {
+          text += '\n\n## Key Files'
+          for (const file of result.files) {
+            const ext = file.path.split('.').pop() || ''
+            text += `\n\n### ${file.path}\n\`\`\`${ext}\n${file.content}\n\`\`\``
+          }
+        }
+
+        text += '\n</compaction_summary>'
+
+        const content = textParts(text)
+        const compactionEntry: WindowEntry = {
+          type: 'compacted',
+          source: 'system',
+          content,
+          estimatedTokens: estimateContentEntry(content),
+        }
+
+        newMessages = [sessionContext, compactionEntry, ...remainingMessages]
+      } else {
+        // Fallback: raw tail preservation — keep latest 25% of softCap worth of messages
+        const configState = ambient.get(ConfigAmbient)
+        const agentStatus = read(AgentStatusProjection)
+        const forkInfo = getForkInfo(agentStatus, value.forkId)
+        const roleConfig = forkInfo ? getRoleConfig(configState, forkInfo.roleId) : null
+        const fallbackBudget = roleConfig
+          ? roleConfig.softCap * COMPACTION_FALLBACK_KEEP_RATIO
+          : fork.systemPromptTokens * 2 // reasonable fallback if config unavailable
+
+        // Walk backwards from all messages (excluding session context) to find what fits
+        const allNonSession = fork.messages.slice(1)
+        let accumulated = 0
+        let keepFrom = allNonSession.length
+        for (let i = allNonSession.length - 1; i >= 0; i--) {
+          if (accumulated + allNonSession[i].estimatedTokens > fallbackBudget) break
+          accumulated += allNonSession[i].estimatedTokens
+          keepFrom = i
+        }
+
+        newMessages = [sessionContext, ...allNonSession.slice(keepFrom)]
+      }
+
+      const messageTokens = newMessages.reduce((sum, e) => sum + e.estimatedTokens, 0)
+
+      const result: ForkWindowState = {
+        ...fork,
+        messages: newMessages,
+        currentChainId: null,
+        messageTokens,
+        lastAnchoredTotal: null,
+        lastAnchoredMessageTokens: null,
+        tokenEstimate: fork.systemPromptTokens + messageTokens,
+      }
+
+      const nextForks = new Map(state.forks).set(value.forkId, result)
+      if (result.tokenEstimate !== fork.tokenEstimate) {
+        emit.tokenEstimateChanged({ forkId: value.forkId, tokenEstimate: result.tokenEstimate })
+      }
+      return { ...state, forks: nextForks }
     }),
   ],
 })

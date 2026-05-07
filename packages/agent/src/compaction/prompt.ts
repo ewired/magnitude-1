@@ -7,34 +7,29 @@ import type { ForkWindowState } from '../window'
 import { windowToPrompt } from '../prompts/window-to-prompt'
 
 export const COMPACTION_REFLECTION_PROMPT = `--- CONVERSATION END ---
---- REFLECTION START ---
+--- COMPACTION ---
 
-You are writing a message to your future self. Your response will replace everything above — your future self will see only this message and the recent turns that follow. Everything else from the conversation is permanently lost.
+<system>
+The conversation is out of context. Your sole purpose now is to compact the conversation into a summary, reflection, and key files.
 
-This message serves two purposes: preserving the information your future self needs to continue, and improving on the conversation by reflecting on what happened — mistakes made, approaches that should change, things to do differently next time.
+FROM THIS POINT FORWARD, YOU ARE NO LONGER MAGNITUDE. YOU ARE A COMPACTOR.
+YOU ARE NO LONGER INTERACTING WITH THE USER.
+YOU HAVE EXACTLY ONE TURN TO PERFORM COMPACTION
+YOU MUST NOT THINK, MESSAGE, OR USE ANY TOOLS OTHER THAN \`compact\` FOR ANY REASON.
+YOU MAY NOT READ FILES, RUN SHELL COMMANDS, OR ANY OTHER TOOLS TO ATTEMPT TO GATHER ADDITIONAL INFORMATION BEFORE COMPACTING, BECAUSE YOU HAVE ONLY ONE TURN.
+ANY ATTEMPT TO CALL A TOOL BESIDES COMPACT THIS TURN WILL RESULT IN COMPACTION FAILURE.
+FAILURE TO CALL COMPACT THIS TURN WILL RESULT IN COMPACTION FAILURE.
 
-## What you can do this turn
+THIS TURN, YOU MUST:
+(1) Avoid thinking for very long, and avoid sending a long message.
+(2) Call EXACTLY ONE TOOL: \`compact\`, and call NO OTHER TOOLS
 
-You have exactly one turn. This is it — there is no follow-up.
+These are the parameters to the compact tool that you must provide this turn:
+- **summary**: What happened in this conversation — decisions made, work completed, current state, user instructions and preferences, work in progress. Write enough that your future self can continue without re-reading the conversation. Be specific: file paths, function names, error messages, architectural decisions, user requirements. Include anything your future self would need to look up again if omitted.
+- **reflection**: What went wrong, incorrect assumptions, approaches that failed, what to do differently. Not what happened — what your future self should change. Name the reasoning traps so your future self avoids them. If nothing went wrong, say so briefly.
+- **files** (optional): Array of file paths to read and preserve verbatim in your future context. Use this for source code you're actively editing, configuration files, or any content that cannot survive summarization. The tool will read these files for you — just provide the paths. Max 10 files. The tool will enforce a token budget and truncate if necessary.
+</system>`
 
-You have full read-only tool access. Tool results from this turn are preserved in the recent tail and survive into your future self's context. Use tools to read anything your future self will need verbatim: source code, type definitions, configuration, error logs. These are things that cannot survive summarization — read them now so they exist in your future self's context as tool results, rather than as your attempted paraphrase of them.
-
-## Principles
-
-**Loss is irreversible.** Your future self cannot recover anything you omit. It can only act on what you leave behind. This asymmetry means errs of inclusion are far cheaper than errs of omission. When uncertain whether something matters, include it.
-
-**Compress by derivation, not by selection.** Do not select which messages to keep — derive the durable outcomes from them. A long exchange that reaches a conclusion should collapse to that conclusion and the reasoning behind it. The conversation is the process; the reflection should be the product.
-
-**Specificity is how information survives.** Abstract summaries lose the very details that make them actionable. Names, paths, signatures, values, error messages — these are the handles your future self will reach for. Generalities are placeholders that require re-derivation.
-
-**Separate what is known from what is uncertain.** Your future self needs to know what it can rely on versus what still needs validation. Conflate the two and it will either over-trust tentative conclusions or re-derive what was already settled.
-
-**Reflection is not optional — it is where compaction adds value.** A reflection that merely preserves information is a worse version of the original context. The point is to improve on the conversation: identify where reasoning went wrong, what approaches should change, and what your future self should do differently. Mistakes and their root assumptions are the most valuable thing to preserve — your future self faces the same reasoning traps, and naming them is how it avoids them.
-
-## Structure
-
-- **Retention**: What your future self needs to continue — decisions made, work in progress and its current state, user instructions, architectural context. Enough to pick up without re-reading code.
-- **Reflection**: What went wrong, what should change, incorrect assumptions, better approaches to take. Not what happened — what your future self should do differently.`
 
 export function buildCompactionPrompt(
   windowState: ForkWindowState,

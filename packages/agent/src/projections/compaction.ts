@@ -9,9 +9,11 @@
 import { Data } from 'effect'
 import { Projection, Signal, FSM } from '@magnitudedev/event-core'
 import type { CompletedTurn } from '../window/types'
+import type { CompactResult } from '../compaction/context'
 const { defineFSM } = FSM
 
-import type { AppEvent, SessionContext } from '../events'
+import type { AppEvent, SessionContext, CompactionOutcome } from '../events'
+import { compactionSignals } from './compaction-signals'
 import { AgentRoutingProjection } from './agent-routing'
 import { AgentStatusProjection, type AgentStatusState } from './agent-status'
 import { WindowProjection } from '../window'
@@ -59,8 +61,9 @@ export class Compacting extends Data.TaggedClass('compacting')<AmbientCompaction
   readonly compactedMessageCount: number
 }> {}
 
-export class PendingFinalization extends Data.TaggedClass('pendingFinalization')<AmbientCompactionFields & {
+export class PendingInjection extends Data.TaggedClass('pendingInjection')<AmbientCompactionFields & {
   readonly turn: CompletedTurn
+  readonly compactionOutcome: CompactionOutcome
   readonly compactedMessageCount: number
   readonly inputTokens: number | null
   readonly outputTokens: number | null
@@ -68,14 +71,14 @@ export class PendingFinalization extends Data.TaggedClass('pendingFinalization')
 }> {}
 
 export const CompactionLifecycle = defineFSM(
-  { idle: CompactionIdle, compacting: Compacting, pendingFinalization: PendingFinalization },
-  { idle: ['compacting'], compacting: ['pendingFinalization', 'idle'], pendingFinalization: ['idle'] }
+  { idle: CompactionIdle, compacting: Compacting, pendingInjection: PendingInjection },
+  { idle: ['compacting'], compacting: ['pendingInjection', 'idle'], pendingInjection: ['idle'] }
 )
 
 export type CompactionState =
   | CompactionIdle
   | Compacting
-  | PendingFinalization
+  | PendingInjection
 
 function emitLifecycleSignals(
   oldState: CompactionState,
@@ -150,11 +153,7 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
   reads: [AgentRoutingProjection, AgentStatusProjection, WindowProjection] as const,
   ambients: [ConfigAmbient] as const,
 
-  signals: {
-    shouldCompactChanged: Signal.create<{ forkId: string | null; shouldCompact: boolean }>('Compaction/shouldCompactChanged'),
-    compactionBlockingChanged: Signal.create<{ forkId: string | null; blocking: boolean }>('Compaction/compactionBlockingChanged'),
-    contextLimitBlockedChanged: Signal.create<{ forkId: string | null; blocked: boolean }>('Compaction/contextLimitBlockedChanged'),
-  },
+  signals: compactionSignals,
 
   initialFork: new CompactionIdle({
     contextLimitBlocked: false,
@@ -178,13 +177,17 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
       return nextState
     },
 
-    compaction_ready: ({ event, fork, emit }) => {
+    compaction_prepared: ({ event, fork, emit }) => {
       if (fork._tag !== 'compacting') return fork
 
       // Preserve contextLimitBlocked through the transition for the same reason
       // as compaction_started — compaction_failed needs it to determine retry intent.
-      const nextState = CompactionLifecycle.transition(fork, 'pendingFinalization', {
+      const compactionOutcome: CompactionOutcome = event.isFallback
+        ? { isFallback: true }
+        : { isFallback: false, compactResult: event.compactResult }
+      const nextState = CompactionLifecycle.transition(fork, 'pendingInjection', {
         turn: event.turn,
+        compactionOutcome,
         compactedMessageCount: event.compactedMessageCount,
         inputTokens: event.inputTokens,
         outputTokens: event.outputTokens,
@@ -197,19 +200,26 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
       return nextState
     },
 
-    compaction_completed: ({ event, fork, emit, ambient, read }) => {
-      if (fork._tag !== 'pendingFinalization') return fork
+    compaction_injected: ({ event, fork, emit, ambient, read }) => {
+      if (fork._tag !== 'pendingInjection') return fork
 
-      const configState = ambient.get(ConfigAmbient)
-      const agentStatus = read(AgentStatusProjection)
-      const limits = getForkConfig(configState, agentStatus, event.forkId)
-      if (!limits) return fork
+      // Emit the compactionInjected signal with all data from PendingInjection
+      emit.compactionInjected({
+        forkId: event.forkId,
+        turn: fork.turn,
+        compactionOutcome: fork.compactionOutcome,
+        compactedMessageCount: fork.compactedMessageCount,
+        inputTokens: fork.inputTokens,
+        outputTokens: fork.outputTokens,
+        refreshedContext: fork.refreshedContext,
+      })
 
-      // Window handles token subtraction via its own compaction_completed handler.
-      // Read the updated tokenEstimate from Window for policy recompute.
-      const windowFork = read(WindowProjection)
+      // Transition to idle with shouldCompact: false.
+      // The window rewrite hasn't happened yet (it fires via signal handler after this),
+      // so reading WindowProjection here would see stale pre-compaction token estimates.
+      // The subsequent tokenEstimateChanged signal from WindowProjection will recompute policy.
       const nextState = CompactionLifecycle.transition(fork, 'idle', {
-        shouldCompact: deriveShouldCompact('idle', windowFork.tokenEstimate, limits),
+        shouldCompact: false,
         contextLimitBlocked: false,
       })
 
@@ -218,9 +228,8 @@ export const CompactionProjection = Projection.defineForked<AppEvent, Compaction
     },
 
     compaction_failed: ({ event, fork, emit }) => {
-      // If contextLimitBlocked was true, the system is still under token pressure —
-      // keep shouldCompact true so compaction can be retried.
-      // The next tokenEstimateChanged signal from Window will correct this if tokens improve.
+      // Window is unchanged after failure — no tokenEstimateChanged signal will fire.
+      // Preserve retry intent: if we were under pressure (contextLimitBlocked), keep shouldCompact true.
       const wasBlocked = fork.contextLimitBlocked
 
       if (fork._tag === 'idle') {

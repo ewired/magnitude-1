@@ -355,7 +355,7 @@ function AppInner({
           sessionTracker.recordTurn(event.providerId ?? null, event.modelId ?? null, event.inputTokens ?? 0, event.outputTokens ?? 0)
         }
 
-        if (event.type === 'compaction_completed') {
+        if (event.type === 'compaction_injected') {
           sessionTracker.recordCompaction()
         }
         if (event.type === 'compaction_failed') {

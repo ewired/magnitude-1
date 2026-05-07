@@ -40,6 +40,18 @@ export const OUTPUT_TOKEN_RESERVE = 8_192
 // Compaction
 // =============================================================================
 
+/** Maximum number of files the compact() tool will read */
+export const COMPACT_MAX_FILES = 10
+
+/** Maximum characters per file in compact() tool output */
+export const COMPACT_MAX_FILE_CHARS = 10_000
+
+/** Maximum retry attempts for compaction if agent doesn't call compact() */
+export const COMPACTION_MAX_RETRIES = 3
+
+/** Fraction of content to keep as fallback when all compaction retries fail */
+export const COMPACTION_FALLBACK_KEEP_RATIO = 0.25
+
 /** Fraction of soft cap to keep as recent messages during compaction */
 export const KEEP_MESSAGE_RATIO = 0.1
 

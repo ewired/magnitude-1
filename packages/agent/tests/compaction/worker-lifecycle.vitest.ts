@@ -28,7 +28,7 @@ const largeUserMessage = {
 }
 
 /**
- * Helper: after compaction_ready, the worker checks TurnProjection.
+ * Helper: after compaction_prepared, the worker checks TurnProjection.
  * If a turn is active (started by TurnController from user_message),
  * it waits for turn_outcome to finalize. We send one to unblock it.
  */
@@ -44,24 +44,23 @@ const sendTurnOutcomeIfNeeded = (h: Effect.Effect.Success<typeof TestHarness>) =
   })
 
 describe('compaction/worker-lifecycle', () => {
-  it.effect('context_limit_hit triggers worker and emits compaction_ready', () =>
+  it.effect('context_limit_hit triggers worker and emits compaction_prepared', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send({ ...largeUserMessage, messageId: 'w1' })
       yield* h.send(mkContextLimitHit())
-      const ready = yield* h.wait.event('compaction_ready', (e) => e.forkId === null)
+      const ready = yield* h.wait.event('compaction_prepared', (e) => e.forkId === null)
       expect(ready.turn.assistant.text.length).toBeGreaterThan(0)
     }).pipe(Effect.provide(workerLayer)))
 
-  it.effect('worker finalizes to compaction_completed and clears gates', () =>
+  it.effect('worker finalizes to compaction_injected and clears gates', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send({ ...largeUserMessage, messageId: 'w2' })
       yield* h.send(mkContextLimitHit())
-      yield* h.wait.event('compaction_ready', (e) => e.forkId === null)
+      yield* h.wait.event('compaction_prepared', (e) => e.forkId === null)
       yield* sendTurnOutcomeIfNeeded(h)
-      const completed = yield* h.wait.event('compaction_completed', (e) => e.forkId === null)
-      expect(completed.turn.assistant.text.length).toBeGreaterThan(0)
+      yield* h.wait.event('compaction_injected', (e) => e.forkId === null)
       const compaction = yield* getCompaction(h)
       expect(compaction._tag).toBe('idle')
       expect(compaction.contextLimitBlocked).toBe(false)
@@ -77,9 +76,9 @@ describe('compaction/worker-lifecycle', () => {
       const compaction = yield* getCompaction(h)
       expect(compaction._tag).toBe('idle')
       expect(compaction.contextLimitBlocked).toBe(false)
-      // Verify no compaction_completed was emitted
+      // Verify no compaction_injected was emitted
       const events = h.events()
-      const completedEvents = events.filter((e) => e.type === 'compaction_completed')
+      const completedEvents = events.filter((e) => e.type === 'compaction_injected')
       expect(completedEvents.length).toBe(0)
     }).pipe(Effect.provide(TestHarnessLive({
       workers: { compaction: true },
@@ -96,13 +95,13 @@ describe('compaction/worker-lifecycle', () => {
       yield* h.send(mkContextLimitHit())
       yield* h.send(mkContextLimitHit())
       yield* h.send(mkContextLimitHit())
-      yield* h.wait.event('compaction_ready', (e) => e.forkId === null)
+      yield* h.wait.event('compaction_prepared', (e) => e.forkId === null)
       yield* sendTurnOutcomeIfNeeded(h)
-      yield* h.wait.event('compaction_completed', (e) => e.forkId === null)
+      yield* h.wait.event('compaction_injected', (e) => e.forkId === null)
 
       const rootEvents = h.events().filter((e) => e.forkId === null)
       const starts = rootEvents.reduce<number[]>((acc, e, i) => e.type === 'compaction_started' ? [...acc, i] : acc, [])
-      const terminals = rootEvents.reduce<number[]>((acc, e, i) => e.type === 'compaction_completed' ? [...acc, i] : acc, [])
+      const terminals = rootEvents.reduce<number[]>((acc, e, i) => e.type === 'compaction_injected' ? [...acc, i] : acc, [])
       expect(starts.length).toBeGreaterThanOrEqual(1)
       expect(terminals.length).toBeGreaterThanOrEqual(1)
 
@@ -119,19 +118,18 @@ describe('compaction/worker-lifecycle', () => {
       expect(failedEvents.length).toBe(0)
     }).pipe(Effect.provide(workerLayer)))
 
-  it.effect('worker ordering emits compaction_ready before compaction_completed', () =>
+  it.effect('worker ordering emits compaction_prepared before compaction_injected', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send({ ...largeUserMessage, messageId: 'w5' })
       yield* h.send(mkContextLimitHit())
-      const ready = yield* h.wait.event('compaction_ready', (e) => e.forkId === null)
+      const ready = yield* h.wait.event('compaction_prepared', (e) => e.forkId === null)
       yield* sendTurnOutcomeIfNeeded(h)
-      const completed = yield* h.wait.event('compaction_completed', (e) => e.forkId === null)
+      const completed = yield* h.wait.event('compaction_injected', (e) => e.forkId === null)
       const events = h.events()
-      const readyIndex = events.findIndex((e) => e.type === 'compaction_ready' && e.forkId === null)
-      const completedIndex = events.findIndex((e) => e.type === 'compaction_completed' && e.forkId === null)
+      const readyIndex = events.findIndex((e) => e.type === 'compaction_prepared' && e.forkId === null)
+      const completedIndex = events.findIndex((e) => e.type === 'compaction_injected' && e.forkId === null)
       expect(ready.turn.assistant.text.length).toBeGreaterThan(0)
-      expect(completed.turn.assistant.text).toBe(ready.turn.assistant.text)
       expect(readyIndex).toBeGreaterThanOrEqual(0)
       expect(completedIndex).toBeGreaterThan(readyIndex)
     }).pipe(Effect.provide(workerLayer)))

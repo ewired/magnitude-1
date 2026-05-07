@@ -35,6 +35,8 @@ import { spawnWorkerModel } from '../models/spawn-worker'
 import { killWorkerModel } from '../models/kill-worker'
 import { skillActivationModel } from '../models/skill-activation'
 import { messageWorkerModel } from '../models/message-worker'
+import { compactTool } from './compact'
+import { compactModel } from '../models/compact'
 
 // =============================================================================
 // Group Toolkits
@@ -70,20 +72,24 @@ export const skillToolkit = defineToolkit({
   skill: { tool: skillTool, state: skillActivationModel },
 })
 
+export const compactToolkit = defineToolkit({
+  compact: { tool: compactTool, state: compactModel },
+})
+
 // =============================================================================
 // Composite Toolkits
 // =============================================================================
 
-/** fs + shell + web + skill — shared by most worker roles */
+/** fs + shell + web + skill + compact — shared by most worker roles */
 const workerBase = mergeToolkits(
   mergeToolkits(fsToolkit, shellToolkit),
-  mergeToolkits(webToolkit, skillToolkit),
+  mergeToolkits(webToolkit, mergeToolkits(skillToolkit, compactToolkit)),
 )
 
-/** fs + shell + skill — no web access */
+/** fs + shell + skill + compact — no web access */
 const criticBase = mergeToolkits(
   mergeToolkits(fsToolkit, shellToolkit),
-  skillToolkit,
+  mergeToolkits(skillToolkit, compactToolkit),
 )
 
 /** fs + shell + web + task + skill — full leader toolkit */
@@ -106,7 +112,7 @@ const ROLE_TOOLKITS: Record<RoleId, Toolkit> = {
   scout:     workerBase,
   architect: workerBase,
   critic:    criticBase,
-  advisor:   emptyToolkit,
+  advisor:   compactToolkit,
 }
 
 // =============================================================================
@@ -114,7 +120,7 @@ const ROLE_TOOLKITS: Record<RoleId, Toolkit> = {
 // =============================================================================
 
 /** Tools that should not be displayed in the UI */
-export const HIDDEN_TOOLS: ReadonlySet<string> = new Set(['createTask', 'updateTask', 'killWorker', 'messageWorker'])
+export const HIDDEN_TOOLS: ReadonlySet<string> = new Set(['createTask', 'updateTask', 'killWorker', 'messageWorker', 'compact'])
 
 export type ToolKey = ToolkitKeys<typeof leaderToolkit>
 

@@ -601,9 +601,9 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
           })
         },
         waitReady: (forkId: string | null = null) =>
-          waitEvent('compaction_ready', (e) => e.forkId === forkId),
+          waitEvent('compaction_prepared', (e) => e.forkId === forkId),
         waitCompleted: (forkId: string | null = null) =>
-          waitEvent('compaction_completed', (e) => e.forkId === forkId),
+          waitEvent('compaction_injected', (e) => e.forkId === forkId),
         assertNotBlocked: async (forkId: string | null = null): Promise<void> => {
           const compaction = await client.runEffect(
             Effect.flatMap(CompactionProjection.Tag, (projection) => projection.getFork(forkId))

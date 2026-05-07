@@ -3,7 +3,7 @@ import { Effect } from 'effect'
 import { expect } from 'vitest'
 
 import { TestHarness, TestHarnessLive } from '../../src/test-harness/harness'
-import { createSubagentFork, getTurn, mkCompactionCompleted, mkCompactionReady, mkCompactionStarted, mkContextLimitHit, mkUserMessage } from './helpers'
+import { createSubagentFork, getTurn, mkCompactionInjected, mkCompactionReady, mkCompactionStarted, mkContextLimitHit, mkUserMessage } from './helpers'
 
 describe('compaction/fork-isolation', () => {
   it.effect('root compaction gates do not mutate subagent working state', () =>
@@ -14,7 +14,7 @@ describe('compaction/fork-isolation', () => {
       yield* h.send(mkContextLimitHit(null))
       yield* h.send(mkCompactionStarted({ forkId: null }))
       yield* h.send(mkCompactionReady({ forkId: null }))
-      yield* h.send(mkCompactionCompleted({ forkId: null }))
+      yield* h.send(mkCompactionInjected({ forkId: null }))
       const subAfter = yield* getTurn(h, subFork)
       expect(subAfter._tag).toBe(subBefore._tag)
       expect(subAfter.triggers.length).toBe(subBefore.triggers.length)
@@ -28,7 +28,7 @@ describe('compaction/fork-isolation', () => {
       yield* h.send(mkContextLimitHit(subFork))
       yield* h.send(mkCompactionStarted({ forkId: subFork }))
       yield* h.send(mkCompactionReady({ forkId: subFork }))
-      yield* h.send(mkCompactionCompleted({ forkId: subFork }))
+      yield* h.send(mkCompactionInjected({ forkId: subFork }))
       const rootAfter = yield* getTurn(h, null)
       expect(rootAfter._tag).toBe(rootBefore._tag)
       expect(rootAfter.triggers.length).toBe(rootBefore.triggers.length)
@@ -42,10 +42,10 @@ describe('compaction/fork-isolation', () => {
       yield* h.send(mkCompactionReady({ forkId: null }))
       yield* h.send(mkCompactionStarted({ forkId: subFork }))
       yield* h.send(mkCompactionReady({ forkId: subFork }))
-      yield* h.send(mkCompactionCompleted({ forkId: subFork }))
+      yield* h.send(mkCompactionInjected({ forkId: subFork }))
       const rootMid = yield* getTurn(h, null)
       expect(rootMid._tag).toBe('idle')
-      yield* h.send(mkCompactionCompleted({ forkId: null }))
+      yield* h.send(mkCompactionInjected({ forkId: null }))
       const rootAfter = yield* getTurn(h, null)
       const subAfter = yield* getTurn(h, subFork)
       expect(rootAfter._tag).toBe('idle')

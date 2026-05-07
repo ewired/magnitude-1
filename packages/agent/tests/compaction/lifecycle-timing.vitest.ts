@@ -6,7 +6,7 @@ import {
   getTurn,
   mkCompactionStarted,
   mkCompactionReady,
-  mkCompactionCompleted,
+  mkCompactionInjected,
   mkContextLimitHit,
   mkTurnStarted,
   mkTurnOutcomeEvent,
@@ -24,16 +24,16 @@ describe('compaction/lifecycle-timing', () => {
       expect(compaction.contextLimitBlocked).toBe(false)
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('pendingFinalization state reached from compaction_ready', () =>
+  it.effect('pendingInjection state reached from compaction_prepared', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady())
 
       const compaction = yield* getCompaction(h)
-      expect(compaction._tag).toBe('pendingFinalization')
+      expect(compaction._tag).toBe('pendingInjection')
       // contextLimitBlocked depends on tokenEstimate vs hardCap, not FSM state alone.
-      // With low tokenEstimate (test default), pendingFinalization does not block.
+      // With low tokenEstimate (test default), pendingInjection does not block.
       // In production, compaction only triggers when tokens are high, so this would be true.
     }).pipe(Effect.provide(TestHarnessLive())))
 
@@ -54,31 +54,31 @@ describe('compaction/lifecycle-timing', () => {
       expect(after.contextLimitBlocked).toBe(true)
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('compaction_ready while turn in-flight defers finalization until turn completes', () =>
+  it.effect('compaction_prepared while turn in-flight defers finalization until turn completes', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
 
-      // Start a turn, then start compaction, then compaction becomes ready
+      // Start a turn, then start compaction, then compaction becomes prepared
       yield* h.send(mkTurnStarted({ turnId: 't1', chainId: 'c1' }))
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady())
 
-      // Should be in pendingFinalization — waiting for turn to finish
+      // Should be in pendingInjection — waiting for turn to finish
       const beforeTurnEnd = yield* getCompaction(h)
-      expect(beforeTurnEnd._tag).toBe('pendingFinalization')
+      expect(beforeTurnEnd._tag).toBe('pendingInjection')
 
       // Complete the turn
       yield* h.send(mkTurnOutcomeEvent({ turnId: 't1', chainId: 'c1' }))
 
       // Now finalize
-      yield* h.send(mkCompactionCompleted())
+      yield* h.send(mkCompactionInjected())
 
       const after = yield* getCompaction(h)
       expect(after._tag).toBe('idle')
       expect(after.contextLimitBlocked).toBe(false)
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('compaction_ready while idle finalizes immediately', () =>
+  it.effect('compaction_prepared while idle finalizes immediately', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
 
@@ -86,12 +86,12 @@ describe('compaction/lifecycle-timing', () => {
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady())
 
-      // pendingFinalization reached
+      // pendingInjection reached
       const ready = yield* getCompaction(h)
-      expect(ready._tag).toBe('pendingFinalization')
+      expect(ready._tag).toBe('pendingInjection')
 
       // Can immediately complete (no turn to wait for)
-      yield* h.send(mkCompactionCompleted())
+      yield* h.send(mkCompactionInjected())
 
       const after = yield* getCompaction(h)
       expect(after._tag).toBe('idle')
@@ -104,7 +104,7 @@ describe('compaction/lifecycle-timing', () => {
       const hImmediate = yield* TestHarness
       yield* hImmediate.send(mkCompactionStarted())
       yield* hImmediate.send(mkCompactionReady())
-      yield* hImmediate.send(mkCompactionCompleted())
+      yield* hImmediate.send(mkCompactionInjected())
       const immediate = yield* getCompaction(hImmediate)
 
       expect(immediate._tag).toBe('idle')
@@ -121,7 +121,7 @@ describe('compaction/lifecycle-timing', () => {
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady())
       yield* h.send(mkTurnOutcomeEvent({ turnId: 't1', chainId: 'c1' }))
-      yield* h.send(mkCompactionCompleted())
+      yield* h.send(mkCompactionInjected())
       const deferred = yield* getCompaction(h)
 
       expect(deferred._tag).toBe('idle')
@@ -152,13 +152,13 @@ describe('compaction/lifecycle-timing', () => {
       expect(after3.shouldCompact).toBe(after1.shouldCompact)
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('terminal state is compaction_completed, not compaction_failed', () =>
+  it.effect('terminal state is compaction_injected, not compaction_failed', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
 
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady())
-      yield* h.send(mkCompactionCompleted())
+      yield* h.send(mkCompactionInjected())
 
       const after = yield* getCompaction(h)
       expect(after._tag).toBe('idle')

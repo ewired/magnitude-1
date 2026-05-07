@@ -2,7 +2,8 @@
  * Agentic compaction turn — runs a normal agent turn for reflection/summarization.
  */
 
-import { Effect, Stream, Ref } from 'effect'
+import { Effect, Layer, Stream, Ref } from 'effect'
+
 import { AmbientServiceTag } from '@magnitudedev/event-core'
 import { logger } from '@magnitudedev/logger'
 import { createHarness } from '@magnitudedev/harness'
@@ -20,14 +21,22 @@ import { getAgentDefinition } from '../agents/registry'
 import { getToolkitForRole } from '../tools/toolkits'
 import { buildSystemPrompt } from '../prompts/system-prompt-builder'
 import { buildCompactionPrompt } from './prompt'
+import { CompactionContextTag, type CompactResult } from './context'
+import { computeCompactionSizing } from './estimate'
 
+import { TraceListener, type ModelCallTrace } from '@magnitudedev/ai'
+import type { AgentCallTrace } from '@magnitudedev/tracing'
+import { writeTrace } from '@magnitudedev/tracing'
+import { ChatPersistence } from '../persistence/chat-persistence-service'
 import { ExecutionManager } from '../execution/types'
 import { SkillsAmbient } from '../ambient/skills-ambient'
 import { buildStandardHooks } from '../execution/harness-hooks'
 import type { RoleId } from '../agents/role-validation'
+import { COMPACTION_MAX_RETRIES } from '../constants'
 
 export interface CompactionTurnResult {
   readonly turn: CompletedTurn
+  readonly compactionOutcome: { readonly isFallback: false; readonly compactResult: CompactResult } | { readonly isFallback: true }
   readonly inputTokens: number | null
   readonly outputTokens: number | null
 }
@@ -36,6 +45,7 @@ export function runCompactionTurn(
   forkId: string | null,
   roleId: RoleId,
   windowState: ForkWindowState,
+  softCap: number,
   publish: (event: AppEvent) => Effect.Effect<void>,
   read: any,
 ): Effect.Effect<CompactionTurnResult, any, any> {
@@ -60,58 +70,124 @@ export function runCompactionTurn(
     const ambientService = yield* AmbientServiceTag
     const skills = ambientService.getValue(SkillsAmbient)
 
-    // Create harness (same config as Cortex — preserves prefix cache)
-    const compactionTurnId = `compaction-${Date.now()}`
-    const harness = createHarness({
-      model: agentModel.model,
-      toolkit,
-      mapStreamError: mapStreamErrorToOutcome,
-      layer: forkLayer,
-      hooks: buildStandardHooks({ forkId, turnId: compactionTurnId, agentDef, workspacePath }),
+    // Compute budget for compact() tool
+    const { keptTailTokens } = computeCompactionSizing(windowState.messages, softCap)
+    const sessionContextTokens = windowState.messages[0]?.estimatedTokens ?? 0
+    const margin = 2000
+    const maxPayloadTokens = Math.max(
+      4000,
+      softCap - windowState.systemPromptTokens - sessionContextTokens - keptTailTokens - margin,
+    )
+
+    // Create CompactionContextTag layer with shared result ref
+    const compactResultRef = yield* Ref.make<CompactResult | null>(null)
+    const compactionLayer = Layer.succeed(CompactionContextTag, {
+      isCompacting: true as const,
+      resultRef: compactResultRef,
+      maxPayloadTokens,
     })
 
-    // Build system prompt (identical to normal turns → prefix cache preserved)
-    const toolDefs = harness.getToolDefinitions()
-    const toolDocs = toolDefs.length > 0 ? renderToolDocs(toolDefs) : ''
-    const systemPrompt = buildSystemPrompt({
-      roleDef: agentDef,
-      skills,
-      lenses: [],
-      toolDocs,
+    // Override TraceListener to tag compaction calls with callType: "compact"
+    const persistence = yield* ChatPersistence
+    const sessionMetadata = yield* persistence.getSessionMetadata()
+    const traceLayer = Layer.succeed(TraceListener, {
+      onTrace: (trace: ModelCallTrace) => {
+        const agentTrace: AgentCallTrace = {
+          ...trace,
+          sessionId: sessionMetadata.sessionId,
+          agentId: roleId,
+          forkId,
+          callType: 'compact',
+        }
+        writeTrace(agentTrace)
+      },
     })
 
-    // Build compaction prompt: full window + reflection instruction appended
-    const timezone = sessionCtx.context?.timezone ?? null
-    const compactionPrompt = buildCompactionPrompt(windowState, systemPrompt, timezone)
+    const turnLayer = Layer.merge(forkLayer, compactionLayer)
 
-    // Run turn — MagnitudeConnectionError propagates to caller
-    const liveTurn = yield* harness.runTurn(compactionPrompt)
+    // Retry loop: attempt up to COMPACTION_MAX_RETRIES times
+    let lastTurn: CompletedTurn | null = null
+    let lastInputTokens: number | null = null
+    let lastOutputTokens: number | null = null
 
-    // Drain events (tools execute automatically via harness)
-    yield* Stream.runForEach(liveTurn.events, () => Effect.void)
+    for (let attempt = 0; attempt < COMPACTION_MAX_RETRIES; attempt++) {
+      // Reset ref for each attempt
+      yield* Ref.set(compactResultRef, null)
 
-    // Build CompletedTurn from canonical turn state
-    const state = yield* Ref.get(liveTurn.state)
-    const canonical = state.canonical
-    const hasContent = (canonical.assistantMessage.text && canonical.assistantMessage.text.trim().length > 0)
-      || (canonical.assistantMessage.toolCalls && canonical.assistantMessage.toolCalls.length > 0)
+      const compactionTurnId = `compaction-${Date.now()}-${attempt}`
+      const harness = createHarness({
+        model: agentModel.model,
+        toolkit,
+        mapStreamError: mapStreamErrorToOutcome,
+        layer: turnLayer,
+        hooks: buildStandardHooks({ forkId, turnId: compactionTurnId, agentDef, workspacePath }),
+      })
 
-    if (!hasContent) {
-      return yield* Effect.fail(new Error('Empty compaction response'))
+      // Build system prompt (identical to normal turns → prefix cache preserved)
+      const toolDefs = harness.getToolDefinitions()
+      const toolDocs = toolDefs.length > 0 ? renderToolDocs(toolDefs) : ''
+      const systemPrompt = buildSystemPrompt({
+        roleDef: agentDef,
+        skills,
+        lenses: [],
+        toolDocs,
+      })
+
+      // Build compaction prompt: full window + reflection instruction appended
+      const timezone = sessionCtx.context?.timezone ?? null
+      const compactionPrompt = buildCompactionPrompt(windowState, systemPrompt, timezone)
+
+      // Run turn (provide traceLayer so model call is tagged as "compact")
+      const liveTurn = yield* Effect.provide(harness.runTurn(compactionPrompt), traceLayer)
+      yield* Stream.runForEach(liveTurn.events, () => Effect.void)
+
+      // Build CompletedTurn from canonical turn state
+      const state = yield* Ref.get(liveTurn.state)
+      const canonical = state.canonical
+      const hasContent = (canonical.assistantMessage.text && canonical.assistantMessage.text.trim().length > 0)
+        || (canonical.assistantMessage.toolCalls && canonical.assistantMessage.toolCalls.length > 0)
+
+      if (hasContent) {
+        lastTurn = {
+          turnId: compactionTurnId,
+          assistant: canonical.assistantMessage,
+          toolResults: [...canonical.toolResults],
+          feedback: [],
+          clean: true,
+        }
+      }
+
+      lastInputTokens = canonical.usage?.inputTokens ?? null
+      lastOutputTokens = canonical.usage?.outputTokens ?? null
+
+      // Check if compact() was called
+      const compactResult = yield* Ref.get(compactResultRef)
+      if (compactResult !== null) {
+        return {
+          turn: lastTurn!,
+          compactionOutcome: { isFallback: false, compactResult },
+          inputTokens: lastInputTokens,
+          outputTokens: lastOutputTokens,
+        }
+      }
+
+      if (attempt < COMPACTION_MAX_RETRIES - 1) {
+        logger.warn({ forkId, attempt: attempt + 1 }, '[CompactionTurn] Agent did not call compact(), retrying')
+      }
     }
 
-    const completed: CompletedTurn = {
-      turnId: compactionTurnId,
-      assistant: canonical.assistantMessage,
-      toolResults: [...canonical.toolResults],
-      feedback: [],
-      clean: true,
+    // All retries exhausted — fallback
+    logger.warn({ forkId }, '[CompactionTurn] All compaction retries exhausted, falling back to tail preservation')
+
+    if (!lastTurn) {
+      return yield* Effect.fail(new Error('Empty compaction response after all retries'))
     }
 
     return {
-      turn: completed,
-      inputTokens: canonical.usage?.inputTokens ?? null,
-      outputTokens: canonical.usage?.outputTokens ?? null,
+      turn: lastTurn,
+      compactionOutcome: { isFallback: true },
+      inputTokens: lastInputTokens,
+      outputTokens: lastOutputTokens,
     }
   })
 }

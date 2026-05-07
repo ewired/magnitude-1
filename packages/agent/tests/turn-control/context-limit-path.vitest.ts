@@ -86,13 +86,8 @@ describe('turn control context-limit path', () => {
       yield* h.send(mkContextLimitHit())
       yield* h.send(mkTurnOutcomeEventFailure({ turnId: 't-b', chainId: 'c-full' }))
       yield* h.send({
-        type: 'compaction_completed',
+        type: 'compaction_injected',
         forkId: null,
-        summary: 's',
-        compactedMessageCount: 1,
-        tokensSaved: 100,
-        preservedVariables: [],
-        refreshedContext: null,
       })
       yield* h.send(mkTurnStarted({ turnId: 't-c', chainId: 'c-full' }))
       yield* h.send(mkTurnOutcomeEventSuccess({ turnId: 't-c', chainId: 'c-full' }))

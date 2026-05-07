@@ -6,7 +6,7 @@ import {
   ROOT_FORK_ID,
   getCompaction,
   getMemory,
-  mkCompactionCompleted,
+  mkCompactionInjected,
   mkCompactionFailed,
   mkCompactionReady,
   mkCompactionStarted,
@@ -81,7 +81,7 @@ describe('window/estimation', () => {
       expect(after.tokenEstimate).toBe(after.systemPromptTokens + after.messageTokens)
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('compaction_completed recomputes messageTokens from surviving entries', () =>
+  it.effect('compaction_injected recomputes messageTokens from surviving entries', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       // Add some content: user message + turn
@@ -97,9 +97,9 @@ describe('window/estimation', () => {
       const beforeCount = before.messages.length
 
       // Compact first message (index 1, after session_context at 0)
-      yield* h.send(mkCompactionStarted())
+      yield* h.send(mkCompactionStarted({ compactedMessageCount: 1 }))
       yield* h.send(mkCompactionReady({ compactedMessageCount: 1 }))
-      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 1 }))
+      yield* h.send(mkCompactionInjected())
 
       const after = yield* getMemory(h)
       // Should have fewer messages + reflection block
@@ -126,7 +126,7 @@ describe('window/estimation', () => {
       // Add compaction to get a compacted entry
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady({ compactedMessageCount: 1 }))
-      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 1, tokensSaved: 50, summary: 'reflection text' }))
+      yield* h.send(mkCompactionInjected())
 
       const win = yield* getMemory(h)
       for (const entry of win.messages) {
@@ -159,7 +159,7 @@ describe('compaction/fsm-policy', () => {
       expect(state.shouldCompact).toBe(false)
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('compaction_ready transitions compacting → pendingFinalization', () =>
+  it.effect('compaction_prepared transitions compacting → pendingInjection', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send(mkCompactionStarted())
@@ -174,19 +174,19 @@ describe('compaction/fsm-policy', () => {
         compactedMessageCount: 2,
       }))
       const state = yield* getCompaction(h)
-      expect(state._tag).toBe('pendingFinalization')
-      if (state._tag === 'pendingFinalization') {
+      expect(state._tag).toBe('pendingInjection')
+      if (state._tag === 'pendingInjection') {
         expect(state.turn.assistant.text).toBe('test summary')
         expect(state.compactedMessageCount).toBe(2)
       }
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('compaction_completed transitions pendingFinalization → idle', () =>
+  it.effect('compaction_injected transitions pendingInjection → idle', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady())
-      yield* h.send(mkCompactionCompleted({ tokensSaved: 50 }))
+      yield* h.send(mkCompactionInjected())
       const state = yield* getCompaction(h)
       expect(state._tag).toBe('idle')
       expect(state.contextLimitBlocked).toBe(false)
@@ -255,7 +255,7 @@ describe('compaction/fsm-policy', () => {
       expect((yield* getCompaction(h)).shouldCompact).toBe(false)
 
       yield* h.send(mkCompactionReady())
-      yield* h.send(mkCompactionCompleted({ tokensSaved: 50 }))
+      yield* h.send(mkCompactionInjected())
       const final = yield* getCompaction(h)
       expect(final._tag).toBe('idle')
       // shouldCompact depends on whether tokenEstimate > softCap after compaction
@@ -279,7 +279,7 @@ describe('compaction/fsm-policy', () => {
       expect((yield* getCompaction(h))._tag).toBe('compacting')
 
       yield* h.send(mkCompactionReady())
-      expect((yield* getCompaction(h))._tag).toBe('pendingFinalization')
+      expect((yield* getCompaction(h))._tag).toBe('pendingInjection')
 
       // compaction_failed transitions back to idle
       // BUG: currently hardcodes shouldCompact: false, preventing retry when tokens are still high

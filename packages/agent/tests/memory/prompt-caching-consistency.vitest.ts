@@ -185,13 +185,34 @@ describe('prompt caching consistency', () => {
       const beforeRendered = yield* getRenderedUserText(h)
 
       yield* h.send({
-        type: 'compaction_completed',
+        type: 'compaction_started',
         forkId: null,
-        summary: 'summary block',
         compactedMessageCount: 1,
-        tokensSaved: 100,
-        preservedVariables: [],
+      })
+      yield* h.send({
+        type: 'compaction_prepared',
+        forkId: null,
+        turn: {
+          turnId: 'compaction-test',
+          assistant: { _tag: 'AssistantMessage' as const, text: 'summary block', toolCalls: [] },
+          toolResults: [],
+          feedback: [],
+          clean: true,
+        },
+        isFallback: false,
+        compactResult: {
+          summary: 'summary block',
+          reflection: 'no issues',
+          files: [],
+        },
+        compactedMessageCount: 1,
+        inputTokens: null,
+        outputTokens: null,
         refreshedContext: null,
+      })
+      yield* h.send({
+        type: 'compaction_injected',
+        forkId: null,
       })
 
       const afterRendered = yield* getRenderedUserText(h)

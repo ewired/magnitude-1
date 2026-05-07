@@ -7,7 +7,7 @@ import {
   expectStableWorkingState,
   getCompaction,
   getTurn,
-  mkCompactionCompleted,
+  mkCompactionInjected,
   mkCompactionFailed,
   mkCompactionReady,
   mkCompactionStarted,
@@ -18,14 +18,14 @@ import {
 } from './helpers'
 
 describe('compaction/working-state-gating', () => {
-  it.effect('compaction_ready sets compaction lifecycle to pendingFinalization', () =>
+  it.effect('compaction_prepared sets compaction lifecycle to pendingInjection', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send(mkUserMessage({ text: 'wake up' }))
       yield* h.send(mkCompactionStarted({ forkId: null }))
       yield* h.send(mkCompactionReady())
       const compaction = yield* getCompaction(h)
-      expect(compaction._tag).toBe('pendingFinalization')
+      expect(compaction._tag).toBe('pendingInjection')
     }).pipe(Effect.provide(TestHarnessLive())))
 
   it.effect('context_limit_hit sets contextLimitBlocked', () =>
@@ -37,13 +37,13 @@ describe('compaction/working-state-gating', () => {
       expect(compaction.contextLimitBlocked).toBe(true)
     }).pipe(Effect.provide(TestHarnessLive())))
 
-  it.effect('compaction_completed clears both gates', () =>
+  it.effect('compaction_injected clears both gates', () =>
     Effect.gen(function* () {
       const h = yield* TestHarness
       yield* h.send(mkContextLimitHit())
       yield* h.send(mkCompactionStarted())
       yield* h.send(mkCompactionReady())
-      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 1 }))
+      yield* h.send(mkCompactionInjected())
       yield* expectCompactionUnblocked(h)
     }).pipe(Effect.provide(TestHarnessLive())))
 
@@ -63,7 +63,7 @@ describe('compaction/working-state-gating', () => {
       const h = yield* TestHarness
       yield* h.send(mkContextLimitHit())
       yield* startReadyCompaction(h)
-      yield* h.send(mkCompactionCompleted({ compactedMessageCount: 1 }))
+      yield* h.send(mkCompactionInjected())
       const compaction = yield* getCompaction(h)
       expect(compaction.contextLimitBlocked).toBe(false)
       expect(compaction._tag).toBe('idle')

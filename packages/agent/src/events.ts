@@ -21,6 +21,7 @@ import type { RoleId } from '@magnitudedev/roles'
 import type { TaskAssignee } from './tasks/types'
 import type { ErrorPresentation } from './errors/present'
 import type { CompletedTurn } from './window/types'
+import type { CompactResult } from './compaction/context'
 
 
 export type Attachment = ImageAttachment | MentionAttachment
@@ -531,26 +532,26 @@ export interface CompactionStarted {
   readonly compactedMessageCount: number  // Number of messages to compact (frozen at trigger time)
 }
 
+/** Compaction outcome — discriminated by isFallback */
+export type CompactionOutcome =
+  | { readonly isFallback: false; readonly compactResult: CompactResult }
+  | { readonly isFallback: true }
+
 /** Compaction BAML summarization complete, ready to finalize */
-export interface CompactionReady {
-  readonly type: 'compaction_ready'
+export type CompactionPrepared = {
+  readonly type: 'compaction_prepared'
   readonly forkId: string | null
   readonly turn: CompletedTurn
   readonly compactedMessageCount: number
   readonly inputTokens: number | null
   readonly outputTokens: number | null
   readonly refreshedContext: SessionContext | null
-}
+} & CompactionOutcome
 
-/** Compaction completed - turn replaces old messages */
-export interface CompactionCompleted {
-  readonly type: 'compaction_completed'
+/** Compaction injected — minimal signal that compaction results should be applied to the window */
+export interface CompactionInjected {
+  readonly type: 'compaction_injected'
   readonly forkId: string | null
-  readonly turn: CompletedTurn
-  readonly compactedMessageCount: number
-  readonly inputTokens: number | null
-  readonly outputTokens: number | null
-  readonly refreshedContext: SessionContext | null  // Fresh session context to replace stale original
 }
 
 /** Compaction failed */
@@ -651,8 +652,8 @@ export type AppEvent =
   | Interrupt
   | SoftInterrupt
   | CompactionStarted
-  | CompactionReady
-  | CompactionCompleted
+  | CompactionPrepared
+  | CompactionInjected
   | CompactionFailed
   | ContextLimitHit
   | ToolApproved
