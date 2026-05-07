@@ -101,7 +101,7 @@ export const MagnitudeLoginScreen = memo(function MagnitudeLoginScreen({
 
         <box style={{ paddingBottom: 1 }}>
           <text style={{ fg: theme.muted }}>
-            Includes a free 3 day trial of Magnitude Pro ($20/mo). Add a card later if you want to keep going.
+            Includes $5 of free credits. Pass-through API pricing with no markup after that.
           </text>
         </box>
 
