@@ -2,6 +2,7 @@ import { Context, Effect, Duration } from "effect"
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
 import { Auth, type AuthApplicator } from "@magnitudedev/ai"
+import { isEnvFlagOn } from "./env"
 import type { BalanceResponse, RoleId, UsagePeriod } from "./contract"
 import { createModelCatalog, type ModelCatalog } from "./catalog"
 import { createRoleSpec, type MagnitudeCallOptions, type MagnitudeStreamError } from "./models"
@@ -64,7 +65,7 @@ export class MagnitudeClient extends Context.Tag("MagnitudeClient")<
 >() {}
 
 export function createMagnitudeClient(config?: MagnitudeClientConfig): MagnitudeClientShape {
-  const useLocal = !!process.env.MAGNITUDE_USE_LOCAL
+  const useLocal = isEnvFlagOn(process.env.MAGNITUDE_USE_LOCAL)
   const apiKey = config?.apiKey ?? (useLocal ? process.env.MAGNITUDE_LOCAL_API_KEY : undefined) ?? process.env.MAGNITUDE_API_KEY
   if (!apiKey) throw new Error(
     useLocal

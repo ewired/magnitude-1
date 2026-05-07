@@ -71,7 +71,7 @@ import { collectSessionContext } from './util/collect-session-context'
 import { AgentModelResolverLive } from './model/model-resolver'
 
 // Config & Auth
-import { MagnitudeClient, createMagnitudeClient } from '@magnitudedev/magnitude-client'
+import { MagnitudeClient, createMagnitudeClient, isEnvFlagOn } from '@magnitudedev/magnitude-client'
 import { createTraceListenerLayer } from './tracing/tracing'
 import type { StorageClient } from '@magnitudedev/storage'
 import { initLogger, logger } from '@magnitudedev/logger'
@@ -214,7 +214,7 @@ export interface CreateClientOptions {
 export async function createCodingAgentClient(options: CreateClientOptions) {
 
   // Construct Magnitude config from options / env vars
-  const useLocal = !!process.env.MAGNITUDE_USE_LOCAL
+  const useLocal = isEnvFlagOn(process.env.MAGNITUDE_USE_LOCAL)
   const apiKey = options.magnitudeApiKey ?? (useLocal ? process.env.MAGNITUDE_LOCAL_API_KEY : undefined) ?? process.env.MAGNITUDE_API_KEY
   if (!apiKey) throw new Error(
     useLocal

@@ -13,3 +13,4 @@ export {
 } from "./errors"
 export { createRoleSpec, createMagnitudeCompatibleSpec, toModelProfile, type MagnitudeCallOptions, type MagnitudeModelSpec, type MagnitudeStreamError, type MagnitudeCompatibleSpecConfig, type ModelProfile } from "./models"
 export { createMagnitudeClient, MagnitudeClient, WebSearchError, type MagnitudeClientConfig, type MagnitudeClientShape, type WebSearchResult, type BalanceQuery } from "./client"
+export { isEnvFlagOn } from "./env"
