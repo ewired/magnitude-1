@@ -36,19 +36,23 @@ interface ToolCallState {
 // =============================================================================
 
 export interface DecoderState {
-  readonly ordinal:        number
-  readonly thoughtOpen:    boolean
-  readonly messageOpen:    boolean
+  readonly ordinal:           number
+  readonly thoughtOpen:       boolean
+  readonly messageOpen:       boolean
   // Map<index, ToolCallState> — rebuilt (not mutated) per step
-  readonly openToolCalls:  ReadonlyMap<number, ToolCallState>
+  readonly openToolCalls:     ReadonlyMap<number, ToolCallState>
+  readonly generateToolCallId: () => string
 }
 
-export const initialDecoderState: DecoderState = {
-  ordinal:       0,
-  thoughtOpen:   false,
-  messageOpen:   false,
-  openToolCalls: new Map(),
-}
+export const initialDecoderState = (
+  generateToolCallId: () => string = () => newToolCallId(1),
+): DecoderState => ({
+  ordinal:        0,
+  thoughtOpen:    false,
+  messageOpen:    false,
+  openToolCalls:  new Map(),
+  generateToolCallId,
+})
 
 // =============================================================================
 // Helpers
@@ -175,6 +179,7 @@ function finalizeToolCall(
 export function processChunk(
   chunk: ChatCompletionsStreamChunk,
   state: DecoderState,
+  generateToolCallId: () => string = () => newToolCallId(state.ordinal + 1),
 ): { state: DecoderState; events: ResponseStreamEvent[] } {
   const events: ResponseStreamEvent[] = []
   let s = state
@@ -227,7 +232,7 @@ export function processChunk(
 
       if (!entry) {
         ord += 1
-        const toolCallId = newToolCallId(ord)
+        const toolCallId = generateToolCallId()
         const toolName   = tc.function?.name ?? ''
         entry = {
           toolCallId,
@@ -271,7 +276,6 @@ export function processChunk(
       usage: toResponseUsage(chunk.usage ?? {
         prompt_tokens: 0,
         completion_tokens: 0,
-        total_tokens: 0,
       }),
     })
   }
@@ -285,12 +289,16 @@ export function processChunk(
 
 export function decode(
   chunks: Stream.Stream<ChatCompletionsStreamChunk, DriverError>,
+  options?: { generateToolCallId?: () => string },
 ): Stream.Stream<ResponseStreamEvent, CodecDecodeError | DriverError> {
+  const initialState = initialDecoderState(
+    options?.generateToolCallId ?? (() => newToolCallId(1)),
+  )
   return chunks.pipe(
     Stream.mapAccum(
-      initialDecoderState,
+      initialState,
       (state, chunk) => {
-        const result = processChunk(chunk, state)
+        const result = processChunk(chunk, state, state.generateToolCallId)
         return [result.state, result.events] as [DecoderState, ResponseStreamEvent[]]
       },
     ),

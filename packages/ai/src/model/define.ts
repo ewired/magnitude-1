@@ -97,6 +97,7 @@ export function modelDefine<
               config.codec.decode(wireStream, {
                 tools,
                 classifyStreamError: config.classifyStreamError,
+                generateToolCallId: options.generateToolCallId,
               }),
             ),
             Effect.mapError((failure) => ({
@@ -135,6 +136,7 @@ export function modelDefine<
             config.codec.decode(wireStream, {
               tools,
               classifyStreamError: config.classifyStreamError,
+              generateToolCallId: options.generateToolCallId,
             }),
           ),
           Effect.mapError((failure) => {

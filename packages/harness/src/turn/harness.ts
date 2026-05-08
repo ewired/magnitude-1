@@ -1,11 +1,13 @@
 import { Effect, Stream, Layer, Ref, Queue } from "effect"
 import type * as HttpClient from "@effect/platform/HttpClient"
-import type {
+import {
   BoundModel,
   ConnectionError,
   StreamError,
   ToolDefinition,
   Prompt,
+  createToolCallId,
+  type ToolCallId,
 } from "@magnitudedev/ai"
 import type { TurnOutcome } from "../events"
 import type { HarnessEvent } from "../events"
@@ -159,8 +161,20 @@ export function createHarness<
     HttpClient.HttpClient
   > {
     return Effect.gen(function* () {
+      // Build replay-aware tool call ID generator from initial engine state.
+      // Yields prior IDs in order (so cachedOutcomes lookups succeed on retry),
+      // then falls back to fresh cuid2 IDs for any new tool calls.
+      const priorIds = [...(config.initialState?.toolCallMap.keys() ?? [])]
+      const generateToolCallId = (() => {
+        let ordinal = 0
+        return (): ToolCallId => {
+          if (ordinal < priorIds.length) return priorIds[ordinal++] as ToolCallId
+          return createToolCallId()
+        }
+      })()
+
       // Get the model stream + parsers (may fail with ConnectionError)
-      const { events: modelEvents, parsers } = yield* model.stream(prompt, toolDefs)
+      const { events: modelEvents, parsers } = yield* model.stream(prompt, toolDefs, { generateToolCallId })
 
       const stateRef = yield* makeStateRef(
         config.initialState ? { engine: config.initialState } : undefined,

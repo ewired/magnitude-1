@@ -99,13 +99,13 @@ describe('mapReason', () => {
 describe('processChunk', () => {
   it('empty chunk (no delta fields) → no events', () => {
     const chunk = makeChunk({})
-    const { events } = processChunk(chunk, initialDecoderState)
+    const { events } = processChunk(chunk, initialDecoderState())
     expect(events).toHaveLength(0)
   })
 
   it('reasoning_content opens thought', () => {
     const chunk = makeChunk({ reasoningContent: 'Let me think' })
-    const { events, state } = processChunk(chunk, initialDecoderState)
+    const { events, state } = processChunk(chunk, initialDecoderState())
     expect(events[0]).toMatchObject({ type: 'thought_start', level: 'medium' })
     expect(events[1]).toMatchObject({ type: 'thought_delta', text: 'Let me think' })
     expect(state.thoughtOpen).toBe(true)
@@ -113,7 +113,7 @@ describe('processChunk', () => {
 
   it('reasoning_content across two chunks keeps thought open', () => {
     const c1 = makeChunk({ reasoningContent: 'Part 1' })
-    const { state: s1, events: e1 } = processChunk(c1, initialDecoderState)
+    const { state: s1, events: e1 } = processChunk(c1, initialDecoderState())
     const c2 = makeChunk({ reasoningContent: ' Part 2' })
     const { state: s2, events: e2 } = processChunk(c2, s1)
     expect(e1.map(e => e.type)).toEqual(['thought_start', 'thought_delta'])
@@ -123,7 +123,7 @@ describe('processChunk', () => {
 
   it('content after reasoning → closes thought, opens message', () => {
     const c1 = makeChunk({ reasoningContent: 'Thinking' })
-    const { state: s1 } = processChunk(c1, initialDecoderState)
+    const { state: s1 } = processChunk(c1, initialDecoderState())
     const c2 = makeChunk({ content: 'Response' })
     const { events } = processChunk(c2, s1)
     expect(events.map(e => e.type)).toContain('thought_end')
@@ -133,7 +133,7 @@ describe('processChunk', () => {
 
   it('finish_reason closes open thought', () => {
     const c1 = makeChunk({ reasoningContent: 'Thinking' })
-    const { state: s1 } = processChunk(c1, initialDecoderState)
+    const { state: s1 } = processChunk(c1, initialDecoderState())
     const c2 = makeChunk({ finishReason: 'stop' })
     const { events } = processChunk(c2, s1)
     expect(events.some(e => e.type === 'thought_end')).toBe(true)
@@ -142,7 +142,7 @@ describe('processChunk', () => {
 
   it('finish_reason closes open message', () => {
     const c1 = makeChunk({ content: 'Hello' })
-    const { state: s1 } = processChunk(c1, initialDecoderState)
+    const { state: s1 } = processChunk(c1, initialDecoderState())
     const c2 = makeChunk({ finishReason: 'stop' })
     const { events } = processChunk(c2, s1)
     expect(events.some(e => e.type === 'message_end')).toBe(true)
@@ -151,7 +151,7 @@ describe('processChunk', () => {
 
   it('tool_call first chunk → tool_call_start', () => {
     const chunk = makeChunk({ toolCalls: [{ index: 0, id: 'srv-id', functionName: 'read_file', functionArguments: '' }] })
-    const { events } = processChunk(chunk, initialDecoderState)
+    const { events } = processChunk(chunk, initialDecoderState())
     expect(events[0].type).toBe('tool_call_start')
     const startEvt = events[0] as { type: string; toolName: string }
     expect(startEvt.toolName).toBe('read_file')
@@ -159,7 +159,7 @@ describe('processChunk', () => {
 
   it('server tool_call id is IGNORED — codec generates its own', () => {
     const chunk = makeChunk({ toolCalls: [{ index: 0, id: 'server-id-123', functionName: 'read_file' }] })
-    const { events } = processChunk(chunk, initialDecoderState)
+    const { events } = processChunk(chunk, initialDecoderState())
     const startEvt = events[0] as { type: string; toolCallId: string }
     expect(startEvt.toolCallId).not.toBe('server-id-123')
     expect(startEvt.toolCallId).toMatch(/^call-/)
@@ -167,7 +167,7 @@ describe('processChunk', () => {
 
   it('tool_call field events accumulate across chunks', () => {
     const c1 = makeChunk({ toolCalls: [{ index: 0, functionName: 'run', functionArguments: '{"a"' }] })
-    const { state: s1, events: e1 } = processChunk(c1, initialDecoderState)
+    const { state: s1, events: e1 } = processChunk(c1, initialDecoderState())
     const c2 = makeChunk({ toolCalls: [{ index: 0, functionArguments: ':1}' }] })
     const { events: e2 } = processChunk(c2, s1)
     expect(e1.some(e => e.type === 'tool_call_field_start')).toBe(true)
@@ -176,7 +176,7 @@ describe('processChunk', () => {
 
   it('finish_reason=tool_calls → emits tool_call_end and response_done', () => {
     const c1 = makeChunk({ toolCalls: [{ index: 0, functionName: 'run', functionArguments: '{"cmd":"ls"}' }] })
-    const { state: s1 } = processChunk(c1, initialDecoderState)
+    const { state: s1 } = processChunk(c1, initialDecoderState())
     const c2 = makeChunk({ finishReason: 'tool_calls', usage: { prompt_tokens: 7, completion_tokens: 3 } })
     const { events } = processChunk(c2, s1)
     const endEvt = events.find(e => e.type === 'tool_call_end') as { type: string; toolCallId: string } | undefined
@@ -189,7 +189,7 @@ describe('processChunk', () => {
 
   it('malformed tool args still emits tool_call_end and response_done', () => {
     const c1 = makeChunk({ toolCalls: [{ index: 0, functionName: 'run', functionArguments: '{bad' }] })
-    const { state: s1 } = processChunk(c1, initialDecoderState)
+    const { state: s1 } = processChunk(c1, initialDecoderState())
     const c2 = makeChunk({ finishReason: 'tool_calls', usage: { prompt_tokens: 1, completion_tokens: 1 } })
     const { events } = processChunk(c2, s1)
     expect(events.some(e => e.type === 'tool_call_end')).toBe(true)
@@ -201,7 +201,7 @@ describe('processChunk', () => {
       finishReason: 'stop',
       usage: { prompt_tokens: 100, completion_tokens: 50, prompt_tokens_details: { cached_tokens: 12 } },
     })
-    const { events } = processChunk(c, initialDecoderState)
+    const { events } = processChunk(c, initialDecoderState())
     const done = events.find(e => e.type === 'response_done') as {
       usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number | null; cacheWriteTokens: number | null }
     } | undefined

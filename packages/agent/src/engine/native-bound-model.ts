@@ -62,6 +62,7 @@ export interface NativeTransport {
     tools:   readonly ToolDef[],
     options: EncodeOptions,
     call:    { readonly endpoint: string; readonly authToken: string },
+    replayOptions?: { generateToolCallId?: () => string },
   ) => Effect.Effect<
     Stream.Stream<ResponseStreamEvent, CodecDecodeError | DriverError>,
     CodecEncodeError | DriverError,
@@ -78,11 +79,11 @@ export const makeNativeTransport = <W, C>(
   codec:  Codec<W, C>,
   driver: Driver<W, C>,
 ): NativeTransport => ({
-  run: (memory, tools, options, call) =>
+  run: (memory, tools, options, call, replayOptions) =>
     Effect.gen(function* () {
       const wireRequest = yield* codec.encode(memory, tools, options)
       const wireStream  = yield* driver.send(wireRequest, call)
-      return codec.decode(wireStream)
+      return codec.decode(wireStream, replayOptions)
     }),
 })
 

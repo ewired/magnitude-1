@@ -1,8 +1,7 @@
-import { init } from "@paralleldrive/cuid2"
 import { Cause, Stream } from "effect"
 import type { Schema } from "effect"
 import { createStreamingFieldParser, type StreamingFieldParser } from "../../streaming/field-parser"
-import type { ProviderToolCallId, ToolCallId } from "../../prompt/ids"
+import { createToolCallId, type ProviderToolCallId, type ToolCallId } from "../../prompt/ids"
 import type { FinishReason, ResponseStreamEvent } from "../../response/events"
 import type { ResponseUsage } from "../../response/usage"
 import type { StreamFailure } from "../../errors/failure"
@@ -21,8 +20,6 @@ interface ToolCallState {
   readonly toolName: string
   readonly parser: StreamingFieldParser
 }
-
-const createToolCallId = init({ length: 8 })
 
 // ---------------------------------------------------------------------------
 // Decoder phase — three states
@@ -118,6 +115,7 @@ function processChunk<TStreamError>(
   state: DecoderState,
   parsers: Map<ToolCallId, StreamingFieldParser>,
   logprobs: TokenLogprob[],
+  generateToolCallId: () => ToolCallId,
 ): readonly [DecoderState, readonly ResponseStreamEvent<TStreamError>[]] {
   const events: ResponseStreamEvent<TStreamError>[] = []
   let nextState = state
@@ -238,7 +236,7 @@ function processChunk<TStreamError>(
         const parser = schema
           ? createStreamingFieldParser(schema)
           : createStreamingFieldParser()
-        const toolCallId = createToolCallId() as ToolCallId
+        const toolCallId = generateToolCallId()
         const providerToolCallId = (toolCallDelta.id ?? toolCallId) as ProviderToolCallId
         toolCall = { toolCallId, providerToolCallId, toolName: name, parser }
         calls.set(toolCallDelta.index, toolCall)
@@ -339,12 +337,14 @@ export function decode<E, TStreamError>(
   options: {
     tools?: readonly ToolDefinition[]
     classifyStreamError: (failure: StreamFailure | E) => TStreamError
+    generateToolCallId?: () => ToolCallId
   },
 ): {
   readonly events: Stream.Stream<ResponseStreamEvent<TStreamError>, never>
   readonly parsers: ReadonlyMap<ToolCallId, StreamingFieldParser>
   readonly logprobs: TokenLogprob[]
 } {
+  const generateToolCallId = options.generateToolCallId ?? createToolCallId
   const parsers = new Map<ToolCallId, StreamingFieldParser>()
   const logprobs: TokenLogprob[] = []
 
@@ -354,7 +354,7 @@ export function decode<E, TStreamError>(
     chunks,
     makeInitialState(options.tools),
     (state, chunk): readonly [DecoderState, readonly ResponseStreamEvent<TStreamError>[]] => {
-      const result = processChunk<TStreamError>(chunk, state, parsers, logprobs)
+      const result = processChunk<TStreamError>(chunk, state, parsers, logprobs, generateToolCallId)
       lastState = result[0]
       return result
     },

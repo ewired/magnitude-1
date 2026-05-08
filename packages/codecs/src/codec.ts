@@ -92,6 +92,7 @@ export interface Codec<WireRequest, WireChunk> {
   ) => Effect.Effect<WireRequest, CodecEncodeError>
 
   readonly decode: (
-    chunks: Stream.Stream<WireChunk, DriverError>,
+    chunks:  Stream.Stream<WireChunk, DriverError>,
+    options?: { generateToolCallId?: () => string },
   ) => Stream.Stream<ResponseStreamEvent, CodecDecodeError | DriverError>
 }
