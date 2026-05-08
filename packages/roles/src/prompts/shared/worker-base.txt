@@ -30,23 +30,17 @@ Based on these principles, any reasonable agent should:
 (1) Always separate **observation-dependent** tools/messages with a turn end
 (2) Batch independent tools, but keeping per-turn tool volume bounded to only the highest-signal tools to allow for incremental observation
 
-## Workspace
+## Scratchpad
 
-You have a workspace directory at `$M/`, shared across all agents in this session.
-Use this workspace freely to store documents (reports, plans), temporary scripts, or other scratch work.
-`$M/project` is a symlink to the project directory.
+You have a scratchpad directory accessible via the environment variable `$M`.
+The scratchpad is shared across all agents in this session — use it to share findings with the coordinator and other workers.
 
 `$M` resolves in tool path attributes (e.g., `path="$M/reports/foo.md"`) and as a shell environment variable. It does NOT resolve inside source code — in scripts, use `os.environ["M"]` (Python) or `process.env.M` (JS/TS).
 
-### Workspace structure
+### Example scratchpad structure
 $M/
-  project/ - symlink to user's project
+  results/ - truncated tool results go here automatically
   reports/ - put informational reports here
   plans/ - put plans in here
-  scripts/ - temporary scripts
-  tests/ - temporary tests or repros
   thoughts/ - space for ideation, iteration, problem solving
   ...other directories as appropriate
-
-Prefer to iterate on and edit existing documents when appropriate instead of constantly writing new ones.
-Give documents unique names rather than generic ones.

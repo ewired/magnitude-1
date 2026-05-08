@@ -20,7 +20,7 @@ interface ForkDetailOverlayProps {
   onErrorAction?: (actionId: ActionId) => void
   modelSummary: { role: string; model: string } | null
   contextHardCap: number | null
-  workspacePath: string | null
+  scratchpadPath: string | null
   projectRoot: string
   subscribeForkDisplay: (forkId: string, cb: (state: DisplayState) => void) => () => void
   subscribeForkCompaction: (forkId: string, cb: (state: CompactionState) => void) => () => void
@@ -54,7 +54,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
   onErrorAction,
   modelSummary,
   contextHardCap,
-  workspacePath,
+  scratchpadPath,
   projectRoot,
   subscribeForkDisplay,
   subscribeForkCompaction,
@@ -121,7 +121,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
   } = useFilePanel({
     display,
     toolState,
-    workspacePath,
+    scratchpadPath,
     projectRoot,
   })
 

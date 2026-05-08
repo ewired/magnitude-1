@@ -145,7 +145,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         const ambientService = yield* AmbientServiceTag
         const skills = ambientService.getValue(SkillsAmbient)
 
-        const workspacePath = sessionCtx.context?.workspacePath ?? process.cwd()
+        const scratchpadPath = sessionCtx.context?.scratchpadPath ?? process.cwd()
 
         // Pass engine state for crash recovery — allows the harness to skip
         // tools that already executed before the process crashed.
@@ -162,7 +162,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
             forkId,
             turnId,
             agentDef,
-            workspacePath,
+            scratchpadPath,
           }),
         })
 

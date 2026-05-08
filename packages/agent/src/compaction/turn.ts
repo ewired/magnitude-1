@@ -66,7 +66,7 @@ export function runCompactionTurn(
 
     // Session context
     const sessionCtx = yield* read(SessionContextProjection)
-    const workspacePath = sessionCtx.context?.workspacePath ?? process.cwd()
+    const scratchpadPath = sessionCtx.context?.scratchpadPath ?? process.cwd()
     const ambientService = yield* AmbientServiceTag
     const skills = ambientService.getValue(SkillsAmbient)
 
@@ -120,7 +120,7 @@ export function runCompactionTurn(
         toolkit,
         mapStreamError: mapStreamErrorToOutcome,
         layer: turnLayer,
-        hooks: buildStandardHooks({ forkId, turnId: compactionTurnId, agentDef, workspacePath }),
+        hooks: buildStandardHooks({ forkId, turnId: compactionTurnId, agentDef, scratchpadPath }),
       })
 
       // Build system prompt (identical to normal turns → prefix cache preserved)

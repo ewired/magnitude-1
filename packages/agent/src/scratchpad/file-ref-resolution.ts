@@ -14,17 +14,17 @@ export interface ResolvedFileRef {
 export function resolveFileRefPath(
   refPath: string,
   cwd: string,
-  workspacePath: string,
+  scratchpadPath: string,
 ): ResolvedFileRef | null {
   const normalized = normalizeReferencedPath(refPath)
   if (!normalized) return null
 
-  const workspacePrefix = normalized.startsWith('$M/') || normalized.startsWith('${M}/')
-  if (workspacePrefix) {
+  const scratchpadPrefix = normalized.startsWith('$M/') || normalized.startsWith('${M}/')
+  if (scratchpadPrefix) {
     const innerPath = normalized.startsWith('${M}/')
       ? normalized.slice('${M}/'.length)
       : normalized.slice('$M/'.length)
-    const resolvedPath = path.resolve(workspacePath, innerPath)
+    const resolvedPath = path.resolve(scratchpadPath, innerPath)
     return {
       resolvedPath,
       displayPath: innerPath,
@@ -45,9 +45,9 @@ export function resolveFileRefPath(
 export function resolveFileRef(
   refPath: string,
   cwd: string,
-  workspacePath: string,
+  scratchpadPath: string,
 ): ResolvedFileRef | null {
-  const resolved = resolveFileRefPath(refPath, cwd, workspacePath)
+  const resolved = resolveFileRefPath(refPath, cwd, scratchpadPath)
   if (!resolved) return null
   if (!existsSync(resolved.resolvedPath)) return null
   return resolved

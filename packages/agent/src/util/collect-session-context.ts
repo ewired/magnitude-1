@@ -171,7 +171,7 @@ export interface CollectSessionContextOptions {
   storage?: StorageClient<RoleId>
 }
 
-export async function collectSessionContext(opts?: CollectSessionContextOptions): Promise<Omit<SessionContext, 'workspacePath'>> {
+export async function collectSessionContext(opts?: CollectSessionContextOptions): Promise<Omit<SessionContext, 'scratchpadPath'>> {
   const cwd = opts?.cwd ?? process.cwd()
   const platform = normalizePlatform(process.platform)
 

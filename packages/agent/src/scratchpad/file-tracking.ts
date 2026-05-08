@@ -16,9 +16,9 @@ export function extractWrittenFilePathFromToolEvent(event: ToolEvent): string | 
   return null
 }
 
-export function isWorkspacePath(resolvedPath: string, workspacePath: string): boolean {
-  const normalizedWorkspace = path.resolve(workspacePath)
+export function isScratchpadPath(resolvedPath: string, scratchpadPath: string): boolean {
+  const normalizedScratchpad = path.resolve(scratchpadPath)
   const normalizedTarget = path.resolve(resolvedPath)
-  const relative = path.relative(normalizedWorkspace, normalizedTarget)
+  const relative = path.relative(normalizedScratchpad, normalizedTarget)
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
 }

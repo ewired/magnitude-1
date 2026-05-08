@@ -21,12 +21,12 @@ export interface StandardHooksContext {
   readonly forkId: string | null
   readonly turnId: string
   readonly agentDef: ReturnType<typeof getAgentDefinition>
-  readonly workspacePath: string
+  readonly scratchpadPath: string
 }
 
 export function buildStandardHooks(ctx: StandardHooksContext): HarnessHooks<PolicyContextProviderTag> {
-  const { forkId, turnId, agentDef, workspacePath } = ctx
-  const resultsDir = path.join(workspacePath, 'results')
+  const { forkId, turnId, agentDef, scratchpadPath } = ctx
+  const resultsDir = path.join(scratchpadPath, 'results')
 
   return {
     beforeExecute: (hookCtx: ExecuteHookContext) =>

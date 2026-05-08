@@ -40,7 +40,7 @@ describe('scanFileRefs', () => {
     ])
   })
 
-  test('matches explicit workspace path', () => {
+  test('matches explicit scratchpad path', () => {
     const refs = scanFileRefs('Use [plan]($M/plan.md)')
     expect(refs).toEqual([
       {

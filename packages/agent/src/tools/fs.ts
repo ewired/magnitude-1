@@ -8,7 +8,7 @@ import { resolve } from 'path'
 import { validateAndApply } from '../util/edit'
 import { WorkingDirectoryTag } from '../execution/working-directory'
 import { readImageFileForModel } from '../util/read-image-file'
-import { expandWorkspacePath } from '../workspace'
+import { expandScratchpadPath } from '../scratchpad'
 import { Fs, resolveFsPath } from '../services/fs'
 import { ToolErrorSchema } from './errors'
 const ToolImageSchema = Schema.Struct({
@@ -53,9 +53,9 @@ export const readTool = defineHarnessTool({
   },
   errorSchema: FsErrorSchema,
   execute: ({ path, offset, limit }, _ctx) => Effect.gen(function* () {
-    const { cwd, workspacePath } = yield* WorkingDirectoryTag
+    const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const expandedPath = expandWorkspacePath(path, workspacePath)
+    const expandedPath = expandScratchpadPath(path, scratchpadPath)
     const fullPath = resolve(cwd, expandedPath)
     const content = yield* fs.readText(fullPath).pipe(
       Effect.catchAll(() => Effect.fail(fsError(`Failed to read ${path}`)))
@@ -113,9 +113,9 @@ export const writeTool = defineHarnessTool({
     linesWritten: Schema.Number,
   }),
   execute: ({ path, content }, ctx) => Effect.gen(function* () {
-    const { cwd, workspacePath } = yield* WorkingDirectoryTag
+    const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const expandedPath = expandWorkspacePath(path, workspacePath)
+    const expandedPath = expandScratchpadPath(path, scratchpadPath)
     const fullPath = resolve(cwd, expandedPath)
     yield* fs.writeFile(fullPath, content).pipe(
       Effect.catchAll(() => Effect.fail(fsError(`Failed to write ${path}`)))
@@ -161,9 +161,9 @@ export const editTool = defineHarnessTool({
       if (state.emitted) return state
       const path = input.path
       if (!path || !path.isFinal) return state
-      const { cwd, workspacePath } = yield* WorkingDirectoryTag
+      const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
       const fs = yield* Fs
-      const expandedPath = expandWorkspacePath(path.value, workspacePath)
+      const expandedPath = expandScratchpadPath(path.value, scratchpadPath)
       const fullPath = resolve(cwd, expandedPath)
       const content = yield* fs.readText(fullPath).pipe(Effect.catchAll(() => Effect.succeed(undefined)))
       if (content == null) return state
@@ -172,9 +172,9 @@ export const editTool = defineHarnessTool({
     }),
   },
   execute: ({ path, old: oldStr, new: newStr, replaceAll }, _ctx) => Effect.gen(function* () {
-    const { cwd, workspacePath } = yield* WorkingDirectoryTag
+    const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const expandedPath = expandWorkspacePath(path, workspacePath)
+    const expandedPath = expandScratchpadPath(path, scratchpadPath)
     const fullPath = resolve(cwd, expandedPath)
 
     const content = yield* fs.readText(fullPath).pipe(
@@ -237,9 +237,9 @@ export const treeTool = defineHarnessTool({
   },
   errorSchema: FsErrorSchema,
   execute: ({ path, gitignore, maxDepth }, _ctx) => Effect.gen(function* () {
-    const { cwd, workspacePath } = yield* WorkingDirectoryTag
+    const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const expandedPath = expandWorkspacePath(path, workspacePath)
+    const expandedPath = expandScratchpadPath(path, scratchpadPath)
     const fullPath = resolve(cwd, expandedPath)
     const respectGitignore = gitignore ?? true
 
@@ -289,9 +289,9 @@ export const grepTool = defineHarnessTool({
   },
   errorSchema: FsErrorSchema,
   execute: ({ pattern, path, glob, limit }, _ctx) => Effect.gen(function* () {
-    const { cwd, workspacePath } = yield* WorkingDirectoryTag
+    const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const resolvedPath = expandWorkspacePath(path ?? '', workspacePath) || undefined
+    const resolvedPath = expandScratchpadPath(path ?? '', scratchpadPath) || undefined
     const resolvedGlob = glob
     const resolvedLimit = limit ?? 50
 
@@ -322,9 +322,9 @@ export const viewTool = defineHarnessTool({
   },
   errorSchema: FsErrorSchema,
   execute: ({ path: filePath }, _ctx) => Effect.gen(function* () {
-    const { cwd, workspacePath } = yield* WorkingDirectoryTag
+    const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const fullPath = resolveFsPath(filePath, cwd, workspacePath)
+    const fullPath = resolveFsPath(filePath, cwd, scratchpadPath)
 
     yield* fs.readFile(fullPath).pipe(
       Effect.catchAll(() => Effect.fail(fsError(`Failed to read image: ${filePath}`)))

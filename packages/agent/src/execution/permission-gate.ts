@@ -57,7 +57,7 @@ export function buildPolicyInterceptor(
         input: ctx.input,
         policyContext: {
           cwd: policyCtx.cwd,
-          workspacePath: policyCtx.workspacePath,
+          scratchpadPath: policyCtx.scratchpadPath,
           disableShellSafeguards: policyCtx.disableShellSafeguards,
           disableCwdSafeguards: policyCtx.disableCwdSafeguards,
         },

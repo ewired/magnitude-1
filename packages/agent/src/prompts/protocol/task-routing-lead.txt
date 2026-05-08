@@ -17,7 +17,7 @@ Prioritize parser tests first.
 
 You can send multiple messages in one turn. If the recipient specifies an invalid or unresolvable target, it is an error.
 
-Messages support GFM-style markdown syntax. Messages also support inline links to local file content or URLs. You can also link directly to your workspace e.g. [foo]($M/foo.md).
+Messages support GFM-style markdown syntax. Messages also support inline links to local file content or URLs. You can also link directly to your scratchpad e.g. [foo]($M/foo.md).
 
 When mentioning files in communications, always prefer using an inline link so that the file is unambiguous and accessible.
 

@@ -174,7 +174,7 @@ export interface CreateClientOptions {
    * Provide a pre-built session context instead of collecting from the local environment.
    * Useful for evals / headless runs where the agent operates in a container.
    */
-  sessionContext?: Omit<SessionContext, 'workspacePath'>
+  sessionContext?: Omit<SessionContext, 'scratchpadPath'>
 
   /**
    * Magnitude API key. Falls back to MAGNITUDE_API_KEY env var.
@@ -316,12 +316,12 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
       }))
 
       const sessionMetadata = yield* persistence.getSessionMetadata()
-      const workspacePath = yield* Effect.promise(() =>
-        options.storage.sessions.createWorkspace(sessionMetadata.sessionId, baseContext.cwd)
+      const scratchpadPath = yield* Effect.promise(() =>
+        options.storage.sessions.createScratchpad(sessionMetadata.sessionId)
       )
       const context: SessionContext = {
         ...baseContext,
-        workspacePath,
+        scratchpadPath,
       }
 
       yield* Effect.promise(() => client.send({
@@ -346,10 +346,10 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
     } else {
       // Existing session — hydrate
-      // Ensure workspace exists and symlink is up-to-date
+      // Ensure scratchpad exists
       const sessionMetadata = yield* persistence.getSessionMetadata()
       yield* Effect.promise(() =>
-        options.storage.sessions.createWorkspace(sessionMetadata.sessionId, process.cwd())
+        options.storage.sessions.createScratchpad(sessionMetadata.sessionId)
       )
 
       yield* hydrationContext.setHydrating(true)

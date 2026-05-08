@@ -76,8 +76,8 @@ export type { CollectSessionContextOptions } from './util/collect-session-contex
 export { loadSkills } from '@magnitudedev/skills'
 export type { Skill } from '@magnitudedev/skills'
 
-// Workspace
-export * from './workspace'
+// Scratchpad
+export * from './scratchpad'
 
 // Projections
 export { WindowProjection } from './window'

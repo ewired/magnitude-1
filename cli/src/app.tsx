@@ -142,7 +142,7 @@ function AppInner({
   const renderer = useRenderer()
   const storage = useStorage()
   const auth = useMagnitudeAuth()
-  const { client, workspacePath, send: clientSend, ensureReady: ensureClientReady, setFactory: setClientFactory, setClient: setLazyClient } = useLazyClient()
+  const { client, scratchpadPath, send: clientSend, ensureReady: ensureClientReady, setFactory: setClientFactory, setClient: setLazyClient } = useLazyClient()
 
   const [display, setDisplay] = useState<DisplayState | null>(null)
   const [toolState, setToolState] = useState<TurnState | null>(null)
@@ -283,7 +283,7 @@ function AppInner({
       logger.warn({ error: err.message }, 'Failed to load skills')
     })
 
-    let resolvedWorkspacePath: string | null = null
+    let resolvedScratchpadPath: string | null = null
     let resolvedSessionId: string | null = null
 
     const createClient = async () => {
@@ -304,7 +304,7 @@ function AppInner({
       const activeSessionId = persistence.getSessionId()
       resolvedSessionId = activeSessionId
       onSessionId?.(activeSessionId)
-      resolvedWorkspacePath = storage.sessions.getWorkspacePath(activeSessionId) ?? null
+      resolvedScratchpadPath = storage.sessions.getScratchpadPath(activeSessionId) ?? null
       initLogger(persistence.getSessionId())
       clearSessionLog(persistence.getSessionId())
       logger.info({ logFile: getSessionLogPath(persistence.getSessionId()) }, 'Session logger initialized')
@@ -324,7 +324,7 @@ function AppInner({
         return
       }
       c = client
-      setLazyClient(client, resolvedWorkspacePath)
+      setLazyClient(client, resolvedScratchpadPath)
       onClientReady?.(client)
       renderer.setTerminalTitle("Magnitude")
 
@@ -962,7 +962,7 @@ function AppInner({
   } = useFilePanel({
     display: activeDisplay ?? display,
     toolState,
-    workspacePath,
+    scratchpadPath,
     projectRoot: process.cwd(),
   })
 
@@ -1119,7 +1119,7 @@ function AppInner({
       forkContextHardCap={forkContextHardCap}
       popForkOverlay={popForkOverlay}
       pushForkOverlay={pushForkOverlay}
-      workspacePath={workspacePath}
+      scratchpadPath={scratchpadPath}
       projectRoot={process.cwd()}
       showCopiedToast={clipboardToast}
       usageVisible={usageOpen}
@@ -1318,9 +1318,9 @@ function AppInner({
               submitUserMessageToFork: ({ forkId, message, attachments }) => handleSubmitViaClientBoundary({ forkId, message, attachments }),
               runSlashCommand: (commandText: string) => routeSlashCommand(commandText, commandContext),
               executeBash: async (command: string) => {
-                const { workspacePath: wp } = await ensureClientReady()
+                const { scratchpadPath: wp } = await ensureClientReady()
                 return executeBashCommand(command, {
-                  workspacePath: wp!,
+                  scratchpadPath: wp!,
                   projectRoot: process.cwd(),
                 })
               },

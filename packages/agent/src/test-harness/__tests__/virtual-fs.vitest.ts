@@ -8,7 +8,7 @@ describe('virtual fs layer', () => {
   it.effect('readText and writeFile work', () =>
     Effect.gen(function* () {
       const files = createVirtualFs({ 'src/index.ts': 'export const x = 1' })
-      const layer = createVirtualFsLayer(files, '/repo', '/workspace')
+      const layer = createVirtualFsLayer(files, '/repo', '/scratchpad')
 
       const before = yield* Effect.flatMap(Fs, (fs) => fs.readText('src/index.ts')).pipe(
         Effect.provide(layer),
@@ -32,7 +32,7 @@ describe('virtual fs layer', () => {
         'src/a.ts': 'alpha\nbeta',
         'src/b.ts': 'gamma\nalphabet',
       })
-      const layer = createVirtualFsLayer(files, '/repo', '/workspace')
+      const layer = createVirtualFsLayer(files, '/repo', '/scratchpad')
 
       const walked = yield* Effect.flatMap(Fs, (fs) => fs.walk('src')).pipe(
         Effect.provide(layer),

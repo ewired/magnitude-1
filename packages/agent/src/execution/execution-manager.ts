@@ -75,7 +75,7 @@ function makeForkLayers(
   policyInterceptor: ReturnType<typeof buildPolicyInterceptor>,
 
   cwd: string,
-  workspacePath: string,
+  scratchpadPath: string,
   ephemeralSessionContext: EphemeralSessionContext,
 ) {
   const agentRegistryStateReaderLayer = Layer.succeed(AgentRegistryStateReaderTag, {
@@ -103,7 +103,7 @@ function makeForkLayers(
   const policyCtxProvider = createPolicyContextProvider(
     forkId,
     cwd,
-    workspacePath,
+    scratchpadPath,
     ephemeralSessionContext,
     agentStatusProjection,
     workingStateProjection,
@@ -128,7 +128,7 @@ function makeForkLayers(
 
 
     Layer.succeed(ApprovalStateTag, approvalState),
-    Layer.succeed(WorkingDirectoryTag, { cwd, workspacePath }),
+    Layer.succeed(WorkingDirectoryTag, { cwd, scratchpadPath }),
     Layer.succeed(EphemeralSessionContextTag, ephemeralSessionContext),
     Layer.succeed(PolicyContextProviderTag, policyCtxProvider),
     Layer.succeed(ToolInterceptorTag, providedInterceptor),
@@ -149,7 +149,7 @@ const makeExecutionManager = Effect.gen(function* () {
   // Per-fork cached layers (built during initFork, reused across turns)
   const forkLayers = new Map<string | null, ForkLayer>()
   const forkCwds = new Map<string | null, string>()
-  const forkWorkspacePaths = new Map<string | null, string | undefined>()
+  const forkScratchpadPaths = new Map<string | null, string | undefined>()
 
   // Bound observables map
   const boundObservables = new Map<string | null, BoundObservable[]>()
@@ -212,7 +212,7 @@ const makeExecutionManager = Effect.gen(function* () {
         )
       }
       const cwd = sessionState.context.cwd
-      const workspacePath = sessionState.context.workspacePath
+      const scratchpadPath = sessionState.context.scratchpadPath
       let layers = makeForkLayers(
         forkId,
         roleId,
@@ -220,21 +220,21 @@ const makeExecutionManager = Effect.gen(function* () {
         workingStateProjection, taskGraphProjection,
         conversationProjection,
         approvalState,
-        persistenceLayer, policyInterceptor, cwd, workspacePath, ephemeralSessionContext,
+        persistenceLayer, policyInterceptor, cwd, scratchpadPath, ephemeralSessionContext,
       )
       forkCwds.set(forkId, cwd)
-      forkWorkspacePaths.set(forkId, workspacePath)
+      forkScratchpadPaths.set(forkId, scratchpadPath)
 
       // Inject role-specific setup layer when the role defines a setup function
       const roleDef = getAgentDefinition(roleId)
       if (roleDef.setup && forkId) {
-        const setupLayer = yield* roleDef.setup({ forkId, roleId, cwd, workspacePath })
+        const setupLayer = yield* roleDef.setup({ forkId, roleId, cwd, scratchpadPath })
         layers = Layer.merge(layers, setupLayer)
       }
 
       // Pre-build teardown effect (so disposeFork needs no requirements)
       if (forkId && roleDef.teardown) {
-        const teardownEffect = roleDef.teardown({ forkId, roleId, cwd, workspacePath }) as Effect.Effect<void>
+        const teardownEffect = roleDef.teardown({ forkId, roleId, cwd, scratchpadPath }) as Effect.Effect<void>
         forkTeardowns.set(forkId, teardownEffect)
       }
 
@@ -264,7 +264,7 @@ const makeExecutionManager = Effect.gen(function* () {
 
       forkLayers.delete(forkId)
       forkCwds.delete(forkId)
-      forkWorkspacePaths.delete(forkId)
+      forkScratchpadPaths.delete(forkId)
 
       boundObservables.delete(forkId)
       forkRoles.delete(forkId)

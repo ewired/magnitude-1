@@ -59,9 +59,9 @@ export function normalizeReferencedPath(refPath: string): string | null {
     normalized = normalized.slice(2)
   }
 
-  const explicitWorkspacePrefix = normalized.startsWith('$M/') || normalized.startsWith('${M}/')
+  const explicitScratchpadPrefix = normalized.startsWith('$M/') || normalized.startsWith('${M}/')
   const prefix = normalized.startsWith('${M}/') ? '${M}/' : normalized.startsWith('$M/') ? '$M/' : ''
-  const body = explicitWorkspacePrefix ? normalized.slice(prefix.length) : normalized
+  const body = explicitScratchpadPrefix ? normalized.slice(prefix.length) : normalized
 
   if (body.length === 0) return null
 
@@ -74,7 +74,7 @@ export function normalizeReferencedPath(refPath: string): string | null {
   // Absolute paths are allowed — they resolve to themselves
   // when processed by resolveFileRefPath
 
-  if (explicitWorkspacePrefix) {
+  if (explicitScratchpadPrefix) {
     return `${prefix}${normalizedBody}`
   }
 

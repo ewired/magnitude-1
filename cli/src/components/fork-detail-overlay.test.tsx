@@ -97,7 +97,7 @@ function propsWithDisplay(display: DisplayState) {
     onForkExpand: noop,
     modelSummary: { role: 'role', model: 'model' },
     contextHardCap: null,
-    workspacePath: '/tmp',
+    scratchpadPath: '/tmp',
     projectRoot: '/tmp',
     subscribeForkDisplay: (_forkId: string, cb: (state: DisplayState) => void) => {
       cb(display)

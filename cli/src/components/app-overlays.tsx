@@ -35,7 +35,7 @@ export type AppOverlaysProps = {
   forkContextHardCap: number | null
   popForkOverlay: () => void
   pushForkOverlay: (forkId: string) => void
-  workspacePath: string | null
+  scratchpadPath: string | null
   projectRoot: string
   showCopiedToast: boolean
 
@@ -63,7 +63,7 @@ export function AppOverlays({
   forkContextHardCap,
   popForkOverlay,
   pushForkOverlay,
-  workspacePath,
+  scratchpadPath,
   projectRoot,
   showCopiedToast,
   usageVisible,
@@ -101,7 +101,7 @@ export function AppOverlays({
           onErrorAction={onErrorAction}
           modelSummary={forkModelSummary}
           contextHardCap={forkContextHardCap}
-          workspacePath={workspacePath}
+          scratchpadPath={scratchpadPath}
           projectRoot={projectRoot}
           subscribeForkDisplay={(fId, cb) => client.state.display.subscribeFork(fId, cb)}
           subscribeForkCompaction={(fId, cb) => client.state.compaction.subscribeFork(fId, cb)}

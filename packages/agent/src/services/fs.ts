@@ -3,7 +3,7 @@ import { relative, resolve } from 'path'
 import { Context, Data, Effect, Layer } from 'effect'
 import { resolveRgPath } from '@magnitudedev/ripgrep'
 import { walk } from '../util/walk'
-import { resolveFileRefPath } from '../workspace/file-ref-resolution'
+import { resolveFileRefPath } from '../scratchpad/file-ref-resolution'
 
 export class FsError extends Data.TaggedError('FsError')<{
   readonly operation: string
@@ -164,7 +164,7 @@ export const FsLive = Layer.succeed(Fs, {
     tryFs('search', searchPath, async () => await rgSearch(pattern, searchPath, glob, limit)),
 })
 
-export function resolveFsPath(path: string, cwd: string, workspacePath: string): string {
-  const resolved = resolveFileRefPath(path, cwd, workspacePath)
+export function resolveFsPath(path: string, cwd: string, scratchpadPath: string): string {
+  const resolved = resolveFileRefPath(path, cwd, scratchpadPath)
   return resolved ? resolved.resolvedPath : resolve(cwd, path)
 }

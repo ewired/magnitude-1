@@ -18,7 +18,7 @@ const now = () => 1_700_000_000_000 + ++seq
 
 export const baseContext = (overrides: Partial<SessionContext> = {}): SessionContext => ({
   cwd: '/tmp/project',
-  workspacePath: '/tmp/test-workspace',
+  scratchpadPath: '/tmp/test-scratchpad',
   platform: 'macos',
   shell: '/bin/zsh',
   timezone: 'UTC',

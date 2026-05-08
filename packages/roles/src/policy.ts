@@ -14,19 +14,19 @@ type FullContext = ExecuteHookContext & { policyContext: PolicyContext }
 const proceed: InterceptorDecision = { _tag: 'Proceed' }
 const reject = (reason: string): InterceptorDecision => ({ _tag: 'Reject', rejection: reason })
 
-function expandWorkspacePath(path: string, workspacePath: string): string {
-  if (path === '$M' || path === '${M}') return workspacePath
-  if (path.startsWith('$M/')) return workspacePath + path.slice(2)
-  if (path.startsWith('${M}/')) return workspacePath + path.slice(4)
+function expandScratchpadPath(path: string, scratchpadPath: string): string {
+  if (path === '$M' || path === '${M}') return scratchpadPath
+  if (path.startsWith('$M/')) return scratchpadPath + path.slice(2)
+  if (path.startsWith('${M}/')) return scratchpadPath + path.slice(4)
   return path
 }
 
-function agentEnv(cwd: string, workspacePath: string): Record<string, string> {
+function agentEnv(cwd: string, scratchpadPath: string): Record<string, string> {
   return {
     ...(process.env as Record<string, string>),
     NO_COLOR: '1',
     PROJECT_ROOT: cwd,
-    M: workspacePath,
+    M: scratchpadPath,
   }
 }
 
@@ -66,7 +66,7 @@ export function denyWritesOutside(
     const { policyContext } = ctx
     if (policyContext.disableCwdSafeguards) return Effect.succeed(null)
 
-    const env = agentEnv(policyContext.cwd, policyContext.workspacePath)
+    const env = agentEnv(policyContext.cwd, policyContext.scratchpadPath)
     const roots = getDirs(policyContext)
 
     if (ctx.toolKey === 'shell') {
@@ -79,7 +79,7 @@ export function denyWritesOutside(
 
     if (ctx.toolKey === 'fileWrite' || ctx.toolKey === 'fileEdit') {
       const input = ctx.input as { path: string }
-      const expandedPath = expandWorkspacePath(input.path, policyContext.workspacePath)
+      const expandedPath = expandScratchpadPath(input.path, policyContext.scratchpadPath)
       const fullPath = resolve(policyContext.cwd, expandedPath)
       if (!isPathWithin(fullPath, env, ...roots)) {
         return Effect.succeed(reject('Cannot write files outside allowed directories'))
@@ -104,10 +104,10 @@ export function denyMassDestructiveIn(
     const classification = classifyShellCommand(input.command)
     if (classification.tier !== 'mass-destructive') return Effect.succeed(null)
 
-    const env = agentEnv(policyContext.cwd, policyContext.workspacePath)
+    const env = agentEnv(policyContext.cwd, policyContext.scratchpadPath)
     const protectedRoots = getDirs(policyContext)
 
-    const nonProtectedRoots = [policyContext.cwd, policyContext.workspacePath]
+    const nonProtectedRoots = [policyContext.cwd, policyContext.scratchpadPath]
     if (writesStayWithin(input.command, env, ...nonProtectedRoots)) {
       return Effect.succeed(null)
     }

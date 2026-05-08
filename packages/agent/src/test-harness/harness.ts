@@ -199,7 +199,7 @@ function defaultSessionContext(overrides: Partial<SessionContext> = {}): Session
     shell: process.env.SHELL ?? '/bin/zsh',
     timezone: 'UTC',
     username: process.env.USER ?? 'tester',
-    workspacePath: '/tmp/test-workspace',
+    scratchpadPath: '/tmp/test-scratchpad',
     fullName: null,
     git: null,
     folderStructure: '.',
@@ -315,7 +315,7 @@ export async function createAgentTestHarness(options: HarnessOptions = {}) {
     const fsLayer = createVirtualFsLayer(
       files,
       options.sessionContext?.cwd ?? process.cwd(),
-      options.sessionContext?.workspacePath ?? '/tmp/test-workspace',
+      options.sessionContext?.scratchpadPath ?? '/tmp/test-scratchpad',
     )
 
     const runtimeLayer = Layer.mergeAll(

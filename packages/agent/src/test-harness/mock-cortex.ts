@@ -218,7 +218,7 @@ export const MockCortex = Worker.defineForked<AppEvent>()({
         const toolkit = getToolkitForRole(roleId)
         const agentDef = getAgentDefinition(roleId)
         const sessionCtx = yield* (yield* SessionContextProjection.Tag).get
-        const workspacePath = sessionCtx.context?.workspacePath ?? '/tmp/test'
+        const scratchpadPath = sessionCtx.context?.scratchpadPath ?? '/tmp/test'
         const forkLayer = execManager.getForkLayer(forkId)
 
         const model = createMockModel(frame, toolkit)
@@ -228,7 +228,7 @@ export const MockCortex = Worker.defineForked<AppEvent>()({
           toolkit,
           mapStreamError: mapStreamErrorToOutcome,
           layer: forkLayer,
-          hooks: buildStandardHooks({ forkId, turnId, agentDef, workspacePath }),
+          hooks: buildStandardHooks({ forkId, turnId, agentDef, scratchpadPath }),
         })
 
         const adapter = createHarnessAdapter({
