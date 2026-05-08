@@ -11,6 +11,7 @@ import type {
   HarnessEvent,
   ToolLifecycleEvent,
 } from '@magnitudedev/harness'
+import type { ProviderToolCallId } from '@magnitudedev/ai'
 import {
   type AppEvent,
   type MessageDestination,
@@ -112,12 +113,13 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
     return defaultProseDest
   }
 
-  const emitToolEvent = (toolCallId: string, toolKey: ToolKey, event: ToolLifecycleEvent): Effect.Effect<void> =>
+  const emitToolEvent = (toolCallId: string, providerToolCallId: ProviderToolCallId, toolKey: ToolKey, event: ToolLifecycleEvent): Effect.Effect<void> =>
     publish({
       type: 'tool_event' as const,
       forkId,
       turnId,
       toolCallId,
+      providerToolCallId,
       toolKey,
       event,
     })
@@ -230,7 +232,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
           const toolKey = resolveToolKey(event.toolName)
           if (!toolKey) break
           toolCallKeys.set(event.toolCallId, toolKey)
-          yield* emitToolEvent(event.toolCallId, toolKey, event)
+          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
           break
         }
 
@@ -238,21 +240,21 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
           const toolKey = toolCallKeys.get(event.toolCallId)
           if (!toolKey) break
           contentFingerprint += event.delta
-          yield* emitToolEvent(event.toolCallId, toolKey, event)
+          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
           break
         }
 
         case 'ToolInputFieldComplete': {
           const toolKey = toolCallKeys.get(event.toolCallId)
           if (!toolKey) break
-          yield* emitToolEvent(event.toolCallId, toolKey, event)
+          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
           break
         }
 
         case 'ToolInputReady': {
           const toolKey = toolCallKeys.get(event.toolCallId)
           if (!toolKey) break
-          yield* emitToolEvent(event.toolCallId, toolKey, event)
+          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
           break
         }
 
@@ -260,14 +262,14 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
         case 'ToolExecutionStarted': {
           const toolKey = toolCallKeys.get(event.toolCallId)
           if (!toolKey) break
-          yield* emitToolEvent(event.toolCallId, toolKey, event)
+          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
           break
         }
 
         case 'ToolEmission': {
           const toolKey = toolCallKeys.get(event.toolCallId)
           if (!toolKey) break
-          yield* emitToolEvent(event.toolCallId, toolKey, event)
+          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
           break
         }
 
@@ -292,14 +294,14 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
             }
           }
 
-          yield* emitToolEvent(event.toolCallId, toolKey, event)
+          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
           break
         }
 
         case 'ToolResultFormatted': {
           const toolKey = toolCallKeys.get(event.toolCallId)
           if (!toolKey) break
-          yield* emitToolEvent(event.toolCallId, toolKey, event)
+          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
           break
         }
 
@@ -350,6 +352,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
                 error: {
                   _tag: 'ToolInputDecodeFailure' as const,
                   toolCallId: outcome.toolCallId,
+                  providerToolCallId: outcome.providerToolCallId,
                   toolName: outcome.toolName,
                   issue: outcome.issue,
                   inputSchema: outcome.inputSchema,

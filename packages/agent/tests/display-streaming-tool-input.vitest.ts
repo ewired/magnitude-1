@@ -14,6 +14,7 @@ import {
   FrameworkErrorPubSubLive,
   FrameworkErrorReporterLive,
 } from '@magnitudedev/event-core'
+import type { ProviderToolCallId, ToolCallId } from '@magnitudedev/ai'
 import type { AppEvent } from '../src/events'
 import { TurnProjection } from '../src/projections/turn'
 import { AgentRoutingProjection } from '../src/projections/agent-routing'
@@ -68,13 +69,14 @@ const turnId = 'turn-1'
 
 describe('Display projection — tool lifecycle events', () => {
   it('creates a ToolStep on ToolInputStarted', async () => {
-    const toolCallId = 'tc-1'
+    const toolCallId = 'tc-1' as ToolCallId
+    const providerToolCallId = 'tc-1' as ProviderToolCallId
 
     const state = await makeDisplay([
       { type: 'turn_started', timestamp: ts(1), forkId, turnId, chainId: 'chain-1' } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, toolKey: 'shell',
-        event: { _tag: 'ToolInputStarted', toolCallId, toolName: 'shell', toolKey: 'shell' },
+        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'shell',
+        event: { _tag: 'ToolInputStarted', toolCallId, providerToolCallId, toolName: 'shell', toolKey: 'shell' },
       } as AppEvent,
     ])
 
@@ -88,29 +90,30 @@ describe('Display projection — tool lifecycle events', () => {
   })
 
   it('updates ToolStep state on ToolExecutionEnded', async () => {
-    const toolCallId = 'tc-1'
+    const toolCallId = 'tc-1' as ToolCallId
+    const providerToolCallId = 'tc-1' as ProviderToolCallId
 
     const state = await makeDisplay([
       { type: 'turn_started', timestamp: ts(1), forkId, turnId, chainId: 'chain-1' } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, toolKey: 'shell',
-        event: { _tag: 'ToolInputStarted', toolCallId, toolName: 'shell', toolKey: 'shell' },
+        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'shell',
+        event: { _tag: 'ToolInputStarted', toolCallId, providerToolCallId, toolName: 'shell', toolKey: 'shell' },
       } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(3), forkId, turnId, toolCallId, toolKey: 'shell',
-        event: { _tag: 'ToolInputReady', toolCallId },
+        type: 'tool_event', timestamp: ts(3), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'shell',
+        event: { _tag: 'ToolInputReady', toolCallId, providerToolCallId },
       } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(4), forkId, turnId, toolCallId, toolKey: 'shell',
+        type: 'tool_event', timestamp: ts(4), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'shell',
         event: {
-          _tag: 'ToolExecutionStarted', toolCallId, toolName: 'shell', toolKey: 'shell',
+          _tag: 'ToolExecutionStarted', toolCallId, providerToolCallId, toolName: 'shell', toolKey: 'shell',
           input: { command: 'ls' }, cached: false,
         },
       } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(5), forkId, turnId, toolCallId, toolKey: 'shell',
+        type: 'tool_event', timestamp: ts(5), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'shell',
         event: {
-          _tag: 'ToolExecutionEnded', toolCallId, toolName: 'shell', toolKey: 'shell',
+          _tag: 'ToolExecutionEnded', toolCallId, providerToolCallId, toolName: 'shell', toolKey: 'shell',
           result: { _tag: 'Success', output: 'file1.txt\nfile2.txt' },
         },
       } as AppEvent,
@@ -130,12 +133,12 @@ describe('Display projection — tool lifecycle events', () => {
     const state = await makeDisplay([
       { type: 'turn_started', timestamp: ts(1), forkId, turnId, chainId: 'chain-1' } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId: 'tc-1', toolKey: 'shell',
-        event: { _tag: 'ToolInputStarted', toolCallId: 'tc-1', toolName: 'shell', toolKey: 'shell' },
+        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId: 'tc-1', providerToolCallId: 'tc-1' as ProviderToolCallId, toolKey: 'shell',
+        event: { _tag: 'ToolInputStarted', toolCallId: 'tc-1' as ToolCallId, providerToolCallId: 'tc-1' as ProviderToolCallId, toolName: 'shell', toolKey: 'shell' },
       } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(3), forkId, turnId, toolCallId: 'tc-2', toolKey: 'fileRead',
-        event: { _tag: 'ToolInputStarted', toolCallId: 'tc-2', toolName: 'read', toolKey: 'fileRead' },
+        type: 'tool_event', timestamp: ts(3), forkId, turnId, toolCallId: 'tc-2', providerToolCallId: 'tc-2' as ProviderToolCallId, toolKey: 'fileRead',
+        event: { _tag: 'ToolInputStarted', toolCallId: 'tc-2' as ToolCallId, providerToolCallId: 'tc-2' as ProviderToolCallId, toolName: 'read', toolKey: 'fileRead' },
       } as AppEvent,
     ])
 

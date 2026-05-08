@@ -1,5 +1,5 @@
 import { Effect, Cause, Data, Layer, Stream, Schema } from "effect"
-import type { ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason, ValidationIssue } from "@magnitudedev/ai"
+import type { ProviderToolCallId, ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason, ValidationIssue } from "@magnitudedev/ai"
 import type { StreamingPartial } from "@magnitudedev/ai"
 import type { HarnessEvent, ToolError, ToolResult, TurnOutcome } from "../events"
 import type { HarnessHooks, ExecuteHookContext } from "../hooks"
@@ -44,6 +44,7 @@ export interface DispatchConfig<TStreamError = StreamError> {
 
 interface ToolCallAccumulator {
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly streamState: unknown
@@ -89,10 +90,10 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
   // ── Emit helper for tool context ─────────────────────────────────
 
-  function makeToolEmit(toolCallId: ToolCallId, toolName: string, toolKey: string) {
+  function makeToolEmit(toolCallId: ToolCallId, providerToolCallId: ProviderToolCallId, toolName: string, toolKey: string) {
     return (value: unknown): Effect.Effect<void> =>
       Effect.gen(function* () {
-        yield* emit({ _tag: "ToolEmission", toolCallId, toolName, toolKey, value })
+        yield* emit({ _tag: "ToolEmission", toolCallId, providerToolCallId, toolName, toolKey, value })
         if (hooks?.onEmission) {
           yield* provideLayer(hooks.onEmission({ toolCallId, toolName, toolKey, value }))
         }
@@ -103,6 +104,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
   function executeTool(
     toolCallId: ToolCallId,
+    providerToolCallId: ProviderToolCallId,
     toolName: string,
     toolKey: string,
     input: Record<string, unknown>,
@@ -119,17 +121,17 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
       return Effect.gen(function* () {
         yield* emit({
           _tag: "ToolExecutionStarted",
-          toolCallId, toolName, toolKey,
+          toolCallId, providerToolCallId, toolName, toolKey,
           input,
           cached: true,
         })
         yield* emit({
           _tag: "ToolExecutionEnded",
-          toolCallId, toolName, toolKey,
+          toolCallId, providerToolCallId, toolName, toolKey,
           result: cached.result,
         })
         const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, cached.result, hooks))
-        yield* emit({ _tag: "ToolResultFormatted", toolCallId, toolName, toolKey, parts })
+        yield* emit({ _tag: "ToolResultFormatted", toolCallId, providerToolCallId, toolName, toolKey, parts })
 
         // Fast-fail on cached error outcomes
         if (cached.result._tag === "Error") {
@@ -151,14 +153,14 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
       if (decision._tag === "Reject") {
         yield* emit({
           _tag: "ToolExecutionStarted",
-          toolCallId, toolName, toolKey,
+          toolCallId, providerToolCallId, toolName, toolKey,
           input,
           cached: false,
         })
         const result: ToolResult = { _tag: "Rejected", rejection: decision.rejection }
-        yield* emit({ _tag: "ToolExecutionEnded", toolCallId, toolName, toolKey, result })
+        yield* emit({ _tag: "ToolExecutionEnded", toolCallId, providerToolCallId, toolName, toolKey, result })
         const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, result, hooks))
-        yield* emit({ _tag: "ToolResultFormatted", toolCallId, toolName, toolKey, parts })
+        yield* emit({ _tag: "ToolResultFormatted", toolCallId, providerToolCallId, toolName, toolKey, parts })
         return yield* Effect.fail(new TurnAbort({ outcome: { _tag: "GateRejected", toolCallId, toolName } }))
       }
 
@@ -166,14 +168,14 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
       yield* emit({
         _tag: "ToolExecutionStarted",
-        toolCallId, toolName, toolKey,
+        toolCallId, providerToolCallId, toolName, toolKey,
         input: effectiveInput,
         cached: false,
       })
 
       // Build ToolContext with working emit
       const toolCtx: ToolContext<unknown> = {
-        emit: makeToolEmit(toolCallId, toolName, toolKey),
+        emit: makeToolEmit(toolCallId, providerToolCallId, toolName, toolKey),
       }
 
       // Execute tool with layer provision
@@ -192,7 +194,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         }),
       )
 
-      yield* emit({ _tag: "ToolExecutionEnded", toolCallId, toolName, toolKey, result })
+      yield* emit({ _tag: "ToolExecutionEnded", toolCallId, providerToolCallId, toolName, toolKey, result })
 
       // afterExecute hook
       if (hooks?.afterExecute) {
@@ -201,7 +203,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
       // Format result
       const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, result, hooks))
-      yield* emit({ _tag: "ToolResultFormatted", toolCallId, toolName, toolKey, parts })
+      yield* emit({ _tag: "ToolResultFormatted", toolCallId, providerToolCallId, toolName, toolKey, parts })
 
       // Fast-fail on tool execution errors
       if (result._tag === "Error") {
@@ -247,6 +249,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
 
         const acc: ToolCallAccumulator = {
           toolCallId: event.toolCallId,
+          providerToolCallId: event.providerToolCallId,
           toolName: event.toolName,
           toolKey,
           streamState: entry.tool.stream?.initial,
@@ -257,6 +260,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         return emit({
           _tag: "ToolInputStarted",
           toolCallId: event.toolCallId,
+          providerToolCallId: event.providerToolCallId,
           toolName: event.toolName,
           toolKey,
         })
@@ -275,6 +279,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
           yield* emit({
             _tag: "ToolInputFieldChunk",
             toolCallId: event.toolCallId,
+            providerToolCallId: event.providerToolCallId,
             field,
             path: event.path,
             delta: event.delta,
@@ -285,7 +290,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
             const parser = config.parsers.get(event.toolCallId)
             if (parser) {
               const toolCtx: ToolContext<unknown> = {
-                emit: makeToolEmit(acc.toolCallId, acc.toolName, acc.toolKey),
+                emit: makeToolEmit(acc.toolCallId, acc.providerToolCallId, acc.toolName, acc.toolKey),
               }
               const partial = parser.partial
               if (partial) {
@@ -315,6 +320,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         return emit({
           _tag: "ToolInputFieldComplete",
           toolCallId: event.toolCallId,
+          providerToolCallId: event.providerToolCallId,
           field,
           path: event.path,
           value: event.value,
@@ -334,10 +340,11 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
           yield* emit({
             _tag: "ToolInputReady",
             toolCallId: acc.toolCallId,
+            providerToolCallId: acc.providerToolCallId,
           })
 
           // Execute tool inline — sequential ordering required for dependent tools
-          yield* executeTool(acc.toolCallId, acc.toolName, acc.toolKey, parser.decoded!)
+          yield* executeTool(acc.toolCallId, acc.providerToolCallId, acc.toolName, acc.toolKey, parser.decoded!)
         })
       }
 
@@ -360,6 +367,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
               yield* emit({
                 _tag: "ToolInputDecodeFailed",
                 toolCallId: event.reason.toolCallId,
+                providerToolCallId: event.reason.providerToolCallId,
                 toolName: acc.toolName,
                 toolKey: acc.toolKey,
                 issue: event.reason.issue,
@@ -374,6 +382,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
               yield* emit({
                 _tag: "ToolResultFormatted",
                 toolCallId: event.reason.toolCallId,
+                providerToolCallId: event.reason.providerToolCallId,
                 toolName: acc.toolName,
                 toolKey: acc.toolKey,
                 parts: decodeFailureParts,
@@ -382,6 +391,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
               outcome = {
                 _tag: "ToolInputDecodeFailure",
                 toolCallId: event.reason.toolCallId,
+                providerToolCallId: event.reason.providerToolCallId,
                 toolName: event.reason.toolName,
                 issue: event.reason.issue,
                 inputSchema,

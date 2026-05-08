@@ -5,7 +5,7 @@ import { expect } from 'vitest'
 import { createHarness } from '../harness'
 import { defineHarnessTool } from '../../tool/tool'
 import { defineToolkit } from '../../tool/toolkit'
-import type { BoundModel, ToolCallId, ResponseStreamEvent, StreamingFieldParser } from '@magnitudedev/ai'
+import type { BoundModel, ProviderToolCallId, ToolCallId, ResponseStreamEvent, StreamingFieldParser } from '@magnitudedev/ai'
 import { createStreamingFieldParser } from '@magnitudedev/ai'
 
 // ── Test tool that always errors ─────────────────────────────────────
@@ -44,6 +44,7 @@ describe('harness queue race (runTurn consumer)', () => {
   it('delivers TurnEnd with ToolExecutionError to the event stream consumer', () =>
     Effect.gen(function* () {
       const callId = 'call-1' as ToolCallId
+      const providerToolCallId = 'call-1' as ProviderToolCallId
 
       // Build parser for the tool call
       const parser = createStreamingFieldParser(inputSchema)
@@ -52,11 +53,11 @@ describe('harness queue race (runTurn consumer)', () => {
       const parsers = new Map<ToolCallId, StreamingFieldParser>([[callId, parser]])
 
       const streamEvents: StreamEvent[] = [
-        { _tag: 'tool_call_start', toolCallId: callId, toolName: 'fail' },
-        { _tag: 'tool_call_field_start', toolCallId: callId, path: ['value'] },
-        { _tag: 'tool_call_field_delta', toolCallId: callId, path: ['value'], delta: '"x"' },
-        { _tag: 'tool_call_field_end', toolCallId: callId, path: ['value'], value: 'x' },
-        { _tag: 'tool_call_ready', toolCallId: callId },
+        { _tag: 'tool_call_start', toolCallId: callId, providerToolCallId, toolName: 'fail' },
+        { _tag: 'tool_call_field_start', toolCallId: callId, providerToolCallId, path: ['value'] },
+        { _tag: 'tool_call_field_delta', toolCallId: callId, providerToolCallId, path: ['value'], delta: '"x"' },
+        { _tag: 'tool_call_field_end', toolCallId: callId, providerToolCallId, path: ['value'], value: 'x' },
+        { _tag: 'tool_call_ready', toolCallId: callId, providerToolCallId },
         { _tag: 'stream_end', reason: { _tag: 'completed', finishReason: 'tool_calls' }, usage: null },
       ]
 

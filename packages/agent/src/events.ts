@@ -8,7 +8,7 @@
 
 
 import type { UserPart } from './content'
-import type { ImageMediaType } from '@magnitudedev/ai'
+import type { ImageMediaType, ProviderToolCallId } from '@magnitudedev/ai'
 import type { ToolLifecycleEvent } from '@magnitudedev/harness'
 import type { ValidationIssue, StreamingPartial } from '@magnitudedev/ai'
 import type { Schema } from 'effect'
@@ -220,6 +220,7 @@ export type TurnFeedback =
 export interface ParseFailureEvent {
   readonly _tag: 'ToolInputDecodeFailure'
   readonly toolCallId: string
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly issue: ValidationIssue
   readonly inputSchema: Schema.Schema.AnyNoContext
@@ -366,6 +367,7 @@ export interface ToolEvent {
   readonly forkId: string | null
   readonly turnId: string
   readonly toolCallId: string
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolKey: ToolKey
   readonly event: ToolLifecycleEvent
 }
@@ -670,4 +672,3 @@ export type AppEvent =
   | SubagentIdleClosed
   | UserReturnConfirmed
   | SkillActivated
-

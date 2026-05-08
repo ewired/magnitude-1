@@ -24,7 +24,7 @@ export type {
 } from "./prompt/messages"
 export type { TextPart, ImagePart, ImageMediaType, ToolCallPart, JsonValue } from "./prompt/parts"
 export { normalizeVision, imagePlaceholder } from "./prompt/normalize-vision"
-export type { ToolCallId } from "./prompt/ids"
+export type { ToolCallId, ProviderToolCallId } from "./prompt/ids"
 
 // Tools
 export type { ToolDefinition } from "./tools/tool-definition"

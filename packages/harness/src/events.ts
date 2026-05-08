@@ -1,4 +1,4 @@
-import type { ResponseUsage, ToolCallId, ToolResultPart, ValidationIssue, StreamingPartial } from "@magnitudedev/ai"
+import type { ProviderToolCallId, ResponseUsage, ToolCallId, ToolResultPart, ValidationIssue, StreamingPartial } from "@magnitudedev/ai"
 import type { Schema } from "effect"
 
 // ── Tool Error ───────────────────────────────────────────────────────
@@ -38,6 +38,7 @@ export type SafetyStopReason =
 interface ToolInputDecodeFailureErased {
   readonly _tag: "ToolInputDecodeFailure"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly issue: ValidationIssue
   readonly inputSchema: Schema.Schema.AnyNoContext
@@ -47,6 +48,7 @@ interface ToolInputDecodeFailureErased {
 interface ToolInputDecodeFailureConcrete<TInput> {
   readonly _tag: "ToolInputDecodeFailure"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly issue: ValidationIssue
   readonly inputSchema: Schema.Schema<TInput, TInput, never>
@@ -96,6 +98,7 @@ export type TurnOutcome<TInput = never> =
 export interface ToolInputStarted {
   readonly _tag: "ToolInputStarted"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
 }
@@ -103,6 +106,7 @@ export interface ToolInputStarted {
 export interface ToolInputFieldChunk {
   readonly _tag: "ToolInputFieldChunk"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly field: string
   readonly path: readonly string[]
   readonly delta: string
@@ -111,6 +115,7 @@ export interface ToolInputFieldChunk {
 export interface ToolInputFieldComplete {
   readonly _tag: "ToolInputFieldComplete"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly field: string
   readonly path: readonly string[]
   readonly value: unknown
@@ -119,6 +124,7 @@ export interface ToolInputFieldComplete {
 export interface ToolInputReady {
   readonly _tag: "ToolInputReady"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
 }
 
 // ── Tool Input Decode Failed ─────────────────────────────────────────
@@ -126,6 +132,7 @@ export interface ToolInputReady {
 interface ToolInputDecodeFailedErased {
   readonly _tag: "ToolInputDecodeFailed"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly issue: ValidationIssue
@@ -136,6 +143,7 @@ interface ToolInputDecodeFailedErased {
 interface ToolInputDecodeFailedConcrete<TInput> {
   readonly _tag: "ToolInputDecodeFailed"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly issue: ValidationIssue
@@ -153,6 +161,7 @@ export type ToolInputDecodeFailed<TInput = never> =
 interface ToolExecutionStartedErased {
   readonly _tag: "ToolExecutionStarted"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly input: Record<string, unknown>
@@ -162,6 +171,7 @@ interface ToolExecutionStartedErased {
 interface ToolExecutionStartedConcrete<TInput> {
   readonly _tag: "ToolExecutionStarted"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly input: TInput
@@ -176,6 +186,7 @@ export type ToolExecutionStarted<TInput = never> =
 interface ToolExecutionEndedErased {
   readonly _tag: "ToolExecutionEnded"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly result: ToolResult
@@ -184,6 +195,7 @@ interface ToolExecutionEndedErased {
 interface ToolExecutionEndedConcrete<TOutput, TError extends ToolError> {
   readonly _tag: "ToolExecutionEnded"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly result: ToolResult<TOutput, TError>
@@ -197,6 +209,7 @@ export type ToolExecutionEnded<TOutput = never, TError extends ToolError = never
 interface ToolEmissionErased {
   readonly _tag: "ToolEmission"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly value: unknown
@@ -205,6 +218,7 @@ interface ToolEmissionErased {
 interface ToolEmissionConcrete<TEmission> {
   readonly _tag: "ToolEmission"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly value: TEmission
@@ -220,6 +234,7 @@ export type ToolEmission<TEmission = never> =
 export interface ToolResultFormatted {
   readonly _tag: "ToolResultFormatted"
   readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly parts: readonly ToolResultPart[]

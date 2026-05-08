@@ -15,6 +15,7 @@ import { TraceListener, type AssembledToolCall, type ModelCallTrace } from "../t
 import type { FinishReason } from "../response/events"
 import type { ResponseUsage } from "../response/usage"
 import type { ConnectionError } from "../errors/model-error"
+import type { ProviderToolCallId, ToolCallId } from "../prompt/ids"
 
 // ---------------------------------------------------------------------------
 // Model.define — internal factory used by protocol namespaces
@@ -125,7 +126,7 @@ export function modelDefine<
         // Mutable accumulators for trace assembly
         let reasoning = ""
         let text = ""
-        const toolCallMap = new Map<string, { id: string; name: string; args: Record<string, unknown> }>()
+        const toolCallMap = new Map<ToolCallId, { id: ToolCallId; providerToolCallId: ProviderToolCallId; name: string; args: Record<string, unknown> }>()
         let finishReason: FinishReason | null = null
         let usage: ResponseUsage | null = null
 
@@ -185,7 +186,7 @@ export function modelDefine<
                   text += event.text
                   break
                 case "tool_call_start":
-                  toolCallMap.set(event.toolCallId, { id: event.toolCallId, name: event.toolName, args: {} })
+                  toolCallMap.set(event.toolCallId, { id: event.toolCallId, providerToolCallId: event.providerToolCallId, name: event.toolName, args: {} })
                   break
                 case "tool_call_field_end": {
                   const tc = toolCallMap.get(event.toolCallId)
@@ -219,7 +220,7 @@ export function modelDefine<
           Stream.ensuring(
             Effect.sync(() => {
               const assembledToolCalls: AssembledToolCall[] = Array.from(toolCallMap.values()).map(
-                (tc) => ({ id: tc.id, name: tc.name, arguments: tc.args }),
+                (tc) => ({ id: tc.id, providerToolCallId: tc.providerToolCallId, name: tc.name, arguments: tc.args }),
               )
               const trace: ModelCallTrace = {
                 modelId: config.modelId,

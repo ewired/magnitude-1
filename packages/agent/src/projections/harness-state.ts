@@ -72,6 +72,7 @@ export function translateTurnOutcome(event: TurnOutcomeEvent): HarnessEvent {
       harnessOutcome = {
         _tag: 'ToolInputDecodeFailure',
         toolCallId: e.toolCallId as ToolCallId,
+        providerToolCallId: e.providerToolCallId,
         toolName: e.toolName,
         issue: e.issue,
         inputSchema: e.inputSchema,

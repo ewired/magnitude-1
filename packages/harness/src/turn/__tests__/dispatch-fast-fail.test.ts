@@ -5,7 +5,7 @@ import { dispatch, TurnAbort } from '../dispatcher'
 import { defineHarnessTool } from '../../tool/tool'
 import { defineToolkit } from '../../tool/toolkit'
 import type { HarnessEvent, TurnOutcome, ToolResult } from '../../events'
-import type { ToolCallId, StreamingFieldParser } from '@magnitudedev/ai'
+import type { ProviderToolCallId, ToolCallId, StreamingFieldParser } from '@magnitudedev/ai'
 import { createStreamingFieldParser } from '@magnitudedev/ai'
 
 // ── Test tools ────────────────────────────────────────────────────────
@@ -33,12 +33,14 @@ const toolkit = defineToolkit({ succeed: succeedEntry, fail: failEntry })
 type StreamEvent = import('@magnitudedev/ai').ResponseStreamEvent<never>
 
 function toolCallEvents(id: string, name: string): StreamEvent[] {
+  const toolCallId = id as ToolCallId
+  const providerToolCallId = id as ProviderToolCallId
   return [
-    { _tag: 'tool_call_start', toolCallId: id as ToolCallId, toolName: name },
-    { _tag: 'tool_call_field_start', toolCallId: id as ToolCallId, path: ['value'] },
-    { _tag: 'tool_call_field_delta', toolCallId: id as ToolCallId, path: ['value'], delta: '"x"' },
-    { _tag: 'tool_call_field_end', toolCallId: id as ToolCallId, path: ['value'], value: 'x' },
-    { _tag: 'tool_call_ready', toolCallId: id as ToolCallId },
+    { _tag: 'tool_call_start', toolCallId, providerToolCallId, toolName: name },
+    { _tag: 'tool_call_field_start', toolCallId, providerToolCallId, path: ['value'] },
+    { _tag: 'tool_call_field_delta', toolCallId, providerToolCallId, path: ['value'], delta: '"x"' },
+    { _tag: 'tool_call_field_end', toolCallId, providerToolCallId, path: ['value'], value: 'x' },
+    { _tag: 'tool_call_ready', toolCallId, providerToolCallId },
   ]
 }
 
@@ -262,7 +264,7 @@ describe('dispatch fast-fail', () => {
     Effect.gen(function* () {
       const events = yield* runDispatch(
         [
-          { _tag: 'tool_call_start', toolCallId: 'call-X' as ToolCallId, toolName: 'nonexistent' },
+          { _tag: 'tool_call_start', toolCallId: 'call-X' as ToolCallId, providerToolCallId: 'call-X' as ProviderToolCallId, toolName: 'nonexistent' },
           ...messageEvents('ignored'),
           streamEnd(),
         ],
@@ -280,14 +282,15 @@ describe('dispatch fast-fail', () => {
   it('still handles parse failure from codec normally', () =>
     Effect.gen(function* () {
       const events = yield* runDispatch([
-        { _tag: 'tool_call_start', toolCallId: 'call-1' as ToolCallId, toolName: 'succeed' },
-        { _tag: 'tool_call_field_start', toolCallId: 'call-1' as ToolCallId, path: ['value'] },
-        { _tag: 'tool_call_field_delta', toolCallId: 'call-1' as ToolCallId, path: ['value'], delta: 'bad' },
+        { _tag: 'tool_call_start', toolCallId: 'call-1' as ToolCallId, providerToolCallId: 'call-1' as ProviderToolCallId, toolName: 'succeed' },
+        { _tag: 'tool_call_field_start', toolCallId: 'call-1' as ToolCallId, providerToolCallId: 'call-1' as ProviderToolCallId, path: ['value'] },
+        { _tag: 'tool_call_field_delta', toolCallId: 'call-1' as ToolCallId, providerToolCallId: 'call-1' as ProviderToolCallId, path: ['value'], delta: 'bad' },
         {
           _tag: 'stream_end',
           reason: {
             _tag: 'validation_failure',
             toolCallId: 'call-1' as ToolCallId,
+            providerToolCallId: 'call-1' as ProviderToolCallId,
             toolName: 'succeed',
             issue: { path: [], message: 'bad input' },
           },

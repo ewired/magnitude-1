@@ -3,7 +3,7 @@ import { Worker } from '@magnitudedev/event-core'
 import type { AppEvent, MessageDestination, TurnOutcome } from '../events'
 import { MockTurnScriptTag, type MockTurnResponse } from './turn-script'
 import { createHarness } from '@magnitudedev/harness'
-import { createStreamingFieldParser, type ResponseStreamEvent, type ModelStreamResult, type ToolCallId, type Prompt, type StreamingFieldParser } from '@magnitudedev/ai'
+import { createStreamingFieldParser, type ResponseStreamEvent, type ModelStreamResult, type ProviderToolCallId, type ToolCallId, type Prompt, type StreamingFieldParser } from '@magnitudedev/ai'
 import type { MagnitudeStreamError } from '@magnitudedev/magnitude-client'
 import { createHarnessAdapter, type IdenticalResponseTracker } from '../execution/harness-adapter'
 import { ExecutionManager } from '../execution/types'
@@ -76,6 +76,7 @@ function parseXmlScript(xml: string, toolkit: import('@magnitudedev/harness').To
       const toolName = invokeMatch[1]
       const paramsXml = invokeMatch[2]
       const toolCallId = `mock-tc-${++toolCallCounter}` as ToolCallId
+      const providerToolCallId = `mock-tc-${toolCallCounter}` as ProviderToolCallId
 
       // Collect parameters
       const params: Record<string, string> = {}
@@ -102,21 +103,21 @@ function parseXmlScript(xml: string, toolkit: import('@magnitudedev/harness').To
       parser.end()
       parsers.set(toolCallId, parser)
 
-      events.push({ _tag: 'tool_call_start', toolCallId, toolName })
+      events.push({ _tag: 'tool_call_start', toolCallId, providerToolCallId, toolName })
 
       for (const [field, value] of Object.entries(params)) {
-        events.push({ _tag: 'tool_call_field_delta', toolCallId, path: [field], delta: value })
-        events.push({ _tag: 'tool_call_field_end', toolCallId, path: [field], value })
+        events.push({ _tag: 'tool_call_field_delta', toolCallId, providerToolCallId, path: [field], delta: value })
+        events.push({ _tag: 'tool_call_field_end', toolCallId, providerToolCallId, path: [field], value })
       }
 
       // If parser decoded successfully, emit tool_call_ready; otherwise emit validation_failure
       if (parser.decoded !== null) {
-        events.push({ _tag: 'tool_call_ready', toolCallId })
+        events.push({ _tag: 'tool_call_ready', toolCallId, providerToolCallId })
       } else {
         // Push stream_end with validation_failure — skip to end of XML
         events.push({
           _tag: 'stream_end',
-          reason: { _tag: 'validation_failure', toolCallId, toolName, issue: { path: [], message: 'Schema validation failed for tool input' } },
+          reason: { _tag: 'validation_failure', toolCallId, providerToolCallId, toolName, issue: { path: [], message: 'Schema validation failed for tool input' } },
           usage: null,
         })
         remaining = remaining.slice(invokeMatch[0].length)

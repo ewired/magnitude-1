@@ -16,6 +16,7 @@ import {
   FrameworkErrorPubSubLive,
   FrameworkErrorReporterLive,
 } from '@magnitudedev/event-core'
+import type { ProviderToolCallId, ToolCallId } from '@magnitudedev/ai'
 import type { AppEvent } from '../src/events'
 import { TurnProjection } from '../src/projections/turn'
 import { AgentRoutingProjection } from '../src/projections/agent-routing'
@@ -60,15 +61,16 @@ const runDisplay = async (events: AppEvent[]): Promise<DisplayState> => {
 
 const turnId = 'turn-1'
 const forkId = null
-const toolCallId = 'call-1'
+const toolCallId = 'call-1' as ToolCallId
+const providerToolCallId = 'call-1' as ProviderToolCallId
 
 describe('Display — toolKey routing & no-duplicate steps', () => {
   it("uses the toolKey carried on tool_event ToolInputStarted", async () => {
     const state = await runDisplay([
       { type: 'turn_started', timestamp: ts(1), forkId, turnId, chainId: 'c1' } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, toolKey: 'fileTree',
-        event: { _tag: 'ToolInputStarted', toolCallId, toolName: 'tree', toolKey: 'fileTree' },
+        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'fileTree',
+        event: { _tag: 'ToolInputStarted', toolCallId, providerToolCallId, toolName: 'tree', toolKey: 'fileTree' },
       } as AppEvent,
     ])
 
@@ -83,18 +85,19 @@ describe('Display — toolKey routing & no-duplicate steps', () => {
     const state = await runDisplay([
       { type: 'turn_started', timestamp: ts(1), forkId, turnId, chainId: 'c1' } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, toolKey: 'fileTree',
-        event: { _tag: 'ToolInputStarted', toolCallId, toolName: 'tree', toolKey: 'fileTree' },
+        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'fileTree',
+        event: { _tag: 'ToolInputStarted', toolCallId, providerToolCallId, toolName: 'tree', toolKey: 'fileTree' },
       } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(3), forkId, turnId, toolCallId, toolKey: 'fileTree',
-        event: { _tag: 'ToolInputReady', toolCallId },
+        type: 'tool_event', timestamp: ts(3), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'fileTree',
+        event: { _tag: 'ToolInputReady', toolCallId, providerToolCallId },
       } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(4), forkId, turnId, toolCallId, toolKey: 'fileTree',
+        type: 'tool_event', timestamp: ts(4), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'fileTree',
         event: {
           _tag: 'ToolExecutionStarted',
           toolCallId,
+          providerToolCallId,
           toolName: 'tree',
           toolKey: 'fileTree',
           input: { path: '.' },
@@ -113,8 +116,8 @@ describe('Display — toolKey routing & no-duplicate steps', () => {
     const state = await runDisplay([
       { type: 'turn_started', timestamp: ts(1), forkId, turnId, chainId: 'c1' } as AppEvent,
       {
-        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, toolKey: 'createTask',
-        event: { _tag: 'ToolInputStarted', toolCallId, toolName: 'createTask', toolKey: 'createTask' },
+        type: 'tool_event', timestamp: ts(2), forkId, turnId, toolCallId, providerToolCallId, toolKey: 'createTask',
+        event: { _tag: 'ToolInputStarted', toolCallId, providerToolCallId, toolName: 'createTask', toolKey: 'createTask' },
       } as AppEvent,
     ])
 

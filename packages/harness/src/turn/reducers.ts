@@ -2,6 +2,7 @@ import type {
   AssistantMessage,
   ToolCallPart,
   ToolCallId,
+  ProviderToolCallId,
   ToolResultMessage,
   ResponseUsage,
   ToolResultPart,
@@ -44,7 +45,7 @@ export interface CanonicalTurnState {
 export interface CanonicalAccumulator {
   readonly reasoning: string
   readonly messageText: string
-  readonly toolCallMeta: ReadonlyMap<string, { readonly toolName: string; readonly toolKey: string }>
+  readonly toolCallMeta: ReadonlyMap<string, { readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string }>
   readonly toolCallInputs: ReadonlyMap<string, JsonValue>
   readonly toolCallInputChunks: ReadonlyMap<string, StreamingPartial<unknown>>
   readonly readyToolCalls: ReadonlySet<string>
@@ -135,12 +136,13 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
         {
           _tag: "ToolCallPart" as const,
           id,
+          providerToolCallId: event.providerToolCallId,
           name: event.toolName,
           input: emptyInput,
         },
       ]
       const meta = new Map(state.toolCallMeta)
-      meta.set(event.toolCallId, { toolName: event.toolName, toolKey: event.toolKey })
+      meta.set(event.toolCallId, { providerToolCallId: event.providerToolCallId, toolName: event.toolName, toolKey: event.toolKey })
       return {
         ...state,
         toolCallMeta: meta,
@@ -185,6 +187,7 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
       const resultMsg: ToolResultMessage = {
         _tag: "ToolResultMessage",
         toolCallId: id,
+        providerToolCallId: event.providerToolCallId,
         toolName: event.toolName,
         parts: event.parts,
       }
@@ -202,7 +205,7 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
           if (state.readyToolCalls.has(tc.id)) return tc
           const chunks = state.toolCallInputChunks.get(tc.id)
           if (chunks && Object.keys(chunks).length > 0) {
-            return { _tag: "ToolCallPart", id: tc.id, name: tc.name, input: extractPartialAsJson(chunks) }
+            return { _tag: "ToolCallPart", id: tc.id, providerToolCallId: tc.providerToolCallId, name: tc.name, input: extractPartialAsJson(chunks) }
           }
           return tc
         })
@@ -345,7 +348,7 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
     if (event._tag === "ToolInputStarted") {
       const model = stateModels.get(event.toolKey)
       if (!model) return state
-      const handle = createToolHandle(event.toolCallId, event.toolKey, model)
+      const handle = createToolHandle(event.toolCallId, event.providerToolCallId, event.toolKey, model)
       // Process the ToolInputStarted event through the handle
       const processed = handle.process(event)
       const handles = new Map(state.handles)

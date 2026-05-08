@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import { imagePlaceholder, normalizeVision } from "../normalize-vision"
 import { Prompt } from "../prompt"
 import type { TextPart, ImagePart } from "../parts"
+import type { ToolCallId, ProviderToolCallId } from "../ids"
 import type { UserMessage, AssistantMessage, ToolResultMessage } from "../messages"
 
 const text = (t: string): TextPart => ({ _tag: "TextPart", text: t })
@@ -51,7 +52,8 @@ describe("normalizeVision", () => {
     const prompt = basePrompt([
       {
         _tag: "ToolResultMessage",
-        toolCallId: "tc1",
+        toolCallId: "tc1" as ToolCallId,
+        providerToolCallId: "tc1" as ProviderToolCallId,
         toolName: "view",
         parts: [image({ mediaType: "image/webp" })],
       } as ToolResultMessage,
