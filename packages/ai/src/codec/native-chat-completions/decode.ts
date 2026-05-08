@@ -116,6 +116,7 @@ function processChunk<TStreamError>(
   parsers: Map<ToolCallId, StreamingFieldParser>,
   logprobs: TokenLogprob[],
   generateToolCallId: () => ToolCallId,
+  classifyStreamError: (failure: StreamFailure) => TStreamError,
 ): readonly [DecoderState, readonly ResponseStreamEvent<TStreamError>[]] {
   const events: ResponseStreamEvent<TStreamError>[] = []
   let nextState = state
@@ -123,6 +124,20 @@ function processChunk<TStreamError>(
   // ── DONE: terminal, skip everything ────────────────────────────────────────
   if (nextState.phase._tag === 'done') {
     return [nextState, events]
+  }
+
+  // ── Server-side error envelope: terminate the stream with a typed error ────
+  if (chunk.error) {
+    const syntheticFailure: StreamFailure = {
+      _tag: "ReadFailure",
+      cause: new Error(chunk.error.message),
+    }
+    events.push({
+      _tag: "stream_end",
+      reason: { _tag: "error", error: classifyStreamError(syntheticFailure) },
+      usage: null,
+    })
+    return [{ ...nextState, phase: { _tag: 'done' } }, events]
   }
 
   // ── Usage chunk: emit stream_end if we have a stored finishReason ──────────
@@ -354,7 +369,14 @@ export function decode<E, TStreamError>(
     chunks,
     makeInitialState(options.tools),
     (state, chunk): readonly [DecoderState, readonly ResponseStreamEvent<TStreamError>[]] => {
-      const result = processChunk<TStreamError>(chunk, state, parsers, logprobs, generateToolCallId)
+      const result = processChunk<TStreamError>(
+        chunk,
+        state,
+        parsers,
+        logprobs,
+        generateToolCallId,
+        options.classifyStreamError as (failure: StreamFailure) => TStreamError,
+      )
       lastState = result[0]
       return result
     },

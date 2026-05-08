@@ -2,6 +2,7 @@ import { Data } from "effect"
 import type { MagnitudeApiError, InsufficientCreditsDetails } from "./contract"
 import {
   defaultClassifyConnectionError,
+  TransportError,
   type ConnectionError,
   type HttpConnectionFailure,
 } from "@magnitudedev/ai"
@@ -78,6 +79,30 @@ export function classifyMagnitudeConnectionError(
         return new ModelNotGrammarCompatible({ message: parsed.error.message })
       case "role_not_found":
         return new RoleNotFound({ message: parsed.error.message })
+      case "upstream_unavailable":
+        return new TransportError({
+          status: failure.status,
+          message: parsed.error.message,
+          retryable: true,
+        })
+      case "stream_interrupted":
+        return new TransportError({
+          status: failure.status,
+          message: parsed.error.message,
+          retryable: true,
+        })
+      case "internal_server_error":
+        return new TransportError({
+          status: failure.status,
+          message: parsed.error.message,
+          retryable: true,
+        })
+      case "provider_error":
+        return new TransportError({
+          status: failure.status,
+          message: parsed.error.message,
+          retryable: true,
+        })
     }
   }
 

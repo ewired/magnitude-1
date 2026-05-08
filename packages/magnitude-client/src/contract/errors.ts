@@ -18,6 +18,7 @@ export type MagnitudeErrorType =
   | "insufficient_quota"
   | "rate_limit_error"
   | "server_error"
+  | "service_unavailable"
 
 export type MagnitudeErrorCode =
   | "invalid_api_key"
@@ -34,6 +35,8 @@ export type MagnitudeErrorCode =
   | "provider_rate_limited"
   | "internal_server_error"
   | "provider_error"
+  | "upstream_unavailable"
+  | "stream_interrupted"
   | "role_not_found"
 
 export type MagnitudeErrorDetails = InsufficientCreditsDetails
