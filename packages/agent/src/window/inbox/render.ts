@@ -256,10 +256,10 @@ export function renderTimeline(input: RenderTimelineInput): UserPart[] {
         else builder.pushPart(part)
       }
     } else {
-      for (const line of renderTimelineTextLines(entry, agentStatusMap)) builder.pushText(`\n${line}`)
+      for (const line of renderTimelineTextLines(entry, agentsMap)) builder.pushText(`\n${line}`)
     }
 
-    const bullet = maybeAttentionBullet(entry, input.timezone, agentStatusMap)
+    const bullet = maybeAttentionBullet(entry, input.timezone, agentsMap)
     if (bullet && (chronological.length - i - 1 > 0 || lifecycleHooks.length > 0)) {
       attentionItems.push({ bullet, kind: entry.kind })
     }
