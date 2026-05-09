@@ -14,6 +14,7 @@ const { ForkContext } = Fork
 export interface SpawnWorkerDirective<R = never> {
   readonly kind: 'spawn_worker'
   readonly id: string
+  readonly agentId: string
   readonly message: string
   readonly role: RoleId
   readonly spawnWorker: (params: {
@@ -70,7 +71,7 @@ export const handleSpawnWorkerDirective = <R>(
 
     const taskContract: string | undefined = undefined
 
-    const agentId = directive.id
+    const agentId = directive.agentId
     const prompt = buildAgentContext(task.title, summary, directive.id, taskContract)
     const forkId = yield* directive.spawnWorker({
       parentForkId,

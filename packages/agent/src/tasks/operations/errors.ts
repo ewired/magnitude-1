@@ -20,6 +20,7 @@ export type TaskOperationErrorCode =
   | 'invalid_status_transition'
   | 'empty_update_patch'
   | 'worker_not_found'
+  | 'agent_not_found'
 
 export interface TaskOperationErrorDetails {
   readonly code: TaskOperationErrorCode
@@ -72,6 +73,13 @@ export function workerNotFound(taskId: string): TaskOperationErrorDetails {
   return {
     code: 'worker_not_found',
     message: `Worker operation rejected: task "${taskId}" has no active worker.`,
+  }
+}
+
+export function agentNotFound(agentId: string): TaskOperationErrorDetails {
+  return {
+    code: 'agent_not_found',
+    message: `Agent operation rejected: no agent found with ID "${agentId}".`,
   }
 }
 

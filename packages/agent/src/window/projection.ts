@@ -20,6 +20,7 @@ import { ConfigAmbient, getRoleConfig } from '../ambient/config-ambient'
 import { UserPresenceProjection } from '../projections/user-presence'
 import { UserMessageResolutionProjection } from '../projections/user-message-resolution'
 import { TaskGraphProjection, type TaskGraphState, type TaskRecord } from '../projections/task-graph'
+import { TaskWorkerProjection, type TaskWorkerSnapshot } from '../projections/task-worker'
 
 import { formatUserPresence, formatUserReturnedAfterAbsence } from '../prompts/presence'
 import type { UserPart, ImageMediaType } from '@magnitudedev/ai'
@@ -47,6 +48,7 @@ import {
   toTimelineTaskTreeDirty,
   toTimelineTaskTreeView,
   toTimelineTaskUpdate,
+  toTimelineTaskReassigned,
 } from './inbox/compose'
 
 import type { ForkWindowState, WindowEntry, QueuedTimelineEntry } from './types'
@@ -95,7 +97,7 @@ function enqueueTimeline(
   return { ...fork, queuedTimeline, nextQueueSeq: seq + 1 }
 }
 
-function flushQueue(fork: ForkWindowState, taskGraphState: TaskGraphState): ForkWindowState {
+function flushQueue(fork: ForkWindowState, taskGraphState: TaskGraphState, taskWorkerState: { snapshots: ReadonlyMap<string, TaskWorkerSnapshot> }): ForkWindowState {
   const sorted = [...fork.queuedTimeline].sort((a, b) => (a.timestamp - b.timestamp) || (a.seq - b.seq))
   const timeline: TimelineEntry[] = []
   const dirtyTaskIds = new Set<string>()
@@ -114,7 +116,7 @@ function flushQueue(fork: ForkWindowState, taskGraphState: TaskGraphState): Fork
   }
 
   if (dirtyTaskIds.size > 0 && latestDirtyTimestamp !== null) {
-    const renderedTree = renderTaskTreesForTaskIds(taskGraphState, Array.from(dirtyTaskIds))
+    const renderedTree = renderTaskTreesForTaskIds(taskGraphState, taskWorkerState, Array.from(dirtyTaskIds))
     if (renderedTree) {
       timeline.push(
         toTimelineTaskTreeView({
@@ -214,39 +216,65 @@ function findRootTaskId(state: TaskGraphState, taskId: string): string {
   return current?.id ?? taskId
 }
 
-function renderTaskSubtree(state: TaskGraphState, taskId: string, depth: number): string[] {
+function renderTaskSubtree(
+  state: TaskGraphState,
+  taskWorkerState: { snapshots: ReadonlyMap<string, TaskWorkerSnapshot> },
+  taskId: string,
+): string {
   const task = state.tasks.get(taskId)
-  if (!task) return []
+  if (!task) return ''
 
-  const indent = '  '.repeat(depth)
+  const status = task.status === 'completed' ? 'completed' : 'pending'
+  const snapshot = taskWorkerState.snapshots.get(taskId)
+  const workerState = snapshot?.workerState
+  const hasWorker = task.worker && task.worker.role !== 'user'
 
-  const status = task.status === 'completed' ? 'done' : task.status
-  const assignedRoleStr = task.worker && task.worker.role !== 'user'
-    ? `, assigned: ${task.worker.role}`
-    : ''
-  const assigneeStr = task.assignee === 'user' ? ', user' : ''
-  const line = `${indent}[${status}] ${task.title} (${task.id}${assignedRoleStr}${assigneeStr})`
+  let xml = `<task title="${escapeXmlAttr(task.title)}" id="${escapeXmlAttr(task.id)}" status="${status}">`
 
-  const childLines = task.childIds.flatMap(childId => renderTaskSubtree(state, childId, depth + 1))
+  if (hasWorker && task.worker) {
+    const workerStatus = workerState?.status ?? 'idle'
+    xml += `\n  <worker id="${escapeXmlAttr(task.worker.agentId)}" role="${task.worker.role}" status="${workerStatus}"/>`
+  }
 
+  if (task.childIds.length > 0) {
+    for (const childId of task.childIds) {
+      const childXml = renderTaskSubtree(state, taskWorkerState, childId)
+      if (childXml) xml += '\n' + indentXml(childXml, 1)
+    }
+  }
 
-  return [line, ...childLines]
+  xml += `</task>`
+  return xml
 }
 
-function renderTaskTreesForTaskIds(state: TaskGraphState, taskIds: readonly string[]): string {
+function escapeXmlAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function indentXml(xml: string, depth: number): string {
+  const prefix = '  '.repeat(depth)
+  return xml.split('\n').map(line => prefix + line).join('\n')
+}
+
+function renderTaskTreesForTaskIds(
+  state: TaskGraphState,
+  taskWorkerState: { snapshots: ReadonlyMap<string, TaskWorkerSnapshot> },
+  taskIds: readonly string[],
+): string {
   const roots = new Set<string>()
   for (const taskId of taskIds) {
     roots.add(findRootTaskId(state, taskId))
   }
 
   const renderedTrees = Array.from(roots)
-    .map(rootId => renderTaskSubtree(state, rootId, 0).join('\n'))
+    .map(rootId => renderTaskSubtree(state, taskWorkerState, rootId))
     .filter(Boolean)
-    .join('\n')
 
-  if (!renderedTrees) return ''
+  if (renderedTrees.length === 0) return ''
 
-  return `${renderedTrees}\n${TASK_TREE_COMPLETION_REMINDER}`
+  if (renderedTrees.length === 1) return renderedTrees[0]
+
+  return `<tasks>\n${renderedTrees.map(t => indentXml(t, 1)).join('\n')}\n</tasks>`
 }
 
 function findTaskForAgent(state: TaskGraphState, args: { agentId: string, forkId: string }): TaskRecord | null {
@@ -271,7 +299,7 @@ function emitIfChanged(
 
 export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowState>()({
   name: 'Window',
-  reads: [AgentStatusProjection, SubagentActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection, HarnessStateProjection] as const,
+  reads: [AgentStatusProjection, SubagentActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection, TaskWorkerProjection, HarnessStateProjection] as const,
   ambients: [SkillsAmbient, ConfigAmbient] as const,
   signals: {
     tokenEstimateChanged: Signal.create<{ forkId: string | null; tokenEstimate: number }>('Window/tokenEstimateChanged'),
@@ -356,7 +384,8 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
 
       const preFlushMessageCount = nextFork.messages.length
       const taskGraphState = read(TaskGraphProjection)
-      const flushed = flushQueue(nextFork, taskGraphState)
+      const taskWorkerState = read(TaskWorkerProjection)
+      const flushed = flushQueue(nextFork, taskGraphState, taskWorkerState)
 
       let messages = flushed.messages
       const flushProducedInbox = messages.length > preFlushMessageCount
@@ -383,7 +412,7 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
         toTimelineObservation({ timestamp: event.timestamp, parts: event.parts.map(toUserPartFromObservation) }),
         event.timestamp,
       )
-      const result = flushQueue(nextFork, read(TaskGraphProjection))
+      const result = flushQueue(nextFork, read(TaskGraphProjection), read(TaskWorkerProjection))
       emitIfChanged(fork, result, event.forkId, emit)
       return result
     },
@@ -517,7 +546,7 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
       }
 
       // Flush queued entries on top of (possibly anchored) base
-      nextFork = flushQueue(nextFork, read(TaskGraphProjection))
+      nextFork = flushQueue(nextFork, read(TaskGraphProjection), read(TaskWorkerProjection))
       emitIfChanged(fork, nextFork, event.forkId, emit)
       return nextFork
     },
@@ -530,6 +559,37 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
   globalEventHandlers: {
     task_assigned: ({ event, state }) => {
       if (!event.workerInfo) return state
+      return state
+    },
+
+    agent_task_changed: ({ event, state }) => {
+      const workerFork = state.forks.get(event.forkId)
+      if (workerFork) {
+        const reassignedEntry = toTimelineTaskReassigned({
+          timestamp: event.timestamp,
+          oldTaskId: event.oldTaskId,
+          newTaskId: event.newTaskId,
+        })
+        const nextFork = enqueueTimeline(workerFork, reassignedEntry, event.timestamp)
+        let nextState: typeof state = { ...state, forks: new Map(state.forks).set(event.forkId, nextFork) }
+
+        // Also inject notification into root fork (leader)
+        const rootFork = nextState.forks.get(null)
+        if (rootFork) {
+          const leaderEntry = toTimelineTaskUpdate({
+            timestamp: event.timestamp,
+            action: 'status_changed',
+            taskId: event.newTaskId,
+            title: undefined,
+            previousStatus: `worker ${event.agentId} on ${event.oldTaskId}`,
+            nextStatus: `worker ${event.agentId} on ${event.newTaskId}`,
+          })
+          const nextRoot = enqueueTimeline(rootFork, leaderEntry, event.timestamp)
+          nextState = { ...nextState, forks: new Map(nextState.forks).set(null, nextRoot) }
+        }
+
+        return nextState
+      }
       return state
     },
 

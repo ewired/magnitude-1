@@ -7,6 +7,7 @@ import { handleCancelDirective, type CancelDirective } from './cancel'
 import { handleMessageDirective, type MessageDirective, type MessageDirectiveSuccess } from './message'
 import { handleSpawnWorkerDirective, type SpawnWorkerDirective } from './spawn-worker'
 import { handleKillWorkerDirective, type KillWorkerDirective } from './kill-worker'
+import { handleReassignWorkerDirective, type ReassignWorkerDirective } from './reassign-worker'
 
 export interface TaskDirectiveContext {
   readonly forkId: string | null
@@ -29,6 +30,7 @@ export type TaskDirective<R = never> =
   | MessageDirective
   | SpawnWorkerDirective<R>
   | KillWorkerDirective
+  | ReassignWorkerDirective
 
 export type HandleTaskDirectiveResult = TaskDirectiveErrorResult | { success: true } | { success: true; title: string } | MessageDirectiveSuccess
 
@@ -49,5 +51,7 @@ export const handleTaskDirective = <R = never>(
       return handleSpawnWorkerDirective(directive, context)
     case 'kill_worker':
       return handleKillWorkerDirective(directive, context)
+    case 'reassign_worker':
+      return handleReassignWorkerDirective(directive, context)
   }
 }

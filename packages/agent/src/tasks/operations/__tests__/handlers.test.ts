@@ -131,6 +131,7 @@ describe('task operation handlers validation', () => {
     const result = await runOp(handleSpawnWorkerDirective({
       kind: 'spawn_worker',
       id: 't2',
+      agentId: 'worker-t2',
       message: 'Test instruction',
       role: 'engineer',
       spawnWorker: () => Effect.succeed('fork-2'),
@@ -158,6 +159,7 @@ describe('task operation handlers validation', () => {
     const result = await runOp(handleSpawnWorkerDirective({
       kind: 'spawn_worker',
       id: 't3',
+      agentId: 'worker-t3',
       message: 'Test instruction',
       role: 'engineer',
       spawnWorker: () => Effect.succeed('fork-3-new'),

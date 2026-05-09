@@ -21,7 +21,7 @@ export const messageWorkerTool = defineHarnessTool({
     name: 'messageWorker',
     description: 'Send a message to another agent worker.',
     inputSchema: Schema.Struct({
-      workerId: Schema.String.annotations({ description: 'ID of the worker to message' }),
+      agentId: Schema.String.annotations({ description: 'Agent ID of the worker to message' }),
       message: Schema.String.annotations({ description: 'Message content to send' }),
       yield: Schema.optional(Schema.Boolean.annotations({ description: 'When true, yield to this worker — the turn will not retrigger.' })),
     }),
@@ -39,7 +39,7 @@ export const messageWorkerTool = defineHarnessTool({
         forkId,
         turnId,
         id: messageId,
-        destination: { kind: 'worker', taskId: input.workerId },
+        destination: { kind: 'worker', agentId: input.agentId },
       })
 
       yield* bus.publish({

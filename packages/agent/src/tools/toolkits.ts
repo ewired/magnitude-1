@@ -15,7 +15,7 @@ import { readTool, writeTool, editTool, treeTool, grepTool, viewTool } from './f
 import { shellTool } from './shell'
 import { webSearchTool } from './web-search'
 import { webFetchTool } from './web-fetch-tool'
-import { createTaskTool, updateTaskTool, spawnWorkerTool, killWorkerTool } from './task-tools'
+import { createTaskTool, updateTaskTool, spawnWorkerTool, killWorkerTool, reassignWorkerTool } from './task-tools'
 import { skillTool } from './skill-tool'
 import { messageWorkerTool } from './agent-communication'
 
@@ -33,6 +33,7 @@ import { createTaskModel } from '../models/create-task'
 import { updateTaskModel } from '../models/update-task'
 import { spawnWorkerModel } from '../models/spawn-worker'
 import { killWorkerModel } from '../models/kill-worker'
+import { reassignWorkerModel } from '../models/reassign-worker'
 import { skillActivationModel } from '../models/skill-activation'
 import { messageWorkerModel } from '../models/message-worker'
 import { compactTool } from './compact'
@@ -61,11 +62,12 @@ export const webToolkit = defineToolkit({
 })
 
 export const taskToolkit = defineToolkit({
-  createTask:    { tool: createTaskTool,    state: createTaskModel },
-  updateTask:    { tool: updateTaskTool,    state: updateTaskModel },
-  spawnWorker:   { tool: spawnWorkerTool,   state: spawnWorkerModel },
-  killWorker:    { tool: killWorkerTool,    state: killWorkerModel },
-  messageWorker: { tool: messageWorkerTool, state: messageWorkerModel },
+  createTask:      { tool: createTaskTool,      state: createTaskModel },
+  updateTask:      { tool: updateTaskTool,      state: updateTaskModel },
+  spawnWorker:     { tool: spawnWorkerTool,     state: spawnWorkerModel },
+  killWorker:      { tool: killWorkerTool,      state: killWorkerModel },
+  reassignWorker:  { tool: reassignWorkerTool,  state: reassignWorkerModel },
+  messageWorker:   { tool: messageWorkerTool,  state: messageWorkerModel },
 })
 
 export const skillToolkit = defineToolkit({
@@ -120,7 +122,7 @@ const ROLE_TOOLKITS: Record<RoleId, Toolkit> = {
 // =============================================================================
 
 /** Tools that should not be displayed in the UI */
-export const HIDDEN_TOOLS: ReadonlySet<string> = new Set(['createTask', 'updateTask', 'killWorker', 'messageWorker', 'compact'])
+export const HIDDEN_TOOLS: ReadonlySet<string> = new Set(['createTask', 'updateTask', 'killWorker', 'reassignWorker', 'messageWorker', 'compact'])
 
 export type ToolKey = ToolkitKeys<typeof leaderToolkit>
 

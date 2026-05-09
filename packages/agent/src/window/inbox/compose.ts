@@ -177,6 +177,18 @@ export function toTimelineTaskUpdate(args: {
   }
 }
 
+export function toTimelineTaskReassigned(args: {
+  timestamp: number
+  oldTaskId: string
+  newTaskId: string
+}): TimelineEntry {
+  return {
+    kind: 'task_reassigned',
+    ...args,
+    text: '',
+  }
+}
+
 export function toTimelineObservation(args: {
   timestamp: number
   parts: readonly UserPart[]

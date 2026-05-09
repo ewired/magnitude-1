@@ -1,7 +1,7 @@
 import type { TaskStatus } from '../../projections/task-graph'
 import type { TaskOperationGraphSnapshot, TaskOperationTaskSnapshot } from './types'
 
-const TASK_STATUSES = ['pending', 'working', 'completed'] as const
+const TASK_STATUSES = ['pending', 'completed'] as const
 
 export function isValidStatus(value: string): value is TaskStatus {
   return TASK_STATUSES.includes(value as TaskStatus)
@@ -9,7 +9,6 @@ export function isValidStatus(value: string): value is TaskStatus {
 
 export function canTransition(from: TaskStatus, to: TaskStatus): boolean {
   if (from === to) return false
-  if (to === 'working') return false
   if (to === 'pending') return from === 'completed'
   if (to === 'completed') return true
   return false

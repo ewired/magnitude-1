@@ -109,7 +109,7 @@ describe('baseline harness lifecycle', () => {
               rootTurns += 1
               if (rootTurns === 1) {
                 return {
-                  ...response().createAgent('baseline-sub', 'explorer', 'baseline', 'do work').yield(),
+                  ...response().createAgent('baseline-sub', 'baseline-sub', 'baseline', 'do work').yield(),
                 }
               }
               return { xml: '<magnitude:yield_user/>' }
@@ -153,7 +153,7 @@ describe('baseline harness lifecycle', () => {
               rootTurns += 1
               if (rootTurns === 1) {
                 return {
-                  ...response().createAgent('baseline-sub-silent', 'explorer', 'baseline', 'do work').yield(),
+                  ...response().createAgent('baseline-sub-silent', 'baseline-sub-silent', 'baseline', 'do work').yield(),
                 }
               }
               return { xml: '<magnitude:yield_user/>' }

@@ -34,7 +34,7 @@ describe('TaskWorkerProjection', () => {
         turnId: 'turn-1',
         toolCallId: 'spawn-1',
         toolKey: 'spawnWorker',
-        event: { _tag: 'ToolInputFieldChunk', toolCallId: 'spawn-1', field: 'id', path: ['id'], delta: 'task-1' },
+        event: { _tag: 'ToolInputFieldChunk', toolCallId: 'spawn-1', field: 'taskId', path: ['taskId'], delta: 'task-1' },
       } as any)
       yield* h.send({
         type: 'tool_event',
@@ -107,7 +107,7 @@ describe('TaskWorkerProjection', () => {
         taskId: 'task-1',
         title: 'Build it',
 
-        status: 'working',
+        status: 'pending',
         parentId: null,
         depth: 0,
         updatedAt: ts(5),
@@ -181,7 +181,7 @@ describe('TaskWorkerProjection', () => {
         turnId: 'turn-1',
         toolCallId: 'kill-1',
         toolKey: 'killWorker',
-        event: { _tag: 'ToolInputFieldChunk', toolCallId: 'kill-1', field: 'id', path: ['id'], delta: 'task-1' },
+        event: { _tag: 'ToolInputFieldChunk', toolCallId: 'kill-1', field: 'taskId', path: ['taskId'], delta: 'task-1' },
       } as any)
       yield* h.send({
         type: 'tool_event',
@@ -259,7 +259,7 @@ describe('TaskWorkerProjection', () => {
         turnId: 'turn-1',
         toolCallId: 'kill-1',
         toolKey: 'killWorker',
-        event: { _tag: 'ToolInputFieldChunk', toolCallId: 'kill-1', field: 'id', path: ['id'], delta: 'task-1' },
+        event: { _tag: 'ToolInputFieldChunk', toolCallId: 'kill-1', field: 'taskId', path: ['taskId'], delta: 'task-1' },
       } as any)
       yield* h.send({
         type: 'tool_event',
@@ -287,7 +287,7 @@ describe('TaskWorkerProjection', () => {
         turnId: 'turn-2',
         toolCallId: 'spawn-1',
         toolKey: 'spawnWorker',
-        event: { _tag: 'ToolInputFieldChunk', toolCallId: 'spawn-1', field: 'id', path: ['id'], delta: 'task-1' },
+        event: { _tag: 'ToolInputFieldChunk', toolCallId: 'spawn-1', field: 'taskId', path: ['taskId'], delta: 'task-1' },
       } as any)
       yield* h.send({
         type: 'tool_event',
@@ -492,7 +492,7 @@ describe('TaskWorkerProjection', () => {
         turnId: 'turn-1',
         toolCallId: 'kill-1',
         toolKey: 'killWorker',
-        event: { _tag: 'ToolExecutionEnded', toolCallId: 'kill-1', toolName: 'kill-worker', toolKey: 'killWorker', result: { _tag: 'Success', output: { id: 'task-1' } } },
+        event: { _tag: 'ToolExecutionEnded', toolCallId: 'kill-1', toolName: 'kill-worker', toolKey: 'killWorker', result: { _tag: 'Success', output: { taskId: 'task-1' } } },
       } as any)
 
       const state = yield* h.projection(TaskWorkerProjection.Tag)

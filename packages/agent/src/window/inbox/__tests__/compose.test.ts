@@ -46,7 +46,7 @@ describe('inbox compose', () => {
         action: 'status_changed',
         taskId: 't1',
         previousStatus: 'pending',
-        nextStatus: 'working',
+        nextStatus: 'completed',
       }).kind,
     ).toBe('task_update')
     expect(toTimelineObservation({ timestamp: TS, parts }).kind).toBe('observation')

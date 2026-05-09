@@ -2,11 +2,11 @@ import { defineStateModel, type BaseState } from '@magnitudedev/harness'
 import { createTaskTool } from '../tools/task-tools'
 
 export interface CreateTaskState extends BaseState {
-  id?: string
+  taskId?: string
 }
 
 const initial: Omit<CreateTaskState, 'phase'> = {
-  id: undefined,
+  taskId: undefined,
 }
 
 export const createTaskModel = defineStateModel(createTaskTool)<CreateTaskState>({
@@ -16,17 +16,17 @@ export const createTaskModel = defineStateModel(createTaskTool)<CreateTaskState>
       case 'ToolInputStarted':
         return { ...state, phase: 'streaming' }
       case 'ToolInputFieldChunk':
-        return event.field === 'id'
-          ? { ...state, phase: 'streaming', id: (state.id ?? '') + event.delta }
+        return event.field === 'taskId'
+          ? { ...state, phase: 'streaming', taskId: (state.taskId ?? '') + event.delta }
           : state
       case 'ToolInputReady':
         return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing', id: event.input.id ?? state.id }
+        return { ...state, phase: 'executing', taskId: event.input.taskId ?? state.taskId }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':
-            return { ...state, phase: 'completed', id: event.result.output.id }
+            return { ...state, phase: 'completed', taskId: event.result.output.taskId }
           case 'Error':
             return { ...state, phase: 'error' }
           case 'Rejected':

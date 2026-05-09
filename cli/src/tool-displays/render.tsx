@@ -12,6 +12,7 @@ import { webFetchDisplay } from './displays/web-fetch'
 import { skillDisplay } from './displays/skill'
 import { defaultDisplay } from './displays/default'
 import { spawnWorkerDisplay } from './displays/spawn-worker'
+import { reassignWorkerDisplay } from './displays/reassign-worker'
 
 /**
  * Erases the specific state type from a ToolDisplay, allowing it to accept BaseState.
@@ -40,6 +41,7 @@ const displaysByToolKey: Partial<Record<string, ToolDisplay<BaseState>>> = {
   webFetch: eraseStateType(webFetchDisplay),
   skill: eraseStateType(skillDisplay),
   spawnWorker: eraseStateType(spawnWorkerDisplay),
+  reassignWorker: eraseStateType(reassignWorkerDisplay),
 }
 
 const fallback = eraseStateType(defaultDisplay)

@@ -291,7 +291,7 @@ export function outcomeWillChainContinue(outcome: TurnOutcome): boolean {
 export type MessageDestination =
   | { readonly kind: 'user' }
   | { readonly kind: 'parent' }
-  | { readonly kind: 'worker'; readonly taskId: string }
+  | { readonly kind: 'worker'; readonly agentId: string }
 
 export interface MessageStart {
   readonly type: 'message_start'
@@ -445,6 +445,15 @@ export interface AgentKilled {
   readonly parentForkId: string | null
   readonly agentId: string
   readonly reason: string
+}
+
+/** Agent reassigned to a different task */
+export interface AgentTaskChanged {
+  readonly type: 'agent_task_changed'
+  readonly forkId: string
+  readonly agentId: string
+  readonly oldTaskId: string
+  readonly newTaskId: string
 }
 
 /** Active subagent explicitly killed by user from subagent tab close confirmation */
@@ -668,6 +677,7 @@ export type AppEvent =
   // Agent events
   | AgentCreated
   | AgentKilled
+  | AgentTaskChanged
   | SubagentUserKilled
   | SubagentIdleClosed
   | UserReturnConfirmed

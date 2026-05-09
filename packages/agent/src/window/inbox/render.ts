@@ -101,7 +101,7 @@ function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_mess
   return builder.build()
 }
 
-function renderTimelineTextLines(entry: Exclude<TimelineEntry, { kind: 'observation' | 'lifecycle_hook' | 'task_start_hook' | 'task_idle_hook' | 'task_complete_hook' | 'task_tree_dirty' | 'task_tree_view' | 'task_update' }>): string[] {
+function renderTimelineTextLines(entry: Exclude<TimelineEntry, { kind: 'observation' | 'lifecycle_hook' | 'task_start_hook' | 'task_idle_hook' | 'task_complete_hook' | 'task_tree_dirty' | 'task_tree_view' | 'task_update' | 'task_reassigned' }>): string[] {
   switch (entry.kind) {
     case 'user_message':
       return [`<magnitude:message from="user">${entry.text}</magnitude:message>`]
@@ -210,14 +210,15 @@ export function renderTimeline(input: RenderTimelineInput): UserPart[] {
     (entry): entry is Extract<TimelineEntry, { kind: 'task_update' }> => entry.kind === 'task_update',
   )
   const chronological = input.timeline.filter(
-    (entry): entry is Exclude<TimelineEntry, { kind: 'lifecycle_hook' | 'task_idle_hook' | 'task_complete_hook' | 'task_start_hook' | 'task_tree_dirty' | 'task_tree_view' | 'task_update' }> =>
+    (entry): entry is Exclude<TimelineEntry, { kind: 'lifecycle_hook' | 'task_idle_hook' | 'task_complete_hook' | 'task_start_hook' | 'task_tree_dirty' | 'task_tree_view' | 'task_update' | 'task_reassigned' }> =>
       entry.kind !== 'lifecycle_hook'
       && entry.kind !== 'task_idle_hook'
       && entry.kind !== 'task_complete_hook'
       && entry.kind !== 'task_start_hook'
       && entry.kind !== 'task_tree_dirty'
       && entry.kind !== 'task_tree_view'
-      && entry.kind !== 'task_update',
+      && entry.kind !== 'task_update'
+      && entry.kind !== 'task_reassigned',
   )
 
   const attentionItems: { bullet: string, kind: TimelineEntry['kind'] }[] = []

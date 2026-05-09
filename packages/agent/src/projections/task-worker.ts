@@ -103,8 +103,8 @@ function flattenTaskTree(state: TaskGraphState): {
 }
 
 function getToolTaskId(state: ToolState): string | null {
-  if (!('id' in state)) return null
-  return typeof state.id === 'string' && state.id.length > 0 ? state.id : null
+  if (!('taskId' in state)) return null
+  return typeof state.taskId === 'string' && state.taskId.length > 0 ? state.taskId : null
 }
 
 function isActiveWorkerTool(handle: ToolHandle): boolean {
@@ -401,5 +401,6 @@ export const TaskWorkerProjection = Projection.define<AppEvent, TaskWorkerState>
     task_assigned: ({ state, read }) => rebuild({ state, read }),
     task_cancelled: ({ state, read }) => rebuild({ state, read }),
     tool_event: ({ state, read }) => rebuild({ state, read }),
+    agent_task_changed: ({ state, read }) => rebuild({ state, read }),
   },
 })

@@ -119,6 +119,10 @@ export type TimelineEntry =
       readonly nextStatus?: string
       readonly cancelledCount?: number
     })
+  | (TimestampedText<'task_reassigned'> & {
+      readonly oldTaskId: string
+      readonly newTaskId: string
+    })
   | (Timestamped<'observation'> & { readonly parts: readonly UserPart[] })
 
 // ---------------------------------------------------------------------------

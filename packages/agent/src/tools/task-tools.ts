@@ -98,22 +98,22 @@ export const createTaskTool = defineHarnessTool({
     name: 'create_task',
     description: 'Create a task.',
     inputSchema: Schema.Struct({
-      id: Schema.String.annotations({ description: 'Unique task identifier' }),
+      taskId: Schema.String.annotations({ description: 'Unique task identifier' }),
       title: Schema.String.annotations({ description: 'Task title' }),
       parent: Schema.optional(Schema.String.annotations({ description: 'Parent task ID to nest under; omit if no parent' })),
     }),
-    outputSchema: Schema.Struct({ id: Schema.String }),
+    outputSchema: Schema.Struct({ taskId: Schema.String }),
   },
   errorSchema: TaskToolErrorSchema,
   execute: (input, _ctx) =>
     Effect.gen(function* () {
       yield* runDirective({
         kind: 'create',
-        taskId: input.id,
+        taskId: input.taskId,
         parentId: input.parent?.trim() || null,
         title: input.title,
       })
-      return { id: input.id }
+      return { taskId: input.taskId }
     }),
 })
 
@@ -122,11 +122,11 @@ export const updateTaskTool = defineHarnessTool({
     name: 'update_task',
     description: 'Update task status.',
     inputSchema: Schema.Struct({
-      id: Schema.String.annotations({ description: 'Task ID to update' }),
+      taskId: Schema.String.annotations({ description: 'Task ID to update' }),
       status: UpdateTaskStatusSchema.annotations({ description: 'New status: pending, completed, or cancelled' }),
     }),
     outputSchema: Schema.Struct({
-      id: Schema.String,
+      taskId: Schema.String,
       status: UpdateTaskStatusSchema,
     }),
   },
@@ -135,10 +135,10 @@ export const updateTaskTool = defineHarnessTool({
     Effect.gen(function* () {
       yield* runDirective({
         kind: 'update',
-        taskId: input.id,
+        taskId: input.taskId,
         status: input.status,
       })
-      return { id: input.id, status: input.status }
+      return { taskId: input.taskId, status: input.status }
     }),
 })
 
@@ -147,13 +147,15 @@ export const spawnWorkerTool = defineHarnessTool({
     name: 'spawn_worker',
     description: 'Spawn a worker for a task id. The body is the worker\'s initial instruction (same mechanics as a normal message). Use <magnitude:message to="task-id"> for follow-up communications. Only use spawn_worker to create a new worker or replace the current one.',
     inputSchema: Schema.Struct({
-      id: Schema.String.annotations({ description: 'Task ID to spawn a worker for' }),
+      taskId: Schema.String.annotations({ description: 'Task ID to spawn a worker for' }),
+      agentId: Schema.String.annotations({ description: 'Unique agent ID for this worker. Use this ID to message or reassign the worker later.' }),
       message: Schema.String.annotations({ description: 'Initial instruction message for the worker' }),
       role: Schema.optional(Schema.String.annotations({ description: 'Worker role (e.g., engineer, scout, architect, critic, scientist, artisan). Defaults to engineer.' })),
       yield: Schema.optional(Schema.Boolean.annotations({ description: 'Set true to wait for this worker to respond before doing anything else.' })),
     }),
     outputSchema: Schema.Struct({
-      id: Schema.String,
+      taskId: Schema.String,
+      agentId: Schema.String,
       title: Schema.String,
       yield: Schema.optional(Schema.Boolean),
     }),
@@ -173,7 +175,8 @@ export const spawnWorkerTool = defineHarnessTool({
       const execManager = yield* ExecutionManager
       const result = yield* runDirective({
         kind: 'spawn_worker',
-        id: input.id,
+        id: input.taskId,
+        agentId: input.agentId,
         message: input.message,
         role,
         spawnWorker: (params): ReturnType<typeof execManager.fork> =>
@@ -190,10 +193,10 @@ export const spawnWorkerTool = defineHarnessTool({
       })
 
       if ('title' in result) {
-        return { id: input.id, title: result.title, yield: input.yield || undefined }
+        return { taskId: input.taskId, agentId: input.agentId, title: result.title, yield: input.yield || undefined }
       }
 
-      return { id: input.id, title: '', yield: input.yield || undefined }
+      return { taskId: input.taskId, agentId: input.agentId, title: '', yield: input.yield || undefined }
     }),
 })
 
@@ -202,10 +205,10 @@ export const killWorkerTool = defineHarnessTool({
     name: 'kill_worker',
     description: 'Kill worker for a task id.',
     inputSchema: Schema.Struct({
-      id: Schema.String.annotations({ description: 'Task ID whose worker to kill' }),
+      taskId: Schema.String.annotations({ description: 'Task ID whose worker to kill' }),
     }),
     outputSchema: Schema.Struct({
-      id: Schema.String,
+      taskId: Schema.String,
     }),
   },
   errorSchema: TaskToolErrorSchema,
@@ -213,8 +216,33 @@ export const killWorkerTool = defineHarnessTool({
     Effect.gen(function* () {
       yield* runDirective({
         kind: 'kill_worker',
-        id: input.id,
+        id: input.taskId,
       })
-      return { id: input.id }
+      return { taskId: input.taskId }
+    }),
+})
+
+export const reassignWorkerTool = defineHarnessTool({
+  definition: {
+    name: 'reassign_worker',
+    description: 'Reassign a worker from its current task to a different task. The worker keeps its identity and conversation history.',
+    inputSchema: Schema.Struct({
+      agentId: Schema.String.annotations({ description: 'Agent ID of the worker to reassign' }),
+      taskId: Schema.String.annotations({ description: 'Task ID to reassign the worker to' }),
+    }),
+    outputSchema: Schema.Struct({
+      agentId: Schema.String,
+      taskId: Schema.String,
+    }),
+  },
+  errorSchema: TaskToolErrorSchema,
+  execute: (input, _ctx) =>
+    Effect.gen(function* () {
+      yield* runDirective({
+        kind: 'reassign_worker',
+        agentId: input.agentId,
+        targetTaskId: input.taskId,
+      })
+      return { agentId: input.agentId, taskId: input.taskId }
     }),
 })
