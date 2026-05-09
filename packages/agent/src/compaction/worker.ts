@@ -115,7 +115,7 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
         })
 
         // 5. Run agentic compaction turn with retry
-        const result: CompactionTurnResult = yield* runCompactionTurn(forkId, roleId, windowState, roleConfig.softCap, publish, read).pipe(
+        const result: CompactionTurnResult = yield* runCompactionTurn(forkId, roleId, windowState, roleConfig.softCap, publish, read, agentState).pipe(
           Effect.retry({
             schedule: retrySchedule,
             while: (err) => {

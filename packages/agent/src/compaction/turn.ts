@@ -33,6 +33,7 @@ import { SkillsAmbient } from '../ambient/skills-ambient'
 import { buildStandardHooks } from '../execution/harness-hooks'
 import type { RoleId } from '../agents/role-validation'
 import { COMPACTION_MAX_RETRIES } from '../constants'
+import type { AgentStatusState } from '../projections/agent-status'
 
 export interface CompactionTurnResult {
   readonly turn: CompletedTurn
@@ -48,6 +49,7 @@ export function runCompactionTurn(
   softCap: number,
   publish: (event: AppEvent) => Effect.Effect<void>,
   read: any,
+  agentStatus: AgentStatusState,
 ): Effect.Effect<CompactionTurnResult, any, any> {
   return Effect.gen(function* () {
     const agentDef = getAgentDefinition(roleId)
@@ -135,7 +137,7 @@ export function runCompactionTurn(
 
       // Build compaction prompt: full window + reflection instruction appended
       const timezone = sessionCtx.context?.timezone ?? null
-      const compactionPrompt = buildCompactionPrompt(windowState, systemPrompt, timezone)
+      const compactionPrompt = buildCompactionPrompt(windowState, systemPrompt, timezone, agentStatus)
 
       // Run turn (provide traceLayer so model call is tagged as "compact")
       const liveTurn = yield* Effect.provide(harness.runTurn(compactionPrompt), traceLayer)

@@ -6,7 +6,7 @@ import { windowToPrompt } from '../../src/prompts/window-to-prompt'
 import type { ForkWindowState } from '../../src/window'
 
 function renderedUserTextFromMemory(memory: ForkWindowState): string {
-  const prompt = windowToPrompt(memory, '', 'UTC', true)
+  const prompt = windowToPrompt(memory, '', 'UTC', { agents: new Map() })
   return prompt.messages
     .filter(m => m._tag === 'UserMessage')
     .map(m => m.parts.map(p => p._tag === 'TextPart' ? p.text : '').join('\n'))

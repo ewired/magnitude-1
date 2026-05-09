@@ -15,6 +15,7 @@ import type { WindowEntry, ForkWindowState } from '../window'
 import type { UserPart } from '@magnitudedev/ai'
 import type { TurnFeedback } from '../window/types'
 import { renderTimeline } from '../window/inbox/render'
+import type { AgentStatusState } from '../projections/agent-status'
 import { renderFeedbackText } from './feedback-text'
 
 // ---------------------------------------------------------------------------
@@ -34,10 +35,12 @@ function renderFeedback(feedback: readonly TurnFeedback[]): UserPart[] {
 function inboxToAiMessages(
   msg: Extract<WindowEntry, { type: 'context' }>,
   timezone: string | null,
+  agentStatus: AgentStatusState,
 ): AiMessage[] {
   const inboxContent = renderTimeline({
     timeline: msg.timeline,
     timezone,
+    agentStatus,
   })
 
   const hasContent = inboxContent.some(p => {
@@ -68,6 +71,7 @@ export function windowToPrompt(
   windowState: ForkWindowState,
   systemPrompt: string,
   timezone: string | null,
+  agentStatus: AgentStatusState,
 ): Prompt {
   const messages: AiMessage[] = []
 
@@ -100,7 +104,7 @@ export function windowToPrompt(
       }
 
       case 'context': {
-        messages.push(...inboxToAiMessages(msg, timezone))
+        messages.push(...inboxToAiMessages(msg, timezone, agentStatus))
         break
       }
     }

@@ -3,9 +3,27 @@ import { YIELD_USER } from '@magnitudedev/xml-act'
 import type { UserPart } from '@magnitudedev/ai'
 import type { TimelineEntry } from '../types'
 import { renderTimeline } from '../render'
+import type { AgentInfo } from '../../../projections/agent-status'
 import {
   WORKER_PROGRESS_USER_MESSAGE_REMINDER,
 } from '../../../prompts/lead-communication-reminders'
+
+const noAgents = { agents: new Map<string, AgentInfo>() }
+
+function makeAgent(status: AgentInfo['status']): AgentInfo {
+  return {
+    agentId: 'test',
+    forkId: 'fork-1',
+    parentForkId: null,
+    name: 'Test Agent',
+    role: 'engineer' as any,
+    context: '',
+    mode: 'spawn',
+    taskId: 't1',
+    message: null,
+    status,
+  }
+}
 
 const TS0 = 1711641600000 // 2024-03-28 16:00:00 UTC
 const TS1 = TS0 + 30_000
@@ -14,14 +32,14 @@ const TS3 = TS0 + 120_000
 
 describe('renderTimeline', () => {
   test('returns empty array for empty input', () => {
-    expect(renderTimeline({ timeline: [], timezone: 'UTC',  })).toEqual([])
+    expect(renderTimeline({ timeline: [], timezone: 'UTC', agentStatus: noAgents })).toEqual([])
   })
 
   test('timeline-only single user message includes marker and user reply reminder', () => {
     const timeline: readonly TimelineEntry[] = [
       { kind: 'user_message', timestamp: TS0, text: 'hello', attachments: [] },
     ]
-    expect(renderTimeline({ timeline, timezone: 'UTC',  })).toEqual([
+    expect(renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })).toEqual([
       {
         _tag: 'TextPart',
         text:
@@ -50,7 +68,7 @@ describe('renderTimeline', () => {
       },
     ]
 
-    expect(renderTimeline({ timeline, timezone: 'UTC',  })).toEqual([
+    expect(renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })).toEqual([
       {
         _tag: 'TextPart',
         text: '--- 2024-03-28 16:00 ---\n<magnitude:message from="user">hello</magnitude:message>\n<mention path="src/a.ts" type="text" truncated="true" original_bytes="42">export const a = 1</mention>',
@@ -64,7 +82,7 @@ describe('renderTimeline', () => {
       { kind: 'user_message', timestamp: TS0, text: 'a', attachments: [] },
       { kind: 'user_message', timestamp: TS2, text: 'b', attachments: [] },
     ]
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -79,7 +97,7 @@ describe('renderTimeline', () => {
       { kind: 'user_message', timestamp: TS2, text: 'second', attachments: [] },
       { kind: 'user_message', timestamp: TS0, text: 'first', attachments: [] },
     ]
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out[0]).toEqual({
       _tag: 'TextPart',
       text:
@@ -107,7 +125,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -130,7 +148,7 @@ describe('renderTimeline', () => {
         taskTitle: 'Investigate the crash',
       },
     ]
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([])
   })
 
@@ -139,7 +157,7 @@ describe('renderTimeline', () => {
       { kind: 'user_message', timestamp: TS0, text: 'first-input', attachments: [] },
       { kind: 'user_message', timestamp: TS0, text: 'second-input', attachments: [] },
     ]
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out[0]).toEqual({
       _tag: 'TextPart',
       text:
@@ -162,7 +180,11 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'engineer', hookType: 'idle' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({
+      timeline,
+      timezone: 'UTC',
+      agentStatus: { agents: new Map([['builder-a', makeAgent('idle')]]) },
+    })
     expect(out[0]).toEqual({
       _tag: 'TextPart',
       text:
@@ -181,7 +203,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -199,7 +221,7 @@ describe('renderTimeline', () => {
       { kind: 'task_update', timestamp: TS3 + 1, action: 'cancelled', taskId: 't2', cancelledCount: 3 },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -215,7 +237,7 @@ describe('renderTimeline', () => {
       { kind: 'task_tree_view', timestamp: TS1, renderedTree: '- [ ] t3 next' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -231,7 +253,7 @@ describe('renderTimeline', () => {
       { kind: 'user_message', timestamp: TS1, text: 'hello', attachments: [] },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -268,7 +290,11 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS3 + 1, agentId: 'builder-x', role: 'engineer', hookType: 'idle' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({
+      timeline,
+      timezone: 'UTC',
+      agentStatus: { agents: new Map([['builder-x', makeAgent('idle')]]) },
+    })
     expect(out[0]).toEqual({
       _tag: 'TextPart',
       text:
@@ -289,7 +315,7 @@ describe('renderTimeline', () => {
       },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -314,7 +340,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     const text = out[0]
     expect(text).toEqual({
       _tag: 'TextPart',
@@ -329,7 +355,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS1, agentId: 'builder-z', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -364,7 +390,11 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS3, agentId: 'builder-x', role: 'engineer', hookType: 'idle' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({
+      timeline,
+      timezone: 'UTC',
+      agentStatus: { agents: new Map([['builder-x', makeAgent('working')]]) },
+    })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -380,7 +410,7 @@ describe('renderTimeline', () => {
       { kind: 'task_idle_hook', timestamp: TS1, taskId: 't1', title: 'Build thing', agentId: 'builder-z' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -404,7 +434,11 @@ describe('renderTimeline', () => {
       },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC',  })
+    const out = renderTimeline({
+      timeline,
+      timezone: 'UTC',
+      agentStatus: { agents: new Map([['builder-x', makeAgent('working')]]) },
+    })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -427,7 +461,7 @@ describe('renderTimeline', () => {
       },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC' })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',
@@ -449,7 +483,7 @@ describe('renderTimeline', () => {
       { kind: 'lifecycle_hook', timestamp: TS2, agentId: 'builder-a', role: 'engineer', hookType: 'spawn' },
     ]
 
-    const out = renderTimeline({ timeline, timezone: 'UTC' })
+    const out = renderTimeline({ timeline, timezone: 'UTC', agentStatus: noAgents })
     expect(out).toEqual([
       {
         _tag: 'TextPart',

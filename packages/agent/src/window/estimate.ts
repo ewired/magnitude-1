@@ -30,7 +30,7 @@ export function estimateTurnEntry(turn: CompletedTurn): number {
 /** Estimate tokens for a context (timeline) entry by rendering it the same way windowToPrompt does. */
 export function estimateContextEntry(timeline: readonly TimelineEntry[]): number {
   if (timeline.length === 0) return 0
-  const rendered = renderTimeline({ timeline, timezone: null })
+  const rendered = renderTimeline({ timeline, timezone: null, agentStatus: { agents: new Map() } })
   return estimateContentTokens(rendered)
 }
 

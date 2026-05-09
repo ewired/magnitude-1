@@ -6,12 +6,14 @@ import {
 } from '../../prompts/lead-communication-reminders'
 import type { AgentAtom, TimelineEntry } from './types'
 import { renderCompactToolCall } from './render-tool-call'
+import type { AgentStatus, AgentInfo, AgentStatusState } from '../../projections/agent-status'
 
 import { taskIdleReminder, taskCompleteReminder } from '../../prompts/tasks/index'
 
 export interface RenderTimelineInput {
   timeline: readonly TimelineEntry[]
   timezone: string | null
+  agentStatus: AgentStatusState
 }
 
 function formatTime(timestamp: number, timezone: string | null): string {
@@ -101,7 +103,10 @@ function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_mess
   return builder.build()
 }
 
-function renderTimelineTextLines(entry: Exclude<TimelineEntry, { kind: 'observation' | 'lifecycle_hook' | 'task_start_hook' | 'task_idle_hook' | 'task_complete_hook' | 'task_tree_dirty' | 'task_tree_view' | 'task_update' | 'task_reassigned' }>): string[] {
+function renderTimelineTextLines(
+  entry: Exclude<TimelineEntry, { kind: 'observation' | 'lifecycle_hook' | 'task_start_hook' | 'task_idle_hook' | 'task_complete_hook' | 'task_tree_dirty' | 'task_tree_view' | 'task_update' | 'task_reassigned' }>,
+  agentsMap: ReadonlyMap<string, AgentInfo>,
+): string[] {
   switch (entry.kind) {
     case 'user_message':
       return [`<magnitude:message from="user">${entry.text}</magnitude:message>`]
@@ -115,7 +120,7 @@ function renderTimelineTextLines(entry: Exclude<TimelineEntry, { kind: 'observat
       return [`<user-to-agent agent="${entry.agentId}">${entry.text}</user-to-agent>`]
     case 'agent_block': {
       const lines = entry.atoms.map(renderAgentAtom).join('\n')
-      const status = entry.atoms[entry.atoms.length - 1]?.kind === 'idle' ? 'idle' : 'working'
+      const status = agentsMap.get(entry.agentId)?.status ?? 'idle'
       return [`<agent id="${entry.agentId}" role="${entry.role}" status="${status}">\n${lines}\n</agent>`]
     }
     case 'subagent_user_killed':
@@ -125,12 +130,13 @@ function renderTimelineTextLines(entry: Exclude<TimelineEntry, { kind: 'observat
   }
 }
 
-function maybeAttentionBullet(entry: TimelineEntry, timezone: string | null): string | null {
+function maybeAttentionBullet(entry: TimelineEntry, timezone: string | null, agentsMap: ReadonlyMap<string, AgentInfo>): string | null {
   if (entry.kind === 'user_message') return `- user message at ${formatTime(entry.timestamp, timezone)}`
   if (entry.kind === 'user_bash_command') return `- user ran bash command at ${formatTime(entry.timestamp, timezone)}`
   if (entry.kind === 'agent_block') {
     if (entry.atoms.some((a) => a.kind === 'error')) return `- ${entry.agentId} errored at ${formatTime(entry.timestamp, timezone)}`
-    if (entry.atoms[entry.atoms.length - 1]?.kind === 'idle') return `- ${entry.agentId} went idle at ${formatTime(entry.timestamp, timezone)}`
+    const agent = agentsMap.get(entry.agentId)
+    if (!agent || agent.status === 'idle') return `- ${entry.agentId} went idle at ${formatTime(entry.timestamp, timezone)}`
   }
   return null
 }
@@ -221,6 +227,8 @@ export function renderTimeline(input: RenderTimelineInput): UserPart[] {
       && entry.kind !== 'task_reassigned',
   )
 
+  const agentsMap = input.agentStatus.agents
+
   const attentionItems: { bullet: string, kind: TimelineEntry['kind'] }[] = []
   let lastMinute: string | null = null
   let lastDateKey: string | null = null
@@ -248,10 +256,10 @@ export function renderTimeline(input: RenderTimelineInput): UserPart[] {
         else builder.pushPart(part)
       }
     } else {
-      for (const line of renderTimelineTextLines(entry)) builder.pushText(`\n${line}`)
+      for (const line of renderTimelineTextLines(entry, agentStatusMap)) builder.pushText(`\n${line}`)
     }
 
-    const bullet = maybeAttentionBullet(entry, input.timezone)
+    const bullet = maybeAttentionBullet(entry, input.timezone, agentStatusMap)
     if (bullet && (chronological.length - i - 1 > 0 || lifecycleHooks.length > 0)) {
       attentionItems.push({ bullet, kind: entry.kind })
     }

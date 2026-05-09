@@ -182,7 +182,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // 6. Build prompt from memory
         // ──────────────────────────────────────────────────────────────────────
         const timezone = sessionCtx.context?.timezone ?? null
-        const prompt = windowToPrompt(windowState, systemPrompt, timezone)
+        const prompt = windowToPrompt(windowState, systemPrompt, timezone, agentState)
 
         // ──────────────────────────────────────────────────────────────────────
         // 7. Build adapter

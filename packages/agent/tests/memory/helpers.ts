@@ -1,5 +1,6 @@
 import { Effect } from 'effect'
 import { SessionContextProjection } from '../../src/projections/session-context'
+import { AgentStatusProjection } from '../../src/projections/agent-status'
 import { WindowProjection, type ForkWindowState, type WindowEntry } from '../../src/window'
 import { windowToPrompt } from '../../src/prompts/window-to-prompt'
 import { TestHarness } from '../../src/test-harness/harness'
@@ -73,7 +74,8 @@ export function getRenderedUserText(h: Effect.Effect.Success<typeof TestHarness>
     const memory = yield* h.projectionFork(WindowProjection.Tag, null)
     const session = yield* h.runEffect(Effect.flatMap(SessionContextProjection.Tag, p => p.get))
     const timezone = session.context?.timezone ?? null
-    const prompt = windowToPrompt(memory, '', timezone, true)
+    const agentStatus = yield* h.projection(AgentStatusProjection.Tag)
+    const prompt = windowToPrompt(memory, '', timezone, agentStatus)
     return prompt.messages
       .filter(m => m._tag === 'UserMessage')
       .map(m => m.parts.map(part => part._tag === 'TextPart' ? part.text : '[image]').join(''))

@@ -162,7 +162,7 @@ describe('memory/timeline-events', () => {
         expect(prev.timeline.some(t => t.kind === 'observation')).toBe(false)
       }
 
-      const prompt = windowToPrompt(memory, '', 'UTC', true)
+      const prompt = windowToPrompt(memory, '', 'UTC', { agents: new Map() })
       const rendered = prompt.messages
         .filter(m => m._tag === 'UserMessage')
         .flatMap(m => m.parts)

@@ -66,7 +66,7 @@ const contextText = (ctx: Extract<ForkWindowState['messages'][number], { type: '
   renderTimeline({
     timeline: ctx.timeline,
     timezone: null,
-
+    agentStatus: { agents: new Map() },
   })
     .filter((p): p is { _tag: 'TextPart', text: string } => p._tag === 'TextPart')
     .map(p => p.text)
