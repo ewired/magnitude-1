@@ -393,7 +393,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
                 providerToolCallId: outcome.providerToolCallId,
                 toolName: outcome.toolName,
                 toolKey: outcome.toolKey,
-                error: outcome.error,
+                issue: outcome.issue,
               }
               break
             }

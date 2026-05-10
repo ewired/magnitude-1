@@ -41,14 +41,14 @@ function toolInputDecodeFailed(id: string, name: string): ToolInputDecodeFailed 
   }
 }
 
-function toolInputValidationFailed(id: string, name: string, error: string): ToolInputValidationFailed {
+function toolInputValidationFailed(id: string, name: string, message: string): ToolInputValidationFailed {
   return {
     _tag: 'ToolInputValidationFailed',
     toolCallId: id as ToolCallId,
     providerToolCallId: id as ProviderToolCallId,
     toolName: name,
     toolKey: name,
-    error,
+    issue: { path: [], message },
   }
 }
 
@@ -63,7 +63,7 @@ function turnEnd(outcome: HarnessEvent extends { _tag: infer T; outcome: infer O
 // ── Tests ─────────────────────────────────────────────────────────────
 
 describe('partial input assembly and ToolResultEntry on failure outcomes', () => {
-  it('assembles partial inputs into assistantMessage.toolCalls on ToolInputDecodeFailure and produces ToolResultEntry', () => {
+  it('assembles partial inputs into assistantMessage.toolCalls on ToolInputDecodeFailure and produces InputRejected result', () => {
     const reducer = CanonicalAccumulatorReducer
     let state = reducer.initial
 
@@ -71,7 +71,7 @@ describe('partial input assembly and ToolResultEntry on failure outcomes', () =>
     state = reducer.step(state, toolInputStarted('call-1', 'file_edit'))
     state = reducer.step(state, toolInputFieldChunk('call-1', ['path'], '/some/invalid/path'))
 
-    // Decode failure event — reducer produces ToolResultEntry with DecodeFailure result
+    // Decode failure event — reducer produces ToolResultEntry with InputRejected result
     state = reducer.step(state, toolInputDecodeFailed('call-1', 'file_edit'))
 
     // Turn ends with decode failure
@@ -93,17 +93,18 @@ describe('partial input assembly and ToolResultEntry on failure outcomes', () =>
     expect(toolCall!.name).toBe('file_edit')
     expect(toolCall!.input).toEqual({ path: '/some/invalid/path' })
 
-    // ToolResultEntry with DecodeFailure result
+    // ToolResultEntry with InputRejected result
     const toolResult = canonical.toolResults[0]
     expect(toolResult).toBeDefined()
     expect(toolResult!.toolName).toBe('file_edit')
-    expect(toolResult!.result._tag).toBe('DecodeFailure')
-    if (toolResult!.result._tag === 'DecodeFailure') {
-      expect(toolResult!.result.receivedInput).toEqual({ path: '/some/invalid/path' })
+    expect(toolResult!.result._tag).toBe('InputRejected')
+    if (toolResult!.result._tag === 'InputRejected') {
+      expect(toolResult!.result.issue).toEqual({ path: [], message: 'bad input' })
+      expect(toolResult!.result.partialInput).toEqual({ path: '/some/invalid/path' })
     }
   })
 
-  it('assembles partial inputs into assistantMessage.toolCalls on ToolInputValidationFailure and produces ToolResultEntry', () => {
+  it('assembles partial inputs into assistantMessage.toolCalls on ToolInputValidationFailure and produces InputRejected result', () => {
     const reducer = CanonicalAccumulatorReducer
     let state = reducer.initial
 
@@ -111,7 +112,7 @@ describe('partial input assembly and ToolResultEntry on failure outcomes', () =>
     state = reducer.step(state, toolInputStarted('call-1', 'file_edit'))
     state = reducer.step(state, toolInputFieldChunk('call-1', ['path'], '/some/invalid/path'))
 
-    // Validation failure event — reducer produces ToolResultEntry with ValidationFailure result
+    // Validation failure event — reducer produces ToolResultEntry with InputRejected result
     state = reducer.step(state, toolInputValidationFailed('call-1', 'file_edit', 'Path does not exist: /some/invalid/path'))
 
     // Turn ends with validation failure
@@ -121,7 +122,7 @@ describe('partial input assembly and ToolResultEntry on failure outcomes', () =>
       providerToolCallId: 'call-1' as ProviderToolCallId,
       toolName: 'file_edit',
       toolKey: 'file_edit',
-      error: 'Path does not exist: /some/invalid/path',
+      issue: { path: [], message: 'Path does not exist: /some/invalid/path' },
     }))
 
     const canonical = projectCanonical(state)
@@ -132,13 +133,13 @@ describe('partial input assembly and ToolResultEntry on failure outcomes', () =>
     expect(toolCall!.name).toBe('file_edit')
     expect(toolCall!.input).toEqual({ path: '/some/invalid/path' })
 
-    // ToolResultEntry with ValidationFailure result
+    // ToolResultEntry with InputRejected result
     const toolResult = canonical.toolResults[0]
     expect(toolResult).toBeDefined()
     expect(toolResult!.toolName).toBe('file_edit')
-    expect(toolResult!.result._tag).toBe('ValidationFailure')
-    if (toolResult!.result._tag === 'ValidationFailure') {
-      expect(toolResult!.result.error).toBe('Path does not exist: /some/invalid/path')
+    expect(toolResult!.result._tag).toBe('InputRejected')
+    if (toolResult!.result._tag === 'InputRejected') {
+      expect(toolResult!.result.issue).toEqual({ path: [], message: 'Path does not exist: /some/invalid/path' })
       expect(toolResult!.result.partialInput).toEqual({ path: '/some/invalid/path' })
     }
   })

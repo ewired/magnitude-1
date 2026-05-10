@@ -262,7 +262,7 @@ export type UnexpectedErrorDetail =
 export type TurnOutcome =
   | { readonly _tag: 'Completed'; readonly completion: TurnCompletion }
   | { readonly _tag: 'ParseFailure'; readonly error: ParseFailureEvent }
-  | { readonly _tag: 'ToolInputValidationFailure'; readonly toolCallId: string; readonly providerToolCallId: string; readonly toolName: string; readonly toolKey: string; readonly error: string }
+  | { readonly _tag: 'ToolInputValidationFailure'; readonly toolCallId: string; readonly providerToolCallId: string; readonly toolName: string; readonly toolKey: string; readonly issue: ValidationIssue }
   | { readonly _tag: 'ToolExecutionError'; readonly toolCallId: string; readonly providerToolCallId: string; readonly toolName: string; readonly toolKey: string; readonly error: { readonly message: string } }
   | { readonly _tag: 'GateRejected'; readonly toolCallId: string; readonly providerToolCallId: string; readonly toolName: string }
   | { readonly _tag: 'ProviderNotReady'; readonly detail: ProviderNotReadyDetail }

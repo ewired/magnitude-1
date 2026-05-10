@@ -15,16 +15,14 @@ type ToolResultErased =
   | { readonly _tag: "Error"; readonly error: ToolError }
   | { readonly _tag: "Rejected"; readonly rejection: unknown }
   | { readonly _tag: "Interrupted" }
-  | { readonly _tag: "DecodeFailure"; readonly issue: ValidationIssue; readonly receivedInput: JsonValue }
-  | { readonly _tag: "ValidationFailure"; readonly error: string; readonly partialInput: JsonValue }
+  | { readonly _tag: "InputRejected"; readonly issue: ValidationIssue; readonly partialInput: JsonValue }
 
 type ToolResultConcrete<TOutput, TError extends ToolError> =
   | { readonly _tag: "Success"; readonly output: TOutput }
   | { readonly _tag: "Error"; readonly error: TError }
   | { readonly _tag: "Rejected"; readonly rejection: unknown }
   | { readonly _tag: "Interrupted" }
-  | { readonly _tag: "DecodeFailure"; readonly issue: ValidationIssue; readonly receivedInput: JsonValue }
-  | { readonly _tag: "ValidationFailure"; readonly error: string; readonly partialInput: JsonValue }
+  | { readonly _tag: "InputRejected"; readonly issue: ValidationIssue; readonly partialInput: JsonValue }
 
 export type ToolResult<TOutput = never, TError extends ToolError = never> =
   [TOutput] extends [never]
@@ -86,7 +84,7 @@ type TurnOutcomeConcrete<TInput> =
   | { readonly _tag: "ContentFiltered" }
   | { readonly _tag: "SafetyStop"; readonly reason: SafetyStopReason }
   | ToolInputDecodeFailure<TInput>
-  | { readonly _tag: "ToolInputValidationFailure"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: string }
+  | { readonly _tag: "ToolInputValidationFailure"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly issue: ValidationIssue }
   | { readonly _tag: "ToolExecutionError"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: ToolError }
   | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
@@ -98,7 +96,7 @@ type TurnOutcomeErased =
   | { readonly _tag: "ContentFiltered" }
   | { readonly _tag: "SafetyStop"; readonly reason: SafetyStopReason }
   | ToolInputDecodeFailure
-  | { readonly _tag: "ToolInputValidationFailure"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: string }
+  | { readonly _tag: "ToolInputValidationFailure"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly issue: ValidationIssue }
   | { readonly _tag: "ToolExecutionError"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: ToolError }
   | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
@@ -253,7 +251,7 @@ export interface ToolInputValidationFailed {
   readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
-  readonly error: string
+  readonly issue: ValidationIssue
 }
 
 // ── Reasoning and Messages ───────────────────────────────────────────

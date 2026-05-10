@@ -62,7 +62,7 @@ export const readTool = defineHarnessTool({
       const fullPath = resolve(cwd, expandedPath)
       const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
       if (!exists) {
-        return yield* Effect.fail(new StreamValidationError({ error: `File not found: ${input.path.value}` }))
+        return yield* Effect.fail(new StreamValidationError({ message: `File not found: ${input.path.value}` }))
       }
       return {}
     }),
@@ -185,7 +185,7 @@ export const editTool = defineHarnessTool({
         const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
         if (!exists) {
           return yield* Effect.fail(new StreamValidationError({
-            error: `File not found: ${path.value}`,
+            message: `File not found: ${path.value}`,
           }))
         }
 
@@ -207,7 +207,7 @@ export const editTool = defineHarnessTool({
 
         if (!content.includes(input.old.value)) {
           return yield* Effect.fail(new StreamValidationError({
-            error: `Text not found in file. Read the file first to get exact content.`,
+            message: `Text not found in file. Read the file first to get exact content.`,
           }))
         }
       }
@@ -290,7 +290,7 @@ export const treeTool = defineHarnessTool({
       const fullPath = resolve(cwd, expandedPath)
       const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
       if (!exists) {
-        return yield* Effect.fail(new StreamValidationError({ error: `Path not found: ${input.path.value}` }))
+        return yield* Effect.fail(new StreamValidationError({ message: `Path not found: ${input.path.value}` }))
       }
       return {}
     }),
@@ -358,7 +358,7 @@ export const grepTool = defineHarnessTool({
       const fullPath = resolve(cwd, expandedPath)
       const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
       if (!exists) {
-        return yield* Effect.fail(new StreamValidationError({ error: `Path not found: ${pathValue}` }))
+        return yield* Effect.fail(new StreamValidationError({ message: `Path not found: ${pathValue}` }))
       }
       return {}
     }),
@@ -406,7 +406,7 @@ export const viewTool = defineHarnessTool({
       const fullPath = resolve(cwd, expandedPath)
       const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
       if (!exists) {
-        return yield* Effect.fail(new StreamValidationError({ error: `File not found: ${input.path.value}` }))
+        return yield* Effect.fail(new StreamValidationError({ message: `File not found: ${input.path.value}` }))
       }
       return {}
     }),

@@ -195,27 +195,7 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
       }
     }
 
-    case "ToolInputDecodeFailed": {
-      const chunks = state.toolCallInputChunks.get(event.toolCallId)
-      const receivedInput: JsonValue = chunks && Object.keys(chunks).length > 0
-        ? extractPartialAsJson(chunks)
-        : {}
-      const result: ToolResultEntry = {
-        toolCallId: event.toolCallId,
-        providerToolCallId: event.providerToolCallId,
-        toolName: event.toolName,
-        result: {
-          _tag: "DecodeFailure",
-          issue: event.issue,
-          receivedInput,
-        },
-      }
-      return {
-        ...state,
-        toolResults: [...state.toolResults, result],
-      }
-    }
-
+    case "ToolInputDecodeFailed":
     case "ToolInputValidationFailed": {
       const chunks = state.toolCallInputChunks.get(event.toolCallId)
       const partialInput: JsonValue = chunks && Object.keys(chunks).length > 0
@@ -226,8 +206,8 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
         providerToolCallId: event.providerToolCallId,
         toolName: event.toolName,
         result: {
-          _tag: "ValidationFailure",
-          error: event.error,
+          _tag: "InputRejected",
+          issue: event.issue,
           partialInput,
         },
       }
@@ -302,7 +282,7 @@ export const CanonicalAccumulatorReducer: Reducer<CanonicalAccumulator> = {
 
 export type ToolOutcome =
   | { readonly _tag: "Completed"; readonly result: ToolResult }
-  | { readonly _tag: "DecodeFailure" }
+  | { readonly _tag: "InputRejected" }
 
 // ── EngineState ──────────────────────────────────────────────────────
 
@@ -342,10 +322,10 @@ function engineStateStep(state: EngineState, event: HarnessEvent): EngineState {
 
     case "TurnEnd": {
       let newState = state
-      // Handle ToolInputDecodeFailure via TurnEnd outcome
-      if (event.outcome._tag === "ToolInputDecodeFailure") {
+      // Both decode and validation failures are input rejections
+      if (event.outcome._tag === "ToolInputDecodeFailure" || event.outcome._tag === "ToolInputValidationFailure") {
         const toolOutcomes = new Map(state.toolOutcomes)
-        toolOutcomes.set(event.outcome.toolCallId, { _tag: "DecodeFailure" })
+        toolOutcomes.set(event.outcome.toolCallId, { _tag: "InputRejected" })
         const deadToolCalls = new Set(state.deadToolCalls)
         deadToolCalls.add(event.outcome.toolCallId)
         newState = { ...state, toolOutcomes, deadToolCalls }

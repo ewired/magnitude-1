@@ -87,7 +87,7 @@ export function translateTurnOutcome(event: TurnOutcomeEvent): HarnessEvent {
         providerToolCallId: agentOutcome.providerToolCallId as ProviderToolCallId,
         toolName: agentOutcome.toolName,
         toolKey: agentOutcome.toolKey,
-        error: agentOutcome.error,
+        issue: agentOutcome.issue,
       }
       break
     }

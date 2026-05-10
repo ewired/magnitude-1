@@ -27,10 +27,8 @@ function estimateResultTokens(result: ToolResult): number {
       return estimateText(JSON.stringify(result.rejection)) + 30
     case "Interrupted":
       return 10
-    case "DecodeFailure":
-      return estimateText(JSON.stringify(result.receivedInput)) + 80
-    case "ValidationFailure":
-      return estimateText(result.error) + estimateText(JSON.stringify(result.partialInput)) + 50
+    case "InputRejected":
+      return estimateText(JSON.stringify(result.partialInput)) + 80
   }
 }
 

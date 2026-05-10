@@ -1,5 +1,5 @@
 import { Effect, Cause, Data, Layer, Stream, Schema } from "effect"
-import type { ProviderToolCallId, ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason } from "@magnitudedev/ai"
+import type { ProviderToolCallId, ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason, ValidationIssue } from "@magnitudedev/ai"
 import type { StreamingPartial } from "@magnitudedev/ai"
 import type { HarnessEvent, ToolError, ToolResult, TurnOutcome } from "../events"
 import type { HarnessHooks, ExecuteHookContext } from "../hooks"
@@ -295,17 +295,18 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
                 ).pipe(
                   Effect.catchTag("StreamValidationError", (e) =>
                     Effect.gen(function* () {
+                      const issue: ValidationIssue = { path: [], message: e.message }
                       yield* emit({
                         _tag: "ToolInputValidationFailed",
                         toolCallId: event.toolCallId,
                         providerToolCallId: event.providerToolCallId,
                         toolName: acc.toolName,
                         toolKey: acc.toolKey,
-                        error: e.error,
+                        issue,
                       })
                       // No formatting — the reducer produces ToolResultEntry from this event
                       return yield* Effect.fail(new TurnAbort({
-                        outcome: { _tag: "ToolInputValidationFailure", toolCallId: acc.toolCallId, providerToolCallId: acc.providerToolCallId, toolName: acc.toolName, toolKey: acc.toolKey, error: e.error },
+                        outcome: { _tag: "ToolInputValidationFailure", toolCallId: acc.toolCallId, providerToolCallId: acc.providerToolCallId, toolName: acc.toolName, toolKey: acc.toolKey, issue },
                       }))
                     }),
                   ),

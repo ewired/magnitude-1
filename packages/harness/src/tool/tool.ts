@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@magnitudedev/ai"
+import type { ToolDefinition, ValidationIssue } from "@magnitudedev/ai"
 import type { Schema } from "effect"
 import { Data, type Effect } from "effect"
 import type { StreamingPartial } from "@magnitudedev/ai"
@@ -6,7 +6,7 @@ import type { StreamingPartial } from "@magnitudedev/ai"
 // --- StreamValidationError ---
 
 export class StreamValidationError extends Data.TaggedError("StreamValidationError")<{
-  readonly error: string
+  readonly message: string
 }> {}
 
 // --- ToolContext ---

@@ -72,21 +72,19 @@ function formatResult(
       return renderTagged('tool_rejected', result.rejection)
     case "Interrupted":
       return [{ _tag: 'TextPart', text: '<tool_interrupted/>' }]
-    case "DecodeFailure":
-      return formatDecodeFailure(result, toolName, schemaLookup)
-    case "ValidationFailure":
-      return formatValidationFailure(result)
+    case "InputRejected":
+      return formatInputRejected(result, toolName, schemaLookup)
   }
 }
 
-function formatDecodeFailure(
-  result: Extract<ToolResult, { _tag: "DecodeFailure" }>,
+function formatInputRejected(
+  result: Extract<ToolResult, { _tag: "InputRejected" }>,
   toolName: string,
   schemaLookup: Map<string, Schema.Schema.AnyNoContext>,
 ): readonly ToolResultPart[] {
   const lines: string[] = [
-    `<decode_error>`,
-    `Invalid input for tool.`,
+    `<input_rejected>`,
+    `Tool input was rejected.`,
     ``,
   ]
   if (result.issue.path.length > 0) {
@@ -110,32 +108,11 @@ function formatDecodeFailure(
   lines.push(`Received:`)
 
   const text = lines.join('\n')
-  const receivedParts = renderToolOutput(result.receivedInput)
+  const receivedParts = renderToolOutput(result.partialInput)
   const parts: ToolResultPart[] = [{ _tag: 'TextPart', text }]
   for (const p of receivedParts) {
     parts.push(p)
   }
-  parts.push({ _tag: 'TextPart', text: '\n</decode_error>' })
-  return parts
-}
-
-function formatValidationFailure(
-  result: Extract<ToolResult, { _tag: "ValidationFailure" }>,
-): readonly ToolResultPart[] {
-  const lines: string[] = [
-    `<streaming_validation_error>`,
-    `Tool input rejected during streaming validation.`,
-    ``,
-    `Problem: ${result.error}`,
-    ``,
-    `Partial input (streaming was interrupted):`,
-  ]
-  const text = lines.join('\n')
-  const partialParts = renderToolOutput(result.partialInput)
-  const parts: ToolResultPart[] = [{ _tag: 'TextPart', text }]
-  for (const p of partialParts) {
-    parts.push(p)
-  }
-  parts.push({ _tag: 'TextPart', text: '\n</streaming_validation_error>' })
+  parts.push({ _tag: 'TextPart', text: '\n</input_rejected>' })
   return parts
 }

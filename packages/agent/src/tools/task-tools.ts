@@ -114,7 +114,7 @@ export const createTaskTool = defineHarnessTool({
       if (!graphState.tasks.has(input.parent.value)) {
         const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
         return yield* new StreamValidationError({
-          error: `Parent task not found: ${input.parent.value}. Valid IDs: ${validIds}`,
+          message: `Parent task not found: ${input.parent.value}. Valid IDs: ${validIds}`,
         })
       }
       return {}
@@ -155,7 +155,7 @@ export const updateTaskTool = defineHarnessTool({
       if (!graphState.tasks.has(input.taskId.value)) {
         const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
         return yield* new StreamValidationError({
-          error: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
+          message: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
         })
       }
       return {}
@@ -202,7 +202,7 @@ export const spawnWorkerTool = defineHarnessTool({
       if (!graphState.tasks.has(input.taskId.value)) {
         const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
         return yield* new StreamValidationError({
-          error: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
+          message: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
         })
       }
 
@@ -211,7 +211,7 @@ export const spawnWorkerTool = defineHarnessTool({
         const agentState = yield* agentStateReader.getAgentState()
         if (agentState.agents.has(input.agentId.value)) {
           return yield* new StreamValidationError({
-            error: `Agent ${input.agentId.value} already exists. Use a unique agentId.`,
+            message: `Agent ${input.agentId.value} already exists. Use a unique agentId.`,
           })
         }
       }
@@ -279,7 +279,7 @@ export const killWorkerTool = defineHarnessTool({
       if (!graphState.tasks.has(input.taskId.value)) {
         const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
         return yield* new StreamValidationError({
-          error: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
+          message: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
         })
       }
       return {}
@@ -318,7 +318,7 @@ export const reassignWorkerTool = defineHarnessTool({
         if (!agentState.agents.has(input.agentId.value)) {
           const validIds = [...agentState.agents.keys()].slice(0, 20).join(', ')
           return yield* new StreamValidationError({
-            error: `Agent not found: ${input.agentId.value}. Valid IDs: ${validIds}`,
+            message: `Agent not found: ${input.agentId.value}. Valid IDs: ${validIds}`,
           })
         }
       }
@@ -329,7 +329,7 @@ export const reassignWorkerTool = defineHarnessTool({
         if (!graphState.tasks.has(input.taskId.value)) {
           const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
           return yield* new StreamValidationError({
-            error: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
+            message: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
           })
         }
       }
