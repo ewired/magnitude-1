@@ -1,5 +1,5 @@
 import { Effect, Cause, Data, Layer, Stream, Schema } from "effect"
-import type { ProviderToolCallId, ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason, ValidationIssue } from "@magnitudedev/ai"
+import type { ProviderToolCallId, ResponseStreamEvent, StreamError, ToolCallId, StreamingFieldParser, FinishReason } from "@magnitudedev/ai"
 import type { StreamingPartial } from "@magnitudedev/ai"
 import type { HarnessEvent, ToolError, ToolResult, TurnOutcome } from "../events"
 import type { HarnessHooks, ExecuteHookContext } from "../hooks"
@@ -48,7 +48,7 @@ interface ToolCallAccumulator {
   readonly toolName: string
   readonly toolKey: string
   readonly streamState: unknown
-  readonly streamHook: StreamHook<any, any, any, any, any> | undefined
+  readonly streamHook: StreamHook<any, any, any, any> | undefined
 }
 
 // ── Dispatch ─────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         // Fast-fail on cached error outcomes
         if (cached.result._tag === "Error") {
           return yield* Effect.fail(new TurnAbort({
-            outcome: { _tag: "ToolExecutionError", toolCallId, toolName, toolKey, error: cached.result.error },
+            outcome: { _tag: "ToolExecutionError", toolCallId, providerToolCallId, toolName, toolKey, error: cached.result.error },
           }))
         }
       })
@@ -161,7 +161,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         yield* emit({ _tag: "ToolExecutionEnded", toolCallId, providerToolCallId, toolName, toolKey, result })
         const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, result, hooks))
         yield* emit({ _tag: "ToolResultFormatted", toolCallId, providerToolCallId, toolName, toolKey, parts })
-        return yield* Effect.fail(new TurnAbort({ outcome: { _tag: "GateRejected", toolCallId, toolName } }))
+        return yield* Effect.fail(new TurnAbort({ outcome: { _tag: "GateRejected", toolCallId, providerToolCallId, toolName } }))
       }
 
       const effectiveInput = (decision._tag === "Proceed" && decision.modifiedInput !== undefined ? decision.modifiedInput : input) as Record<string, unknown>
@@ -208,7 +208,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
       // Fast-fail on tool execution errors
       if (result._tag === "Error") {
         return yield* Effect.fail(new TurnAbort({
-          outcome: { _tag: "ToolExecutionError", toolCallId, toolName, toolKey, error: result.error },
+          outcome: { _tag: "ToolExecutionError", toolCallId, providerToolCallId, toolName, toolKey, error: result.error },
         }))
       }
     })
@@ -297,14 +297,36 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
                 const newStreamState = yield* provideLayer(
                   acc.streamHook.onInput(partial, acc.streamState, toolCtx),
                 ).pipe(
-                  Effect.catchAllCause((cause) =>
-                    Effect.as(
-                      Effect.logWarning("Stream hook onInput failed", { cause: Cause.squash(cause) }),
-                      acc.streamState,
-                    ),
+                  Effect.catchTag("StreamValidationError", (e) =>
+                    Effect.gen(function* () {
+                      yield* emit({
+                        _tag: "ToolInputValidationFailed",
+                        toolCallId: event.toolCallId,
+                        providerToolCallId: event.providerToolCallId,
+                        toolName: acc.toolName,
+                        toolKey: acc.toolKey,
+                        error: e.error,
+                      })
+                      const result: ToolResult = { _tag: "Error", error: { message: e.error } }
+                      const parts = yield* provideLayer(
+                        formatToolResult(acc.toolCallId, acc.toolName, acc.toolKey, result, hooks),
+                      )
+                      yield* emit({
+                        _tag: "ToolResultFormatted",
+                        toolCallId: acc.toolCallId,
+                        providerToolCallId: acc.providerToolCallId,
+                        toolName: acc.toolName,
+                        toolKey: acc.toolKey,
+                        parts,
+                      })
+                      return yield* Effect.fail(new TurnAbort({
+                        outcome: { _tag: "ToolInputValidationFailure", toolCallId: acc.toolCallId, providerToolCallId: acc.providerToolCallId, toolName: acc.toolName, toolKey: acc.toolKey, error: e.error },
+                      }))
+                    }),
                   ),
                 )
-                accumulators.set(event.toolCallId, { ...acc, streamState: newStreamState })
+                const current = accumulators.get(event.toolCallId)!
+                accumulators.set(event.toolCallId, { ...current, streamState: newStreamState })
               }
             }
           }

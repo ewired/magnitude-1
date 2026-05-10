@@ -262,6 +262,9 @@ export type UnexpectedErrorDetail =
 export type TurnOutcome =
   | { readonly _tag: 'Completed'; readonly completion: TurnCompletion }
   | { readonly _tag: 'ParseFailure'; readonly error: ParseFailureEvent }
+  | { readonly _tag: 'ToolInputValidationFailure'; readonly toolCallId: string; readonly providerToolCallId: string; readonly toolName: string; readonly toolKey: string; readonly error: string }
+  | { readonly _tag: 'ToolExecutionError'; readonly toolCallId: string; readonly providerToolCallId: string; readonly toolName: string; readonly toolKey: string; readonly error: { readonly message: string } }
+  | { readonly _tag: 'GateRejected'; readonly toolCallId: string; readonly providerToolCallId: string; readonly toolName: string }
   | { readonly _tag: 'ProviderNotReady'; readonly detail: ProviderNotReadyDetail }
   | { readonly _tag: 'ConnectionFailure'; readonly detail: ConnectionFailureDetail }
   | { readonly _tag: 'ContextWindowExceeded' }
@@ -279,6 +282,9 @@ export function outcomeWillChainContinue(outcome: TurnOutcome): boolean {
   return (
     (outcome._tag === 'Completed' && outcome.completion.toolCallsCount > 0)
     || outcome._tag === 'ParseFailure'
+    || outcome._tag === 'ToolInputValidationFailure'
+    || outcome._tag === 'ToolExecutionError'
+    || outcome._tag === 'GateRejected'
     || outcome._tag === 'ConnectionFailure'
     || outcome._tag === 'ContextWindowExceeded'
   )

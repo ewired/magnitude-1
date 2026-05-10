@@ -27,6 +27,7 @@ function isToolLifecycleEvent(event: HarnessEvent): event is ToolLifecycleEvent 
     case 'ToolInputFieldComplete':
     case 'ToolInputReady':
     case 'ToolInputDecodeFailed':
+    case 'ToolInputValidationFailed':
     case 'ToolExecutionStarted':
     case 'ToolExecutionEnded':
     case 'ToolEmission':

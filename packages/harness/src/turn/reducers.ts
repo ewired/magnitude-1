@@ -274,6 +274,12 @@ function engineStateStep(state: EngineState, event: HarnessEvent): EngineState {
       return { ...state, toolOutcomes }
     }
 
+    case "ToolInputValidationFailed": {
+      const deadToolCalls = new Set(state.deadToolCalls)
+      deadToolCalls.add(event.toolCallId)
+      return { ...state, deadToolCalls }
+    }
+
     case "TurnEnd": {
       let newState = state
       // Handle ToolInputDecodeFailure via TurnEnd outcome
@@ -356,7 +362,7 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
       return { handles }
     }
 
-    if (event._tag === "TurnEnd" && (event.outcome._tag === "Interrupted" || event.outcome._tag === "ToolExecutionError")) {
+    if (event._tag === "TurnEnd" && (event.outcome._tag === "Interrupted" || event.outcome._tag === "ToolExecutionError" || event.outcome._tag === "ToolInputValidationFailure")) {
       const handles = new Map(state.handles)
       for (const [id, handle] of handles) {
         if (handle.state.phase !== "completed" && handle.state.phase !== "error" && handle.state.phase !== "rejected") {
@@ -371,6 +377,8 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
       event._tag === "ToolInputFieldChunk" ||
       event._tag === "ToolInputFieldComplete" ||
       event._tag === "ToolInputReady" ||
+      event._tag === "ToolInputDecodeFailed" ||
+      event._tag === "ToolInputValidationFailed" ||
       event._tag === "ToolExecutionStarted" ||
       event._tag === "ToolExecutionEnded" ||
       event._tag === "ToolEmission" ||

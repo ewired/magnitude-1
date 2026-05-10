@@ -49,6 +49,8 @@ export const updateTaskModel = defineStateModel(updateTaskTool)<UpdateTaskState>
       }
       case 'ToolInputDecodeFailed':
         return { ...state, phase: 'error', errorMessage: event.issue.message }
+      case 'ToolInputValidationFailed':
+        return { ...state, phase: 'error', errorMessage: event.error }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

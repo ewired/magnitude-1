@@ -72,6 +72,17 @@ export function createVirtualFsLayer(files: Map<string, string>, cwd: string, sc
   }
 
   return Layer.succeed(Fs, {
+    exists: (path) =>
+      Effect.try({
+        try: () => {
+          const absolutePath = toAbsoluteVirtualPath(path, cwd, scratchpadPath)
+          if (absoluteFiles.has(absolutePath)) return true
+          if (isDirectoryPath(absolutePath, absoluteFiles)) return true
+          return false
+        },
+        catch: (cause) => new FsError({ operation: 'exists', path, cause }),
+      }),
+
     readFile: (path) =>
       Effect.try({
         try: () => Buffer.from(readFromMap(path), 'utf8'),

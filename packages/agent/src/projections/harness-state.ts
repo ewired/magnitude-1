@@ -20,7 +20,7 @@ import {
   type Toolkit,
   type TurnOutcome as HarnessTurnOutcome,
 } from '@magnitudedev/harness'
-import type { ResponseUsage, ToolCallId } from '@magnitudedev/ai'
+import type { ResponseUsage, ToolCallId, ProviderToolCallId } from '@magnitudedev/ai'
 import type { AppEvent, TurnOutcomeEvent } from '../events'
 import { ToolkitAmbient } from '../ambient/toolkit-ambient'
 
@@ -77,6 +77,37 @@ export function translateTurnOutcome(event: TurnOutcomeEvent): HarnessEvent {
         issue: e.issue,
         inputSchema: e.inputSchema,
         receivedInput: e.receivedInput,
+      }
+      break
+    }
+    case 'ToolInputValidationFailure': {
+      harnessOutcome = {
+        _tag: 'ToolInputValidationFailure' as const,
+        toolCallId: agentOutcome.toolCallId as ToolCallId,
+        providerToolCallId: agentOutcome.providerToolCallId as ProviderToolCallId,
+        toolName: agentOutcome.toolName,
+        toolKey: agentOutcome.toolKey,
+        error: agentOutcome.error,
+      }
+      break
+    }
+    case 'ToolExecutionError': {
+      harnessOutcome = {
+        _tag: 'ToolExecutionError' as const,
+        toolCallId: agentOutcome.toolCallId as ToolCallId,
+        providerToolCallId: agentOutcome.providerToolCallId as ProviderToolCallId,
+        toolName: agentOutcome.toolName,
+        toolKey: agentOutcome.toolKey,
+        error: agentOutcome.error,
+      }
+      break
+    }
+    case 'GateRejected': {
+      harnessOutcome = {
+        _tag: 'GateRejected' as const,
+        toolCallId: agentOutcome.toolCallId as ToolCallId,
+        providerToolCallId: agentOutcome.providerToolCallId as ProviderToolCallId,
+        toolName: agentOutcome.toolName,
       }
       break
     }

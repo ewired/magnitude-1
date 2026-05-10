@@ -63,7 +63,7 @@ export type ToolInputDecodeFailure<TInput = never> =
 // ── Turn Outcome ─────────────────────────────────────────────────────
 
 interface TurnOutcomeBase {
-  readonly _tag: "Completed" | "OutputTruncated" | "ContentFiltered" | "SafetyStop" | "ToolInputDecodeFailure" | "ToolExecutionError" | "GateRejected" | "EngineDefect" | "Interrupted"
+  readonly _tag: "Completed" | "OutputTruncated" | "ContentFiltered" | "SafetyStop" | "ToolInputDecodeFailure" | "ToolInputValidationFailure" | "ToolExecutionError" | "GateRejected" | "EngineDefect" | "Interrupted"
 }
 
 type TurnOutcomeConcrete<TInput> =
@@ -72,8 +72,9 @@ type TurnOutcomeConcrete<TInput> =
   | { readonly _tag: "ContentFiltered" }
   | { readonly _tag: "SafetyStop"; readonly reason: SafetyStopReason }
   | ToolInputDecodeFailure<TInput>
-  | { readonly _tag: "ToolExecutionError"; readonly toolCallId: ToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: ToolError }
-  | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly toolName: string }
+  | { readonly _tag: "ToolInputValidationFailure"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: string }
+  | { readonly _tag: "ToolExecutionError"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: ToolError }
+  | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
   | { readonly _tag: "Interrupted" }
 
@@ -83,8 +84,9 @@ type TurnOutcomeErased =
   | { readonly _tag: "ContentFiltered" }
   | { readonly _tag: "SafetyStop"; readonly reason: SafetyStopReason }
   | ToolInputDecodeFailure
-  | { readonly _tag: "ToolExecutionError"; readonly toolCallId: ToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: ToolError }
-  | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly toolName: string }
+  | { readonly _tag: "ToolInputValidationFailure"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: string }
+  | { readonly _tag: "ToolExecutionError"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string; readonly toolKey: string; readonly error: ToolError }
+  | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
   | { readonly _tag: "Interrupted" }
 
@@ -240,6 +242,17 @@ export interface ToolResultFormatted {
   readonly parts: readonly ToolResultPart[]
 }
 
+// ── Tool Input Validation Failed ───────────────────────────────────
+
+export interface ToolInputValidationFailed {
+  readonly _tag: "ToolInputValidationFailed"
+  readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
+  readonly toolName: string
+  readonly toolKey: string
+  readonly error: string
+}
+
 // ── Reasoning and Messages ───────────────────────────────────────────
 
 export interface ThoughtStart {
@@ -296,6 +309,7 @@ type ToolLifecycleEventErased =
   | ToolInputFieldComplete
   | ToolInputReady
   | ToolInputDecodeFailed
+  | ToolInputValidationFailed
   | ToolExecutionStarted
   | ToolExecutionEnded
   | ToolEmission
@@ -307,6 +321,7 @@ type ToolLifecycleEventConcrete<TInput, TOutput, TEmission, TError extends ToolE
   | ToolInputFieldComplete
   | ToolInputReady
   | ToolInputDecodeFailed<TInput>
+  | ToolInputValidationFailed
   | ToolExecutionStarted<TInput>
   | ToolExecutionEnded<TOutput, TError>
   | ToolEmission<TEmission>
@@ -325,6 +340,7 @@ type HarnessEventErased =
   | MessageDelta
   | MessageEnd
   | ToolLifecycleEvent
+  | ToolInputValidationFailed
   | TurnEnd
 
 type HarnessEventConcrete<TInput, TOutput, TEmission, TError extends ToolError> =
@@ -335,6 +351,7 @@ type HarnessEventConcrete<TInput, TOutput, TEmission, TError extends ToolError> 
   | MessageDelta
   | MessageEnd
   | ToolLifecycleEvent<TInput, TOutput, TEmission, TError>
+  | ToolInputValidationFailed
   | TurnEnd<TInput>
 
 export type HarnessEvent<TInput = never, TOutput = never, TEmission = never, TError extends ToolError = never> =

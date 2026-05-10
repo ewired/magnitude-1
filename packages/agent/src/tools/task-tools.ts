@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { defineHarnessTool } from '@magnitudedev/harness'
+import { defineHarnessTool, StreamValidationError } from '@magnitudedev/harness'
 import { Fork } from '@magnitudedev/event-core'
 import { ExecutionManager } from '../execution/types'
 import { TaskGraphStateReaderTag } from './task-reader'
@@ -105,6 +105,21 @@ export const createTaskTool = defineHarnessTool({
     outputSchema: Schema.Struct({ taskId: Schema.String }),
   },
   errorSchema: TaskToolErrorSchema,
+  stream: {
+    initial: {},
+    onInput: (input, _state, _ctx) => Effect.gen(function* () {
+      if (!input.parent?.isFinal || !input.parent.value) return {}
+      const taskReader = yield* TaskGraphStateReaderTag
+      const graphState = yield* taskReader.getState()
+      if (!graphState.tasks.has(input.parent.value)) {
+        const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
+        return yield* new StreamValidationError({
+          error: `Parent task not found: ${input.parent.value}. Valid IDs: ${validIds}`,
+        })
+      }
+      return {}
+    }),
+  },
   execute: (input, _ctx) =>
     Effect.gen(function* () {
       yield* runDirective({
@@ -131,6 +146,21 @@ export const updateTaskTool = defineHarnessTool({
     }),
   },
   errorSchema: TaskToolErrorSchema,
+  stream: {
+    initial: {},
+    onInput: (input, _state, _ctx) => Effect.gen(function* () {
+      if (!input.taskId?.isFinal) return {}
+      const taskReader = yield* TaskGraphStateReaderTag
+      const graphState = yield* taskReader.getState()
+      if (!graphState.tasks.has(input.taskId.value)) {
+        const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
+        return yield* new StreamValidationError({
+          error: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
+        })
+      }
+      return {}
+    }),
+  },
   execute: (input, _ctx) =>
     Effect.gen(function* () {
       yield* runDirective({
@@ -161,6 +191,34 @@ export const spawnWorkerTool = defineHarnessTool({
     }),
   },
   errorSchema: TaskToolErrorSchema,
+  stream: {
+    initial: {},
+    onInput: (input, _state, _ctx) => Effect.gen(function* () {
+      if (!input.taskId?.isFinal) return {}
+
+      const taskReader = yield* TaskGraphStateReaderTag
+      const graphState = yield* taskReader.getState()
+
+      if (!graphState.tasks.has(input.taskId.value)) {
+        const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
+        return yield* new StreamValidationError({
+          error: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
+        })
+      }
+
+      if (input.agentId?.isFinal) {
+        const agentStateReader = yield* AgentStateReaderTag
+        const agentState = yield* agentStateReader.getAgentState()
+        if (agentState.agents.has(input.agentId.value)) {
+          return yield* new StreamValidationError({
+            error: `Agent ${input.agentId.value} already exists. Use a unique agentId.`,
+          })
+        }
+      }
+
+      return {}
+    }),
+  },
   execute: (input, _ctx) =>
     Effect.gen(function* () {
       const roleStr = input.role ?? 'engineer'
@@ -212,6 +270,21 @@ export const killWorkerTool = defineHarnessTool({
     }),
   },
   errorSchema: TaskToolErrorSchema,
+  stream: {
+    initial: {},
+    onInput: (input, _state, _ctx) => Effect.gen(function* () {
+      if (!input.taskId?.isFinal) return {}
+      const taskReader = yield* TaskGraphStateReaderTag
+      const graphState = yield* taskReader.getState()
+      if (!graphState.tasks.has(input.taskId.value)) {
+        const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
+        return yield* new StreamValidationError({
+          error: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
+        })
+      }
+      return {}
+    }),
+  },
   execute: (input, _ctx) =>
     Effect.gen(function* () {
       yield* runDirective({
@@ -236,6 +309,34 @@ export const reassignWorkerTool = defineHarnessTool({
     }),
   },
   errorSchema: TaskToolErrorSchema,
+  stream: {
+    initial: {},
+    onInput: (input, _state, _ctx) => Effect.gen(function* () {
+      if (input.agentId?.isFinal) {
+        const agentStateReader = yield* AgentStateReaderTag
+        const agentState = yield* agentStateReader.getAgentState()
+        if (!agentState.agents.has(input.agentId.value)) {
+          const validIds = [...agentState.agents.keys()].slice(0, 20).join(', ')
+          return yield* new StreamValidationError({
+            error: `Agent not found: ${input.agentId.value}. Valid IDs: ${validIds}`,
+          })
+        }
+      }
+
+      if (input.taskId?.isFinal) {
+        const taskReader = yield* TaskGraphStateReaderTag
+        const graphState = yield* taskReader.getState()
+        if (!graphState.tasks.has(input.taskId.value)) {
+          const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
+          return yield* new StreamValidationError({
+            error: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
+          })
+        }
+      }
+
+      return {}
+    }),
+  },
   execute: (input, _ctx) =>
     Effect.gen(function* () {
       yield* runDirective({

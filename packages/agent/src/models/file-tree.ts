@@ -57,6 +57,8 @@ export const fileTreeModel = defineStateModel(treeTool)<FileTreeState>({
       }
       case 'ToolInputDecodeFailed':
         return { ...state, phase: 'error', errorDetail: event.issue.message }
+      case 'ToolInputValidationFailed':
+        return { ...state, phase: 'error', errorDetail: event.error }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

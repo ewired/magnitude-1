@@ -258,6 +258,13 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
           break
         }
 
+        case 'ToolInputValidationFailed': {
+          const toolKey = toolCallKeys.get(event.toolCallId)
+          if (!toolKey) break
+          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
+          break
+        }
+
         // ── Tool Execution Lifecycle ─────────────────────────────
         case 'ToolExecutionStarted': {
           const toolKey = toolCallKeys.get(event.toolCallId)
@@ -363,14 +370,38 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
             }
 
             case 'GateRejected': {
-              executionResult = completed(1)
+              executionResult = {
+                _tag: 'GateRejected',
+                toolCallId: outcome.toolCallId,
+                providerToolCallId: outcome.providerToolCallId,
+                toolName: outcome.toolName,
+              }
               break
             }
 
             case 'ToolExecutionError': {
               // Tool execution failed — chain-continue so the model can respond to the error.
-              // The formatted error result is already in the canonical messages.
-              executionResult = completed(toolsCalledKeys.length)
+              executionResult = {
+                _tag: 'ToolExecutionError',
+                toolCallId: outcome.toolCallId,
+                providerToolCallId: outcome.providerToolCallId,
+                toolName: outcome.toolName,
+                toolKey: outcome.toolKey,
+                error: outcome.error,
+              }
+              break
+            }
+
+            case 'ToolInputValidationFailure': {
+              // Streaming validation failed — chain-continue so the model can respond to the error.
+              executionResult = {
+                _tag: 'ToolInputValidationFailure',
+                toolCallId: outcome.toolCallId,
+                providerToolCallId: outcome.providerToolCallId,
+                toolName: outcome.toolName,
+                toolKey: outcome.toolKey,
+                error: outcome.error,
+              }
               break
             }
 

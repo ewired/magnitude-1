@@ -262,5 +262,11 @@ export function present(outcome: TurnOutcome): ErrorPresentation {
         llmFeedback: outcome.message,
         retryable: false,
       }
+    case 'ToolInputValidationFailure':
+      return SILENT
+    case 'ToolExecutionError':
+      return SILENT
+    case 'GateRejected':
+      return SILENT
   }
 }

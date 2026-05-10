@@ -3,7 +3,7 @@
  */
 
 import { Effect, Schema } from 'effect'
-import { defineHarnessTool } from '@magnitudedev/harness'
+import { defineHarnessTool, StreamValidationError } from '@magnitudedev/harness'
 import { resolve } from 'path'
 import { validateAndApply } from '../util/edit'
 import { WorkingDirectoryTag } from '../execution/working-directory'
@@ -52,6 +52,21 @@ export const readTool = defineHarnessTool({
     outputSchema: Schema.String,
   },
   errorSchema: FsErrorSchema,
+  stream: {
+    initial: {},
+    onInput: (input, _state, _ctx) => Effect.gen(function* () {
+      if (!input.path?.isFinal) return {}
+      const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
+      const fs = yield* Fs
+      const expandedPath = expandScratchpadPath(input.path.value, scratchpadPath)
+      const fullPath = resolve(cwd, expandedPath)
+      const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
+      if (!exists) {
+        return yield* Effect.fail(new StreamValidationError({ error: `File not found: ${input.path.value}` }))
+      }
+      return {}
+    }),
+  },
   execute: ({ path, offset, limit }, _ctx) => Effect.gen(function* () {
     const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
@@ -158,17 +173,46 @@ export const editTool = defineHarnessTool({
   stream: {
     initial: { emitted: false },
     onInput: (input, state: { emitted: boolean }, ctx) => Effect.gen(function* () {
-      if (state.emitted) return state
       const path = input.path
-      if (!path || !path.isFinal) return state
-      const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
-      const fs = yield* Fs
-      const expandedPath = expandScratchpadPath(path.value, scratchpadPath)
-      const fullPath = resolve(cwd, expandedPath)
-      const content = yield* fs.readText(fullPath).pipe(Effect.catchAll(() => Effect.succeed(undefined)))
-      if (content == null) return state
-      yield* ctx.emit({ type: 'file_edit_base_content', path: path.value, baseContent: content })
-      return { emitted: true }
+
+      // --- Validation: path must exist ---
+      if (path?.isFinal && !state.emitted) {
+        const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
+        const fs = yield* Fs
+        const expandedPath = expandScratchpadPath(path.value, scratchpadPath)
+        const fullPath = resolve(cwd, expandedPath)
+
+        const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
+        if (!exists) {
+          return yield* Effect.fail(new StreamValidationError({
+            error: `File not found: ${path.value}`,
+          }))
+        }
+
+        // Emit base content for preview diffs (only once, after path validated)
+        const content = yield* fs.readText(fullPath).pipe(Effect.catchAll(() => Effect.succeed(undefined)))
+        if (content != null) {
+          yield* ctx.emit({ type: 'file_edit_base_content', path: path.value, baseContent: content })
+        }
+        return { emitted: true }
+      }
+
+      // --- Validation: old text must be found in file ---
+      if (path?.isFinal && input.old?.isFinal && state.emitted) {
+        const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
+        const fs = yield* Fs
+        const expandedPath = expandScratchpadPath(path.value, scratchpadPath)
+        const fullPath = resolve(cwd, expandedPath)
+        const content = yield* fs.readText(fullPath).pipe(Effect.catchAll(() => Effect.succeed('')))
+
+        if (!content.includes(input.old.value)) {
+          return yield* Effect.fail(new StreamValidationError({
+            error: `Text not found in file. Read the file first to get exact content.`,
+          }))
+        }
+      }
+
+      return state
     }),
   },
   execute: ({ path, old: oldStr, new: newStr, replaceAll }, _ctx) => Effect.gen(function* () {
@@ -236,6 +280,21 @@ export const treeTool = defineHarnessTool({
     outputSchema: Schema.Array(TreeEntry),
   },
   errorSchema: FsErrorSchema,
+  stream: {
+    initial: {},
+    onInput: (input, _state, _ctx) => Effect.gen(function* () {
+      if (!input.path?.isFinal) return {}
+      const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
+      const fs = yield* Fs
+      const expandedPath = expandScratchpadPath(input.path.value, scratchpadPath)
+      const fullPath = resolve(cwd, expandedPath)
+      const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
+      if (!exists) {
+        return yield* Effect.fail(new StreamValidationError({ error: `Path not found: ${input.path.value}` }))
+      }
+      return {}
+    }),
+  },
   execute: ({ path, gitignore, maxDepth }, _ctx) => Effect.gen(function* () {
     const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
@@ -288,6 +347,22 @@ export const grepTool = defineHarnessTool({
     outputSchema: Schema.Array(SearchMatch),
   },
   errorSchema: FsErrorSchema,
+  stream: {
+    initial: {},
+    onInput: (input, _state, _ctx) => Effect.gen(function* () {
+      const pathValue = input.path?.value
+      if (!pathValue || !input.path?.isFinal) return {}
+      const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
+      const fs = yield* Fs
+      const expandedPath = expandScratchpadPath(pathValue, scratchpadPath)
+      const fullPath = resolve(cwd, expandedPath)
+      const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
+      if (!exists) {
+        return yield* Effect.fail(new StreamValidationError({ error: `Path not found: ${pathValue}` }))
+      }
+      return {}
+    }),
+  },
   execute: ({ pattern, path, glob, limit }, _ctx) => Effect.gen(function* () {
     const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
@@ -321,6 +396,21 @@ export const viewTool = defineHarnessTool({
     outputSchema: ToolImageSchema,
   },
   errorSchema: FsErrorSchema,
+  stream: {
+    initial: {},
+    onInput: (input, _state, _ctx) => Effect.gen(function* () {
+      if (!input.path?.isFinal) return {}
+      const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
+      const fs = yield* Fs
+      const expandedPath = expandScratchpadPath(input.path.value, scratchpadPath)
+      const fullPath = resolve(cwd, expandedPath)
+      const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
+      if (!exists) {
+        return yield* Effect.fail(new StreamValidationError({ error: `File not found: ${input.path.value}` }))
+      }
+      return {}
+    }),
+  },
   execute: ({ path: filePath }, _ctx) => Effect.gen(function* () {
     const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs

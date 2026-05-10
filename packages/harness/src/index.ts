@@ -10,6 +10,7 @@ export { defineStateModel } from "./tool/state-model"
 
 // Tool
 export type { HarnessTool, ToolContext, StreamHook } from "./tool/tool"
+export { StreamValidationError } from "./tool/tool"
 export { defineHarnessTool } from "./tool/tool"
 
 // Toolkit
@@ -44,6 +45,7 @@ export type {
   MessageEnd,
   TurnEnd,
   ToolLifecycleEvent,
+  ToolInputValidationFailed,
   HarnessEvent,
 } from "./events"
 

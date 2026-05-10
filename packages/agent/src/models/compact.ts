@@ -17,6 +17,8 @@ export const compactModel = defineStateModel(compactTool)<CompactState>({
         return { ...state, phase: event.result._tag === 'Success' ? 'completed' as const : 'error' as const }
       case 'ToolInputDecodeFailed':
         return { ...state, phase: 'error' as const, errorMessage: event.issue.message }
+      case 'ToolInputValidationFailed':
+        return { ...state, phase: 'error' as const, errorMessage: event.error }
       default:
         return state
     }
