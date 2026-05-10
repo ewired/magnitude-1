@@ -199,8 +199,10 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
 
     case "TurnEnd": {
       let assistantMessage = state.assistantMessage
-      // On interrupt or tool execution error, assemble partial inputs for tool calls that never got ToolInputReady
-      if (event.outcome._tag === "Interrupted" || event.outcome._tag === "ToolExecutionError") {
+      // Assemble partial inputs for any tool calls that never got ToolInputReady,
+      // regardless of why the turn ended. This ensures the LLM sees what it actually
+      // sent (e.g. a path that failed validation) instead of an empty {} placeholder.
+      {
         const toolCalls: readonly ToolCallPart[] = (assistantMessage.toolCalls ?? []).map((tc): ToolCallPart => {
           if (state.readyToolCalls.has(tc.id)) return tc
           const chunks = state.toolCallInputChunks.get(tc.id)
