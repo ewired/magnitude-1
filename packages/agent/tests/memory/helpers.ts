@@ -3,8 +3,12 @@ import { SessionContextProjection } from '../../src/projections/session-context'
 import { AgentStatusProjection } from '../../src/projections/agent-status'
 import { WindowProjection, type ForkWindowState, type WindowEntry } from '../../src/window'
 import { windowToPrompt } from '../../src/prompts/window-to-prompt'
+import { createToolResultFormatter } from '@magnitudedev/harness'
+import { leaderToolkit } from '../../src/tools/toolkits'
 import { TestHarness } from '../../src/test-harness/harness'
 import { createId } from '../../src/util/id'
+
+const leaderFormatter = createToolResultFormatter(leaderToolkit)
 
 export function getRootMemory(h: Effect.Effect.Success<typeof TestHarness>) {
   return h.projectionFork(WindowProjection.Tag, null)
@@ -75,7 +79,7 @@ export function getRenderedUserText(h: Effect.Effect.Success<typeof TestHarness>
     const session = yield* h.runEffect(Effect.flatMap(SessionContextProjection.Tag, p => p.get))
     const timezone = session.context?.timezone ?? null
     const agentStatus = yield* h.projection(AgentStatusProjection.Tag)
-    const prompt = windowToPrompt(memory, '', timezone, agentStatus)
+    const prompt = windowToPrompt(memory, '', timezone, agentStatus, leaderFormatter)
     return prompt.messages
       .filter(m => m._tag === 'UserMessage')
       .map(m => m.parts.map(part => part._tag === 'TextPart' ? part.text : '[image]').join(''))

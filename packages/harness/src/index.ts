@@ -25,6 +25,7 @@ export { createToolHandle } from "./tool/tool-handle"
 export type {
   ToolError,
   ToolResult,
+  ToolResultEntry,
   SafetyStopReason,
   ToolInputDecodeFailure,
   TurnOutcome,
@@ -36,7 +37,6 @@ export type {
   ToolExecutionStarted,
   ToolExecutionEnded,
   ToolEmission,
-  ToolResultFormatted,
   ThoughtStart,
   ThoughtDelta,
   ThoughtEnd,
@@ -53,8 +53,8 @@ export type {
 export type { ExecuteHookContext, InterceptorDecision, HarnessHooks } from "./hooks"
 
 // Reducers
-export type { Reducer, TurnState, CanonicalTurnState, EngineState, ToolOutcome, ToolHandleState } from "./turn/reducers"
-export { createTurnReducer } from "./turn/reducers"
+export type { Reducer, TurnState, CanonicalTurnState, CanonicalAccumulator, EngineState, ToolOutcome, ToolHandleState } from "./turn/reducers"
+export { createTurnReducer, projectCanonical, CanonicalAccumulatorReducer } from "./turn/reducers"
 
 // Dispatcher
 export type { DispatchConfig } from "./turn/dispatcher"
@@ -63,12 +63,11 @@ export { dispatch } from "./turn/dispatcher"
 // Content building
 export { ContentBuilder } from "./content"
 
-// Result formation (legacy, used by dispatcher)
-export { formatToolResult as formatToolResultLegacy } from "./turn/result-formation"
-
-// Formatting utilities
-export { formatToolResult, formatDecodeFailure } from "./formatting"
-export { isImageValue, toImagePart, isScalar, renderToolOutput, renderTagged } from "./formatting"
+// Rendering utilities (used by agent formatting layer)
+export { isImageValue, toImagePart, isScalar, renderToolOutput, renderTagged } from "./formatting/helpers"
+export { renderExpectedParams } from "./formatting/schema-render"
+export type { ToolResultFormatter } from "./formatting/tool-result-formatter"
+export { createToolResultFormatter } from "./formatting/tool-result-formatter"
 
 // Harness
 export type { HarnessConfig, Harness, LiveTurn, ReplayTurn } from "./turn/harness"

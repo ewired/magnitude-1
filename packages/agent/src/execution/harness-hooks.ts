@@ -1,20 +1,17 @@
 /**
  * Shared harness hooks used by Cortex and CompactionWorker.
  *
- * Centralises beforeExecute (policy gate), afterExecute (result persistence),
- * and formatResult (truncation) so the two callers stay in sync.
+ * Centralises beforeExecute (policy gate) and afterExecute (result persistence).
+ * Formatting has moved to the agent's prompt construction layer.
  */
 
 import { Effect } from 'effect'
 import { logger } from '@magnitudedev/logger'
 import type { ExecuteHookContext, HarnessHooks, InterceptorDecision, ToolResult } from '@magnitudedev/harness'
-import { isImageValue, formatToolResult as defaultFormatToolResult } from '@magnitudedev/harness'
 import * as path from 'path'
 
 import { PolicyContextProviderTag } from '../agents/types'
 import { persistResult } from '../runtime/result-persistence'
-import { describeShape, estimateText } from '../truncation'
-import { TRUNCATION_TOKEN_LIMIT } from '../constants'
 import type { getAgentDefinition } from '../agents/registry'
 
 export interface StandardHooksContext {
@@ -51,37 +48,5 @@ export function buildStandardHooks(ctx: StandardHooksContext): HarnessHooks<Poli
           )
         }
       }),
-
-    formatResult(toolCallId, _toolName, _toolKey, result) {
-      if (result._tag !== 'Success' || result.output === undefined) {
-        return defaultFormatToolResult(result)
-      }
-      if (isImageValue(result.output)) {
-        return defaultFormatToolResult(result)
-      }
-
-      let serialized: string
-      try {
-        serialized = JSON.stringify(result.output, null, 2)
-      } catch {
-        return defaultFormatToolResult(result)
-      }
-
-      const estimatedTokens = estimateText(serialized)
-      if (estimatedTokens <= TRUNCATION_TOKEN_LIMIT) {
-        return defaultFormatToolResult(result)
-      }
-
-      const resultPath = `$M/results/${turnId}_${toolCallId}.json`
-      const shapeSummary = describeShape(result.output)
-
-      const text = [
-        `<truncated path="${resultPath}" estimated_tokens="${estimatedTokens}">`,
-        shapeSummary,
-        `</truncated>`,
-      ].join('\n')
-
-      return [{ _tag: 'TextPart' as const, text }]
-    },
   }
 }

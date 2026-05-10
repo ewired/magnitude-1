@@ -1,6 +1,38 @@
 import type { CompletedTurn } from '../window/types'
+import type { ToolResult } from '@magnitudedev/harness'
 import { renderFeedbackText } from '../prompts/feedback-text'
 import { estimateText, estimateImageTokens, DEFAULT_IMAGE_TOKENS } from '../truncation/estimate'
+import { describeShape } from '../truncation'
+import { TRUNCATION_TOKEN_LIMIT } from '../constants'
+
+function estimateResultTokens(result: ToolResult): number {
+  switch (result._tag) {
+    case "Success": {
+      if (result.output === undefined) return 10
+      try {
+        const serialized = JSON.stringify(result.output)
+        const estimated = estimateText(serialized)
+        // Account for truncation — large outputs get replaced with a short summary
+        if (estimated > TRUNCATION_TOKEN_LIMIT) {
+          return estimateText(describeShape(result.output)) + 50
+        }
+        return estimated
+      } catch {
+        return 50
+      }
+    }
+    case "Error":
+      return estimateText(result.error.message) + 30
+    case "Rejected":
+      return estimateText(JSON.stringify(result.rejection)) + 30
+    case "Interrupted":
+      return 10
+    case "DecodeFailure":
+      return estimateText(JSON.stringify(result.receivedInput)) + 80
+    case "ValidationFailure":
+      return estimateText(result.error) + estimateText(JSON.stringify(result.partialInput)) + 50
+  }
+}
 
 export function estimateCompletedTurn(turn: CompletedTurn): number {
   let tokens = 0
@@ -18,17 +50,9 @@ export function estimateCompletedTurn(turn: CompletedTurn): number {
     }
   }
 
-  // Tool results
-  for (const result of turn.toolResults) {
-    for (const part of result.parts) {
-      if (part._tag === 'TextPart') {
-        tokens += estimateText(part.text)
-      } else if (part._tag === 'ImagePart') {
-        tokens += part.dimensions
-          ? estimateImageTokens(part.dimensions.width, part.dimensions.height)
-          : DEFAULT_IMAGE_TOKENS
-      }
-    }
+  // Tool results (semantic outcomes)
+  for (const entry of turn.toolResults) {
+    tokens += estimateResultTokens(entry.result)
   }
 
   // Feedback

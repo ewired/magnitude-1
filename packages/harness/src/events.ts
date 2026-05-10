@@ -1,4 +1,4 @@
-import type { ProviderToolCallId, ResponseUsage, ToolCallId, ToolResultPart, ValidationIssue, StreamingPartial } from "@magnitudedev/ai"
+import type { ProviderToolCallId, ResponseUsage, ToolCallId, JsonValue, ValidationIssue, StreamingPartial } from "@magnitudedev/ai"
 import type { Schema } from "effect"
 
 // ── Tool Error ───────────────────────────────────────────────────────
@@ -15,17 +15,31 @@ type ToolResultErased =
   | { readonly _tag: "Error"; readonly error: ToolError }
   | { readonly _tag: "Rejected"; readonly rejection: unknown }
   | { readonly _tag: "Interrupted" }
+  | { readonly _tag: "DecodeFailure"; readonly issue: ValidationIssue; readonly receivedInput: JsonValue }
+  | { readonly _tag: "ValidationFailure"; readonly error: string; readonly partialInput: JsonValue }
 
 type ToolResultConcrete<TOutput, TError extends ToolError> =
   | { readonly _tag: "Success"; readonly output: TOutput }
   | { readonly _tag: "Error"; readonly error: TError }
   | { readonly _tag: "Rejected"; readonly rejection: unknown }
   | { readonly _tag: "Interrupted" }
+  | { readonly _tag: "DecodeFailure"; readonly issue: ValidationIssue; readonly receivedInput: JsonValue }
+  | { readonly _tag: "ValidationFailure"; readonly error: string; readonly partialInput: JsonValue }
 
 export type ToolResult<TOutput = never, TError extends ToolError = never> =
   [TOutput] extends [never]
     ? ToolResultErased
     : ToolResultConcrete<TOutput, [TError] extends [never] ? ToolError : TError>
+
+// ── Tool Result Entry ────────────────────────────────────────────────
+
+/** A tool result entry — the semantic result plus identifying metadata. */
+export interface ToolResultEntry {
+  readonly toolCallId: ToolCallId
+  readonly providerToolCallId: ProviderToolCallId
+  readonly toolName: string
+  readonly result: ToolResult
+}
 
 // ── Safety Stop ──────────────────────────────────────────────────────
 
@@ -231,17 +245,6 @@ export type ToolEmission<TEmission = never> =
     ? ToolEmissionErased
     : ToolEmissionConcrete<TEmission>
 
-// ── Tool Result Formatting ───────────────────────────────────────────
-
-export interface ToolResultFormatted {
-  readonly _tag: "ToolResultFormatted"
-  readonly toolCallId: ToolCallId
-  readonly providerToolCallId: ProviderToolCallId
-  readonly toolName: string
-  readonly toolKey: string
-  readonly parts: readonly ToolResultPart[]
-}
-
 // ── Tool Input Validation Failed ───────────────────────────────────
 
 export interface ToolInputValidationFailed {
@@ -313,7 +316,6 @@ type ToolLifecycleEventErased =
   | ToolExecutionStarted
   | ToolExecutionEnded
   | ToolEmission
-  | ToolResultFormatted
 
 type ToolLifecycleEventConcrete<TInput, TOutput, TEmission, TError extends ToolError> =
   | ToolInputStarted
@@ -325,7 +327,6 @@ type ToolLifecycleEventConcrete<TInput, TOutput, TEmission, TError extends ToolE
   | ToolExecutionStarted<TInput>
   | ToolExecutionEnded<TOutput, TError>
   | ToolEmission<TEmission>
-  | ToolResultFormatted
 
 export type ToolLifecycleEvent<TInput = never, TOutput = never, TEmission = never, TError extends ToolError = never> =
   [TInput] extends [never]

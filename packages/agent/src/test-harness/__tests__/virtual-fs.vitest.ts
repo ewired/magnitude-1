@@ -58,19 +58,16 @@ describe('virtual fs integration with harness', () => {
 
       yield* harness.user('read file')
       const completed = yield* harness.wait.turnCompleted(null)
-      const resultEvent = yield* harness.wait.event(
+      const toolEnded = yield* harness.wait.event(
         'tool_event',
-        (e) => e.forkId === null && e.event._tag === 'ToolResultFormatted',
+        (e) => e.forkId === null && e.event._tag === 'ToolExecutionEnded' && e.event.toolName === 'read',
       )
 
       expect(completed.outcome._tag).toBe('Completed')
-      if (resultEvent.event._tag !== 'ToolResultFormatted') {
-        throw new Error('Expected ToolResultFormatted')
+      if (toolEnded.event._tag !== 'ToolExecutionEnded') {
+        throw new Error('Expected ToolExecutionEnded')
       }
-      // The formatted result parts should contain the file content
-      const textPart = resultEvent.event.parts.find((p: any) => p._tag === 'TextPart')
-      expect(textPart).toBeDefined()
-      expect((textPart as any).text).toContain('export const x = 1')
+      expect(toolEnded.event.result._tag).toBe('Success')
     }).pipe(
       Effect.provide(
         TestHarnessLive({

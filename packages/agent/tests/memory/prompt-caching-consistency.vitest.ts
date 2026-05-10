@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
+import type { ToolCallId, ProviderToolCallId } from '@magnitudedev/ai'
 import { TestHarness, TestHarnessLive } from '../../src/test-harness/harness'
 import { assertPrefixUnchanged, getRenderedUserText, getRootMemory, sendUserMessage, snapshotMessageRefs } from './helpers'
 
@@ -118,8 +119,8 @@ describe('prompt caching consistency', () => {
       const beforeMemory = yield* getRootMemory(h)
       const before = snapshotMessageRefs(beforeMemory)
 
-      yield* h.send({ type: 'tool_event', forkId: null, turnId: 't-1', toolCallId: 'x', toolKey: 'fileRead', event: { _tag: 'ToolInputStarted', toolCallId: 'x', toolName: 'read', toolName: 'fileRead', group: 'fs', openSpan: { start: { offset: 0, line: 1, col: 1 }, end: { offset: 10, line: 1, col: 11 } } } })
-      yield* h.send({ type: 'tool_event', forkId: null, turnId: 't-1', toolCallId: 'x', toolKey: 'fileRead', event: { _tag: 'ToolInputStarted', toolCallId: 'x', toolName: 'read', toolName: 'fileRead', group: 'fs', openSpan: { start: { offset: 0, line: 1, col: 1 }, end: { offset: 10, line: 1, col: 11 } } } })
+      yield* h.send({ type: 'tool_event', forkId: null, turnId: 't-1', toolCallId: 'x', providerToolCallId: 'x' as ProviderToolCallId, toolKey: 'fileRead', event: { _tag: 'ToolInputStarted', toolCallId: 'x' as ToolCallId, providerToolCallId: 'x' as ProviderToolCallId, toolName: 'read', toolKey: 'fileRead' } })
+      yield* h.send({ type: 'tool_event', forkId: null, turnId: 't-1', toolCallId: 'x', providerToolCallId: 'x' as ProviderToolCallId, toolKey: 'fileRead', event: { _tag: 'ToolInputStarted', toolCallId: 'x' as ToolCallId, providerToolCallId: 'x' as ProviderToolCallId, toolName: 'read', toolKey: 'fileRead' } })
 
       const midMemory = yield* getRootMemory(h)
       assertPrefixUnchanged(before, midMemory)

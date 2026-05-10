@@ -6,8 +6,7 @@ import type { HarnessHooks, ExecuteHookContext } from "../hooks"
 import type { Toolkit } from "../tool/toolkit"
 import type { HarnessToolErased, ToolContext, StreamHook } from "../tool/tool"
 import type { EngineState, ToolOutcome } from "./reducers"
-import { formatDecodeFailure } from "../formatting/format-decode-failure"
-import { formatToolResult } from "./result-formation"
+
 
 // ── TurnAbort — planned abort control flow ────────────────────────────
 
@@ -130,8 +129,11 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
           toolCallId, providerToolCallId, toolName, toolKey,
           result: cached.result,
         })
-        const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, cached.result, hooks))
-        yield* emit({ _tag: "ToolResultFormatted", toolCallId, providerToolCallId, toolName, toolKey, parts })
+
+        // afterExecute hook for cached results
+        if (hooks?.afterExecute) {
+          yield* provideLayer(hooks.afterExecute({ toolCallId, toolName, toolKey, input, result: cached.result }))
+        }
 
         // Fast-fail on cached error outcomes
         if (cached.result._tag === "Error") {
@@ -159,8 +161,6 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         })
         const result: ToolResult = { _tag: "Rejected", rejection: decision.rejection }
         yield* emit({ _tag: "ToolExecutionEnded", toolCallId, providerToolCallId, toolName, toolKey, result })
-        const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, result, hooks))
-        yield* emit({ _tag: "ToolResultFormatted", toolCallId, providerToolCallId, toolName, toolKey, parts })
         return yield* Effect.fail(new TurnAbort({ outcome: { _tag: "GateRejected", toolCallId, providerToolCallId, toolName } }))
       }
 
@@ -200,10 +200,6 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
       if (hooks?.afterExecute) {
         yield* provideLayer(hooks.afterExecute({ ...hookCtx, result }))
       }
-
-      // Format result
-      const parts = yield* provideLayer(formatToolResult(toolCallId, toolName, toolKey, result, hooks))
-      yield* emit({ _tag: "ToolResultFormatted", toolCallId, providerToolCallId, toolName, toolKey, parts })
 
       // Fast-fail on tool execution errors
       if (result._tag === "Error") {
@@ -307,18 +303,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
                         toolKey: acc.toolKey,
                         error: e.error,
                       })
-                      const result: ToolResult = { _tag: "Error", error: { message: e.error } }
-                      const parts = yield* provideLayer(
-                        formatToolResult(acc.toolCallId, acc.toolName, acc.toolKey, result, hooks),
-                      )
-                      yield* emit({
-                        _tag: "ToolResultFormatted",
-                        toolCallId: acc.toolCallId,
-                        providerToolCallId: acc.providerToolCallId,
-                        toolName: acc.toolName,
-                        toolKey: acc.toolKey,
-                        parts,
-                      })
+                      // No formatting — the reducer produces ToolResultEntry from this event
                       return yield* Effect.fail(new TurnAbort({
                         outcome: { _tag: "ToolInputValidationFailure", toolCallId: acc.toolCallId, providerToolCallId: acc.providerToolCallId, toolName: acc.toolName, toolKey: acc.toolKey, error: e.error },
                       }))
@@ -397,18 +382,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
                 receivedInput,
               })
 
-              // Format the decode failure as a tool result so it appears in the prompt
-              const decodeFailureParts = config.hooks?.formatDecodeFailure
-                ? config.hooks.formatDecodeFailure(acc.toolName, event.reason.issue, inputSchema, receivedInput)
-                : formatDecodeFailure(acc.toolName, event.reason.issue, inputSchema, receivedInput)
-              yield* emit({
-                _tag: "ToolResultFormatted",
-                toolCallId: event.reason.toolCallId,
-                providerToolCallId: event.reason.providerToolCallId,
-                toolName: acc.toolName,
-                toolKey: acc.toolKey,
-                parts: decodeFailureParts,
-              })
+              // No formatting — the reducer produces ToolResultEntry from this event
 
               outcome = {
                 _tag: "ToolInputDecodeFailure",

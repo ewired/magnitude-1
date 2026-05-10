@@ -21,6 +21,7 @@ import { getAgentDefinition } from '../agents/registry'
 import { getToolkitForRole } from '../tools/toolkits'
 import { buildSystemPrompt } from '../prompts/system-prompt-builder'
 import { buildCompactionPrompt } from './prompt'
+import { createToolResultFormatter } from '@magnitudedev/harness'
 import { CompactionContextTag, type CompactResult } from './context'
 import { computeCompactionSizing } from './estimate'
 
@@ -137,7 +138,8 @@ export function runCompactionTurn(
 
       // Build compaction prompt: full window + reflection instruction appended
       const timezone = sessionCtx.context?.timezone ?? null
-      const compactionPrompt = buildCompactionPrompt(windowState, systemPrompt, timezone, agentStatus)
+      const formatter = createToolResultFormatter(toolkit)
+      const compactionPrompt = buildCompactionPrompt(windowState, systemPrompt, timezone, agentStatus, formatter)
 
       // Run turn (provide traceLayer so model call is tagged as "compact")
       const liveTurn = yield* Effect.provide(harness.runTurn(compactionPrompt), traceLayer)

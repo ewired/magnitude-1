@@ -80,13 +80,6 @@ const recordedEvents: HarnessEvent[] = [
     result: { _tag: "Success", output: "hello" },
   },
   {
-    _tag: "ToolResultFormatted",
-    toolCallId: "tc_1" as ToolCallId,
-    toolName: "echo",
-    toolKey: "echo",
-    parts: [{ _tag: "TextPart", text: "hello" }],
-  },
-  {
     _tag: "TurnEnd",
     outcome: { _tag: "Completed", toolCallsCount: 1 },
     usage: null,

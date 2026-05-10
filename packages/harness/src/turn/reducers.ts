@@ -3,9 +3,7 @@ import type {
   ToolCallPart,
   ToolCallId,
   ProviderToolCallId,
-  ToolResultMessage,
   ResponseUsage,
-  ToolResultPart,
   JsonValue,
 } from "@magnitudedev/ai"
 import type {
@@ -26,11 +24,13 @@ export interface Reducer<TState> {
   readonly step: (state: TState, event: HarnessEvent) => TState
 }
 
+import type { ToolResultEntry } from '../events'
+
 // ── CanonicalTurnState (public) ──────────────────────────────────────
 
 export interface CanonicalTurnState {
   readonly assistantMessage: AssistantMessage
-  readonly toolResults: readonly ToolResultMessage[]
+  readonly toolResults: readonly ToolResultEntry[]
   readonly outcome: TurnOutcome | null
   readonly usage: ResponseUsage | null
 }
@@ -50,7 +50,7 @@ export interface CanonicalAccumulator {
   readonly toolCallInputChunks: ReadonlyMap<string, StreamingPartial<unknown>>
   readonly readyToolCalls: ReadonlySet<string>
   readonly assistantMessage: AssistantMessage
-  readonly toolResults: readonly ToolResultMessage[]
+  readonly toolResults: readonly ToolResultEntry[]
   readonly outcome: TurnOutcome | null
   readonly usage: ResponseUsage | null
 }
@@ -182,23 +182,64 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
       }
     }
 
-    case "ToolResultFormatted": {
-      const id = event.toolCallId
-      const resultMsg: ToolResultMessage = {
-        _tag: "ToolResultMessage",
-        toolCallId: id,
+    case "ToolExecutionEnded": {
+      const result: ToolResultEntry = {
+        toolCallId: event.toolCallId,
         providerToolCallId: event.providerToolCallId,
         toolName: event.toolName,
-        parts: event.parts,
+        result: event.result,
       }
       return {
         ...state,
-        toolResults: [...state.toolResults, resultMsg],
+        toolResults: [...state.toolResults, result],
+      }
+    }
+
+    case "ToolInputDecodeFailed": {
+      const chunks = state.toolCallInputChunks.get(event.toolCallId)
+      const receivedInput: JsonValue = chunks && Object.keys(chunks).length > 0
+        ? extractPartialAsJson(chunks)
+        : {}
+      const result: ToolResultEntry = {
+        toolCallId: event.toolCallId,
+        providerToolCallId: event.providerToolCallId,
+        toolName: event.toolName,
+        result: {
+          _tag: "DecodeFailure",
+          issue: event.issue,
+          receivedInput,
+        },
+      }
+      return {
+        ...state,
+        toolResults: [...state.toolResults, result],
+      }
+    }
+
+    case "ToolInputValidationFailed": {
+      const chunks = state.toolCallInputChunks.get(event.toolCallId)
+      const partialInput: JsonValue = chunks && Object.keys(chunks).length > 0
+        ? extractPartialAsJson(chunks)
+        : {}
+      const result: ToolResultEntry = {
+        toolCallId: event.toolCallId,
+        providerToolCallId: event.providerToolCallId,
+        toolName: event.toolName,
+        result: {
+          _tag: "ValidationFailure",
+          error: event.error,
+          partialInput,
+        },
+      }
+      return {
+        ...state,
+        toolResults: [...state.toolResults, result],
       }
     }
 
     case "TurnEnd": {
       let assistantMessage = state.assistantMessage
+
       // Assemble partial inputs for any tool calls that never got ToolInputReady,
       // regardless of why the turn ended. This ensures the LLM sees what it actually
       // sent (e.g. a path that failed validation) instead of an empty {} placeholder.
@@ -213,9 +254,26 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
         })
         assistantMessage = { ...assistantMessage, toolCalls }
       }
+
+      // Add synthetic results for tool calls that never got a result event.
+      // This ensures every ToolCallPart has a matching ToolResultEntry,
+      // satisfying the OpenAI API constraint that every tool call must have a result.
+      const toolResults = [...state.toolResults]
+      for (const tc of (assistantMessage.toolCalls ?? [])) {
+        if (!toolResults.some(r => r.toolCallId === tc.id)) {
+          toolResults.push({
+              toolCallId: tc.id,
+            providerToolCallId: tc.providerToolCallId,
+            toolName: tc.name,
+            result: { _tag: "Interrupted" },
+          })
+        }
+      }
+
       return {
         ...state,
         assistantMessage,
+        toolResults,
         outcome: event.outcome,
         usage: event.usage,
       }
@@ -364,7 +422,9 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
       return { handles }
     }
 
-    if (event._tag === "TurnEnd" && (event.outcome._tag === "Interrupted" || event.outcome._tag === "ToolExecutionError" || event.outcome._tag === "ToolInputValidationFailure")) {
+    if (event._tag === "TurnEnd") {
+      // Interrupt ALL non-terminal handles on any TurnEnd.
+      // The turn is over — any handle not in a terminal state should be interrupted.
       const handles = new Map(state.handles)
       for (const [id, handle] of handles) {
         if (handle.state.phase !== "completed" && handle.state.phase !== "error" && handle.state.phase !== "rejected") {
@@ -383,8 +443,7 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
       event._tag === "ToolInputValidationFailed" ||
       event._tag === "ToolExecutionStarted" ||
       event._tag === "ToolExecutionEnded" ||
-      event._tag === "ToolEmission" ||
-      event._tag === "ToolResultFormatted"
+      event._tag === "ToolEmission"
     ) {
       const existing = state.handles.get(event.toolCallId)
       if (!existing) return state

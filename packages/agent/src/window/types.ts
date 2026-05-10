@@ -1,4 +1,5 @@
-import type { UserPart, AssistantMessage, ToolResultMessage } from '@magnitudedev/ai'
+import type { UserPart, AssistantMessage } from '@magnitudedev/ai'
+import type { ToolResultEntry } from '@magnitudedev/harness'
 import type { TimelineEntry } from './inbox/types'
 import type { StrategyId } from '../events'
 
@@ -14,7 +15,7 @@ export type TurnFeedback =
 export interface CompletedTurn {
   readonly turnId: string
   readonly assistant: AssistantMessage
-  readonly toolResults: readonly ToolResultMessage[]
+  readonly toolResults: readonly ToolResultEntry[]
   readonly feedback: readonly TurnFeedback[]
   readonly clean: boolean
 }

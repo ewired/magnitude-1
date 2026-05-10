@@ -32,6 +32,7 @@ import { getToolkitForRole } from '../tools/toolkits'
 import { createHarnessAdapter } from '../execution/harness-adapter'
 import { buildSystemPrompt } from '../prompts/system-prompt-builder'
 import { windowToPrompt } from '../prompts/window-to-prompt'
+import { createToolResultFormatter } from '@magnitudedev/harness'
 
 import { ExecutionManager } from '../execution/types'
 import { SkillsAmbient } from '../ambient/skills-ambient'
@@ -182,7 +183,8 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // 6. Build prompt from memory
         // ──────────────────────────────────────────────────────────────────────
         const timezone = sessionCtx.context?.timezone ?? null
-        const prompt = windowToPrompt(windowState, systemPrompt, timezone, agentState)
+        const formatter = createToolResultFormatter(toolkit)
+        const prompt = windowToPrompt(windowState, systemPrompt, timezone, agentState, formatter)
 
         // ──────────────────────────────────────────────────────────────────────
         // 7. Build adapter

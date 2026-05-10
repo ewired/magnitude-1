@@ -305,13 +305,6 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
           break
         }
 
-        case 'ToolResultFormatted': {
-          const toolKey = toolCallKeys.get(event.toolCallId)
-          if (!toolKey) break
-          yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)
-          break
-        }
-
         // ── Turn End ─────────────────────────────────────────────
         case 'TurnEnd': {
           const outcome = event.outcome

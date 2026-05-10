@@ -172,7 +172,6 @@ describe('dispatch fast-fail', () => {
       expect(toolTags).toContain('ToolInputStarted')
       expect(toolTags).toContain('ToolExecutionStarted')
       expect(toolTags).toContain('ToolExecutionEnded')
-      expect(toolTags).toContain('ToolResultFormatted')
 
       // TurnEnd is the last event
       const tags = eventTags(events)

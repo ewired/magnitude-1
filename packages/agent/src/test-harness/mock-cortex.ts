@@ -301,6 +301,22 @@ export const MockCortex = Worker.defineForked<AppEvent>()({
             modelId: null,
           })
         ),
+        Effect.onInterrupt(() =>
+          publish({
+            type: 'turn_outcome',
+            forkId,
+            turnId,
+            chainId,
+            strategyId: 'native',
+            outcome: { _tag: 'Cancelled', reason: { _tag: 'UserInterrupt' } },
+            inputTokens: null,
+            outputTokens: null,
+            cacheReadTokens: null,
+            cacheWriteTokens: null,
+            providerId: null,
+            modelId: null,
+          })
+        ),
       )
     },
   },

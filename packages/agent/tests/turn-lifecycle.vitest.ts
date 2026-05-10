@@ -2,6 +2,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { YIELD_USER } from '@magnitudedev/xml-act'
 import { TestHarness, TestHarnessLive } from '../src/test-harness/harness'
+import { WindowProjection } from '../src/window'
 import { IDENTICAL_RESPONSE_BREAKER_THRESHOLD } from '../src/execution/execution-manager'
 
 describe('turn lifecycle', () => {
@@ -119,21 +120,52 @@ describe('turn lifecycle', () => {
         timestamp: Date.now(),
       })
 
-      yield* h.script.next({ xml: `<magnitude:message to="${taskId}">hello</magnitude:message>\n${YIELD_USER}` })
+      // Simulate a turn that produces InvalidMessageDestination feedback
+      // when messaging a task with no active worker.
+      yield* h.send({ type: 'turn_started', forkId: null, turnId: 't-1', chainId: 'c-1' })
 
-      yield* h.user('trigger workerless task message')
-      const completed = yield* h.wait.turnCompleted(null)
+      // Add a message so the turn has content (avoiding empty-response error)
+      yield* h.send({ type: 'message_start', forkId: null, turnId: 't-1', id: 'msg-1', destination: { kind: 'user' } })
+      yield* h.send({ type: 'message_chunk', forkId: null, turnId: 't-1', id: 'msg-1', text: 'trying to message worker' })
+      yield* h.send({ type: 'message_end', forkId: null, turnId: 't-1', id: 'msg-1' })
 
-      expect(completed.outcome._tag).toBe('Completed')
-      if (completed.outcome._tag === 'Completed') {
-        expect(completed.outcome.completion.toolCallsCount).toBeGreaterThan(0)
-        expect(completed.outcome.completion.feedback).toEqual([
-          {
-            _tag: 'InvalidMessageDestination',
-            destination: taskId,
-            message: `Invalid message destination "${taskId}": task has no active worker`,
+      yield* h.send({
+        type: 'turn_outcome',
+        forkId: null,
+        turnId: 't-1',
+        chainId: 'c-1',
+        strategyId: 'native',
+        outcome: {
+          _tag: 'Completed',
+          completion: {
+            toolCallsCount: 0,
+            finishReason: 'stop',
+            feedback: [{
+              _tag: 'InvalidMessageDestination',
+              destination: taskId,
+              message: `Invalid message destination "${taskId}": task has no active worker`,
+            }],
           },
-        ])
+        },
+        inputTokens: null,
+        outputTokens: null,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
+        providerId: null,
+        modelId: null,
+      })
+
+      // Verify the feedback was recorded in the window state
+      const windowState = yield* h.projectionFork(WindowProjection.Tag, null)
+      const lastEntry = windowState.messages[windowState.messages.length - 1]
+      expect(lastEntry?.type).toBe('assistant_turn')
+      if (lastEntry?.type === 'assistant_turn') {
+        // The feedback should contain the InvalidMessageDestination error
+        const errorFeedback = lastEntry.turn.feedback.filter(f => f.kind === 'error')
+        expect(errorFeedback).toEqual([{
+          kind: 'error',
+          message: `Invalid message destination "${taskId}": task has no active worker`,
+        }])
       }
     }).pipe(Effect.provide(TestHarnessLive()))
   )

@@ -1,8 +1,9 @@
 import { describe, it } from '@effect/vitest'
 import { expect } from 'vitest'
 import { CanonicalAccumulatorReducer, projectCanonical } from '../reducers'
-import type { HarnessEvent, ToolInputStarted, ToolInputFieldChunk, ToolInputDecodeFailure, ToolInputValidationFailure } from '../../events'
-import type { ProviderToolCallId, ToolCallId } from '@magnitudedev/ai'
+import type { HarnessEvent, ToolInputStarted, ToolInputFieldChunk, ToolInputDecodeFailed, ToolInputValidationFailed } from '../../events'
+import type { ProviderToolCallId, ToolCallId, StreamingPartial } from '@magnitudedev/ai'
+import type { Schema } from 'effect'
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -27,51 +28,42 @@ function toolInputFieldChunk(id: string, path: string[], delta: string): ToolInp
   }
 }
 
-function turnEndWithDecodeFailure(
-  toolCallId: string,
-  toolName: string,
-): HarnessEvent {
-  const failure: ToolInputDecodeFailure = {
-    _tag: 'ToolInputDecodeFailure',
-    toolCallId: toolCallId as ToolCallId,
-    providerToolCallId: toolCallId as ProviderToolCallId,
-    toolName,
-    issue: { path: [], message: 'bad input' },
-    inputSchema: {} as any,
-    receivedInput: {} as any,
-  }
+function toolInputDecodeFailed(id: string, name: string): ToolInputDecodeFailed {
   return {
-    _tag: 'TurnEnd',
-    outcome: failure,
-    usage: null,
-  } as HarnessEvent
+    _tag: 'ToolInputDecodeFailed',
+    toolCallId: id as ToolCallId,
+    providerToolCallId: id as ProviderToolCallId,
+    toolName: name,
+    toolKey: name,
+    issue: { path: [], message: 'bad input' },
+    inputSchema: {} as Schema.Schema.AnyNoContext,
+    receivedInput: {} as StreamingPartial<Record<string, unknown>>,
+  }
 }
 
-function turnEndWithValidationFailure(
-  toolCallId: string,
-  toolName: string,
-): HarnessEvent {
-  const failure: ToolInputValidationFailure = {
-    _tag: 'ToolInputValidationFailure',
-    toolCallId: toolCallId as ToolCallId,
-    providerToolCallId: toolCallId as ProviderToolCallId,
-    toolName,
-    toolKey: toolName,
-    error: 'validation failed',
+function toolInputValidationFailed(id: string, name: string, error: string): ToolInputValidationFailed {
+  return {
+    _tag: 'ToolInputValidationFailed',
+    toolCallId: id as ToolCallId,
+    providerToolCallId: id as ProviderToolCallId,
+    toolName: name,
+    toolKey: name,
+    error,
   }
+}
+
+function turnEnd(outcome: HarnessEvent extends { _tag: infer T; outcome: infer O } ? O : never): HarnessEvent {
   return {
     _tag: 'TurnEnd',
-    outcome: failure,
+    outcome,
     usage: null,
   } as HarnessEvent
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
 
-describe('partial input assembly on failure outcomes', () => {
-  // ── Repro: ToolInputDecodeFailure loses partial inputs ───────────
-
-  it('assembles partial inputs into assistantMessage.toolCalls on ToolInputDecodeFailure', () => {
+describe('partial input assembly and ToolResultEntry on failure outcomes', () => {
+  it('assembles partial inputs into assistantMessage.toolCalls on ToolInputDecodeFailure and produces ToolResultEntry', () => {
     const reducer = CanonicalAccumulatorReducer
     let state = reducer.initial
 
@@ -79,24 +71,39 @@ describe('partial input assembly on failure outcomes', () => {
     state = reducer.step(state, toolInputStarted('call-1', 'file_edit'))
     state = reducer.step(state, toolInputFieldChunk('call-1', ['path'], '/some/invalid/path'))
 
-    // Turn ends with decode failure — the model sent invalid JSON
-    state = reducer.step(state, turnEndWithDecodeFailure('call-1', 'file_edit'))
+    // Decode failure event — reducer produces ToolResultEntry with DecodeFailure result
+    state = reducer.step(state, toolInputDecodeFailed('call-1', 'file_edit'))
+
+    // Turn ends with decode failure
+    state = reducer.step(state, turnEnd({
+      _tag: 'ToolInputDecodeFailure',
+      toolCallId: 'call-1' as ToolCallId,
+      providerToolCallId: 'call-1' as ProviderToolCallId,
+      toolName: 'file_edit',
+      issue: { path: [], message: 'bad input' },
+      inputSchema: {} as Schema.Schema.AnyNoContext,
+      receivedInput: {} as StreamingPartial<Record<string, unknown>>,
+    }))
 
     const canonical = projectCanonical(state)
 
+    // Partial input assembled into assistantMessage.toolCalls
     const toolCall = canonical.assistantMessage.toolCalls?.[0]
     expect(toolCall).toBeDefined()
     expect(toolCall!.name).toBe('file_edit')
-
-    // BUG: Currently this is {} because TurnEnd only assembles partials for
-    // Interrupted and ToolExecutionError, not ToolInputDecodeFailure.
-    // The partial input should contain { path: "/some/invalid/path" }.
     expect(toolCall!.input).toEqual({ path: '/some/invalid/path' })
+
+    // ToolResultEntry with DecodeFailure result
+    const toolResult = canonical.toolResults[0]
+    expect(toolResult).toBeDefined()
+    expect(toolResult!.toolName).toBe('file_edit')
+    expect(toolResult!.result._tag).toBe('DecodeFailure')
+    if (toolResult!.result._tag === 'DecodeFailure') {
+      expect(toolResult!.result.receivedInput).toEqual({ path: '/some/invalid/path' })
+    }
   })
 
-  // ── Repro: ToolInputValidationFailure loses partial inputs ───────
-
-  it('assembles partial inputs into assistantMessage.toolCalls on ToolInputValidationFailure', () => {
+  it('assembles partial inputs into assistantMessage.toolCalls on ToolInputValidationFailure and produces ToolResultEntry', () => {
     const reducer = CanonicalAccumulatorReducer
     let state = reducer.initial
 
@@ -104,18 +111,58 @@ describe('partial input assembly on failure outcomes', () => {
     state = reducer.step(state, toolInputStarted('call-1', 'file_edit'))
     state = reducer.step(state, toolInputFieldChunk('call-1', ['path'], '/some/invalid/path'))
 
-    // Turn ends with validation failure — the path is invalid
-    state = reducer.step(state, turnEndWithValidationFailure('call-1', 'file_edit'))
+    // Validation failure event — reducer produces ToolResultEntry with ValidationFailure result
+    state = reducer.step(state, toolInputValidationFailed('call-1', 'file_edit', 'Path does not exist: /some/invalid/path'))
+
+    // Turn ends with validation failure
+    state = reducer.step(state, turnEnd({
+      _tag: 'ToolInputValidationFailure',
+      toolCallId: 'call-1' as ToolCallId,
+      providerToolCallId: 'call-1' as ProviderToolCallId,
+      toolName: 'file_edit',
+      toolKey: 'file_edit',
+      error: 'Path does not exist: /some/invalid/path',
+    }))
 
     const canonical = projectCanonical(state)
 
+    // Partial input assembled into assistantMessage.toolCalls
     const toolCall = canonical.assistantMessage.toolCalls?.[0]
     expect(toolCall).toBeDefined()
     expect(toolCall!.name).toBe('file_edit')
-
-    // BUG: Currently this is {} because TurnEnd only assembles partials for
-    // Interrupted and ToolExecutionError, not ToolInputValidationFailure.
-    // The partial input should contain { path: "/some/invalid/path" }.
     expect(toolCall!.input).toEqual({ path: '/some/invalid/path' })
+
+    // ToolResultEntry with ValidationFailure result
+    const toolResult = canonical.toolResults[0]
+    expect(toolResult).toBeDefined()
+    expect(toolResult!.toolName).toBe('file_edit')
+    expect(toolResult!.result._tag).toBe('ValidationFailure')
+    if (toolResult!.result._tag === 'ValidationFailure') {
+      expect(toolResult!.result.error).toBe('Path does not exist: /some/invalid/path')
+      expect(toolResult!.result.partialInput).toEqual({ path: '/some/invalid/path' })
+    }
+  })
+
+  it('adds synthetic Interrupted result for tool calls that never completed', () => {
+    const reducer = CanonicalAccumulatorReducer
+    let state = reducer.initial
+
+    // Stream a tool call — but no ToolExecutionEnded or failure event
+    state = reducer.step(state, toolInputStarted('call-1', 'file_edit'))
+    state = reducer.step(state, toolInputFieldChunk('call-1', ['path'], '/some/path'))
+
+    // Turn is interrupted — no result event for this tool call
+    state = reducer.step(state, turnEnd({ _tag: 'Interrupted' }))
+
+    const canonical = projectCanonical(state)
+
+    // Partial input assembled
+    const toolCall = canonical.assistantMessage.toolCalls?.[0]
+    expect(toolCall!.input).toEqual({ path: '/some/path' })
+
+    // Synthetic ToolResultEntry added
+    const toolResult = canonical.toolResults[0]
+    expect(toolResult).toBeDefined()
+    expect(toolResult!.result._tag).toBe('Interrupted')
   })
 })

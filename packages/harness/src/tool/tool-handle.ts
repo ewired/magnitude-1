@@ -31,7 +31,6 @@ function isToolLifecycleEvent(event: HarnessEvent): event is ToolLifecycleEvent 
     case 'ToolExecutionStarted':
     case 'ToolExecutionEnded':
     case 'ToolEmission':
-    case 'ToolResultFormatted':
       return true
     default:
       return false

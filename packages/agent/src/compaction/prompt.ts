@@ -6,6 +6,7 @@ import { Prompt } from '@magnitudedev/ai'
 import type { ForkWindowState } from '../window'
 import { windowToPrompt } from '../prompts/window-to-prompt'
 import type { AgentStatusState } from '../projections/agent-status'
+import type { ToolResultFormatter } from '@magnitudedev/harness'
 
 export const COMPACTION_REFLECTION_PROMPT = `--- CONVERSATION END ---
 --- COMPACTION ---
@@ -37,8 +38,9 @@ export function buildCompactionPrompt(
   systemPrompt: string,
   timezone: string | null,
   agentStatus: AgentStatusState,
+  formatter: ToolResultFormatter,
 ): Prompt {
-  const basePrompt = windowToPrompt(windowState, systemPrompt, timezone, agentStatus)
+  const basePrompt = windowToPrompt(windowState, systemPrompt, timezone, agentStatus, formatter)
 
   return Prompt.from({
     system: basePrompt.system,
