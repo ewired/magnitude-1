@@ -10,12 +10,12 @@
   <strong>Opinionated coding agent for open models</strong>
 </p>
 
-Magnitude gets the most out of open models for coding. We continuously test our setup so you don't have to. 
+Magnitude is the best way to code with open models. We continuously test and optimize our setup so you don't have to.
 
-- **Multi-model** - GLM 5.1, Kimi K2.6, DeepSeek V4, all used for the right job
-- **Verified providers** - Only the ones serving the models correctly and fast
-- **Opinionated** - We continuously test and lean into model capabilities
-- **Sustainable** - No wild inference subsidization. Built for what comes next
+- **Multi-model** - GLM, Kimi, MiniMax, DeepSeek all used for the right job.
+- **Verified providers** - Only the ones serving the models correctly and fast.
+- **Opinionated** - We continuously test and lean into model capabilities.
+- **Sustainable** - Pass-through API pricing with no markup. $5 free credits.
 
 <p align="center">
   <img src="interface.png" alt="Magnitude interface" width="100%" />
@@ -27,9 +27,11 @@ Magnitude gets the most out of open models for coding. We continuously test our 
 2. Run `magnitude` which will ask for an API key
 3. Sign up at [app.magnitude.dev](https://app.magnitude.dev) to get your free API key
 
+> If you are on Windows, you will need to use `wsl`.
+
 $5 of free credits to start, no card required. Pass-through API pricing with no markup after that.
 
-> If you are on Windows, you will need to use `wsl`.
+Want to chat about your use case for open models? [Book a call with our founder](https://calendly.com/tom-magnitude/30min)
 
 ## Specialized agents
 
@@ -38,7 +40,7 @@ Magnitude is a curated system of specialized agents, each with its own defined r
 - **Leader.** Talks to the user and delegates work. **Model:** GLM 5.1.
 - **Scout.** Fast and efficient exploration. **Model:** MiniMax M2.7.
 - **Architect.** Plans and high-level design thinking. **Model:** GLM 5.1.
-- **Engineer.** Concrete planning and implementation. **Model:** MiniMax M2.7.
+- **Engineer.** Concrete planning and implementation. **Model:** Kimi K2.6.
 - **Critic.** Critical and detail-oriented analysis. **Model:** GLM 5.1.
 - **Scientist.** Empirical debugging and information gathering. **Model:** GLM 5.1.
 - **Artisan.** Tasteful and creative work. **Model:** Kimi K2.6.
@@ -48,11 +50,11 @@ We test these constantly. New models drop, the lineup updates.
 
 ## Why we built this
 
-Open models are good enough for serious coding, but using them well is the wild west. Generalist harnesses like OpenCode and Cline support 30+ providers and 100s of models, which means they can't optimize for any specific setup. You end up hacking your own stack that may or may not work reliably, and needs to be redone every time a new model drops.
+Open models are now good enough for serious coding. But it's the wild west. You need to choose a harness, then a model, then a provider. And hope they all play nicely together. Often they don't, and you get broken tool calls or subpar performance.
 
-Magnitude bundles the harness, models, and provider into one stack we continuously test and optimize. By design, we only support the Magnitude Provider. It's how we really lean into model capabilities and keep the quality bar high. Pricing is pass-through to the underlying providers with no markup, so we don't have to subsidize inference to compete. Sustainable by default.
+Magnitude bundles the harness, models, and provider into one stack that we continuously test and optimize. We benchmark model combinations to find the best setups, tune our harness to each model's quirks, and route only to providers serving them correctly and fast. 
 
-We want to build the coding agent for open models that "just works". One that keeps you at the frontier, without you having to do a thing.
+We know this isn't for everyone. Some people want the flexibility. Some people want to hack together their own setups. And we respect that. But we want to offer a path to using open models that just works. One that will stay on the frontier, without you having to do a thing.
 
 ## Acknowledgments
 
