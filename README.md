@@ -3,18 +3,18 @@
 </p>
 
 <p align="center">
-  <a href="https://docs.magnitude.dev" target="_blank"><img src="https://img.shields.io/badge/📕-Docs-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="Documentation" /></a> <a href="https://app.magnitude.dev" target="_blank"><img src="https://img.shields.io/badge/%F0%9F%96%A5-Console-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="Console" /></a> <img src="https://img.shields.io/badge/License-Apache%202.0-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="License" /> <a href="https://discord.gg/VcdpMh9tTy" target="_blank"><img src="https://img.shields.io/discord/1305570963206836295?style=flat-square&logo=discord&logoColor=white&label=Discord&labelColor=5865F2&color=gray" alt="Discord" /></a> <a href="https://x.com/usemagnitude" target="_blank"><img src="https://img.shields.io/badge/-Follow%20Magnitude-000000?style=flat-square&labelColor=000000&color=gray&logo=x&logoColor=white" alt="Follow Magnitude" /></a>
+  <a href="https://docs.magnitude.dev" target="_blank"><img src="https://img.shields.io/badge/📕-Docs-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="Documentation" /></a> <a href="https://app.magnitude.dev" target="_blank"><img src="https://img.shields.io/badge/%F0%9F%96%A5-Console-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="Console" /></a> <img src="https://img.shields.io/badge/License-Apache%202.0-232f41?style=flat-square&labelColor=0369a1&color=gray" alt="License" /> <a href="https://discord.gg/VcdpMh9tTy" target="_blank"><img src="https://img.shields.io/badge/-Join%20community-gray?style=flat-square&logo=discord&logoColor=white&labelColor=5865F2" alt="Join community" /></a> <a href="https://x.com/usemagnitude" target="_blank"><img src="https://img.shields.io/badge/-Follow%20Magnitude-000000?style=flat-square&labelColor=000000&color=gray&logo=x&logoColor=white" alt="Follow Magnitude" /></a>
 </p>
 
 <p align="center">
   <strong>Opinionated coding agent for open models</strong>
 </p>
 
-Magnitude is the best way to code with open models. We continuously test and optimize our setup so you don't have to.
+Magnitude is the best way to code with open models. We continuously test and optimize so you don't have to.
 
 - **Multi-model** - GLM, Kimi, MiniMax, DeepSeek all used for the right job.
 - **Verified providers** - Only the ones serving the models correctly and fast.
-- **Opinionated** - We continuously test and lean into model capabilities.
+- **Purpose-built** — Agent harness built from scratch around open models.
 - **Sustainable** - Pass-through API pricing with no markup. $5 free credits.
 
 <p align="center">
