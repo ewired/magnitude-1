@@ -1,7 +1,7 @@
 import { describe, it } from '@effect/vitest'
 import { expect } from 'vitest'
 import { CanonicalAccumulatorReducer, projectCanonical } from '../reducers'
-import type { HarnessEvent, ToolInputStarted, ToolInputFieldChunk, ToolInputDecodeFailed, ToolInputValidationFailed } from '../../events'
+import type { HarnessEvent, ToolInputStarted, ToolInputFieldChunk, ToolInputRejected } from '../../events'
 import type { ProviderToolCallId, ToolCallId, StreamingPartial } from '@magnitudedev/ai'
 import type { Schema } from 'effect'
 
@@ -28,22 +28,9 @@ function toolInputFieldChunk(id: string, path: string[], delta: string): ToolInp
   }
 }
 
-function toolInputDecodeFailed(id: string, name: string): ToolInputDecodeFailed {
+function toolInputRejected(id: string, name: string, message: string): ToolInputRejected {
   return {
-    _tag: 'ToolInputDecodeFailed',
-    toolCallId: id as ToolCallId,
-    providerToolCallId: id as ProviderToolCallId,
-    toolName: name,
-    toolKey: name,
-    issue: { path: [], message: 'bad input' },
-    inputSchema: {} as Schema.Schema.AnyNoContext,
-    receivedInput: {} as StreamingPartial<Record<string, unknown>>,
-  }
-}
-
-function toolInputValidationFailed(id: string, name: string, message: string): ToolInputValidationFailed {
-  return {
-    _tag: 'ToolInputValidationFailed',
+    _tag: 'ToolInputRejected',
     toolCallId: id as ToolCallId,
     providerToolCallId: id as ProviderToolCallId,
     toolName: name,
@@ -72,7 +59,7 @@ describe('partial input assembly and ToolResultEntry on failure outcomes', () =>
     state = reducer.step(state, toolInputFieldChunk('call-1', ['path'], '/some/invalid/path'))
 
     // Decode failure event — reducer produces ToolResultEntry with InputRejected result
-    state = reducer.step(state, toolInputDecodeFailed('call-1', 'file_edit'))
+    state = reducer.step(state, toolInputRejected('call-1', 'file_edit', 'bad input'))
 
     // Turn ends with decode failure
     state = reducer.step(state, turnEnd({
@@ -113,7 +100,7 @@ describe('partial input assembly and ToolResultEntry on failure outcomes', () =>
     state = reducer.step(state, toolInputFieldChunk('call-1', ['path'], '/some/invalid/path'))
 
     // Validation failure event — reducer produces ToolResultEntry with InputRejected result
-    state = reducer.step(state, toolInputValidationFailed('call-1', 'file_edit', 'Path does not exist: /some/invalid/path'))
+    state = reducer.step(state, toolInputRejected('call-1', 'file_edit', 'Path does not exist: /some/invalid/path'))
 
     // Turn ends with validation failure
     state = reducer.step(state, turnEnd({

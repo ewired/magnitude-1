@@ -141,34 +141,16 @@ export interface ToolInputReady {
   readonly providerToolCallId: ProviderToolCallId
 }
 
-// ── Tool Input Decode Failed ─────────────────────────────────────────
+// ── Tool Input Rejected ─────────────────────────────────────────────
 
-interface ToolInputDecodeFailedErased {
-  readonly _tag: "ToolInputDecodeFailed"
+export interface ToolInputRejected {
+  readonly _tag: "ToolInputRejected"
   readonly toolCallId: ToolCallId
   readonly providerToolCallId: ProviderToolCallId
   readonly toolName: string
   readonly toolKey: string
   readonly issue: ValidationIssue
-  readonly inputSchema: Schema.Schema.AnyNoContext
-  readonly receivedInput: StreamingPartial<Record<string, unknown>>
 }
-
-interface ToolInputDecodeFailedConcrete<TInput> {
-  readonly _tag: "ToolInputDecodeFailed"
-  readonly toolCallId: ToolCallId
-  readonly providerToolCallId: ProviderToolCallId
-  readonly toolName: string
-  readonly toolKey: string
-  readonly issue: ValidationIssue
-  readonly inputSchema: Schema.Schema<TInput, TInput, never>
-  readonly receivedInput: StreamingPartial<TInput>
-}
-
-export type ToolInputDecodeFailed<TInput = never> =
-  [TInput] extends [never]
-    ? ToolInputDecodeFailedErased
-    : ToolInputDecodeFailedConcrete<TInput>
 
 // ── Tool Execution Lifecycle ─────────────────────────────────────────
 
@@ -243,16 +225,7 @@ export type ToolEmission<TEmission = never> =
     ? ToolEmissionErased
     : ToolEmissionConcrete<TEmission>
 
-// ── Tool Input Validation Failed ───────────────────────────────────
 
-export interface ToolInputValidationFailed {
-  readonly _tag: "ToolInputValidationFailed"
-  readonly toolCallId: ToolCallId
-  readonly providerToolCallId: ProviderToolCallId
-  readonly toolName: string
-  readonly toolKey: string
-  readonly issue: ValidationIssue
-}
 
 // ── Reasoning and Messages ───────────────────────────────────────────
 
@@ -309,8 +282,7 @@ type ToolLifecycleEventErased =
   | ToolInputFieldChunk
   | ToolInputFieldComplete
   | ToolInputReady
-  | ToolInputDecodeFailed
-  | ToolInputValidationFailed
+  | ToolInputRejected
   | ToolExecutionStarted
   | ToolExecutionEnded
   | ToolEmission
@@ -320,8 +292,7 @@ type ToolLifecycleEventConcrete<TInput, TOutput, TEmission, TError extends ToolE
   | ToolInputFieldChunk
   | ToolInputFieldComplete
   | ToolInputReady
-  | ToolInputDecodeFailed<TInput>
-  | ToolInputValidationFailed
+  | ToolInputRejected
   | ToolExecutionStarted<TInput>
   | ToolExecutionEnded<TOutput, TError>
   | ToolEmission<TEmission>
@@ -339,7 +310,6 @@ type HarnessEventErased =
   | MessageDelta
   | MessageEnd
   | ToolLifecycleEvent
-  | ToolInputValidationFailed
   | TurnEnd
 
 type HarnessEventConcrete<TInput, TOutput, TEmission, TError extends ToolError> =
@@ -350,7 +320,6 @@ type HarnessEventConcrete<TInput, TOutput, TEmission, TError extends ToolError> 
   | MessageDelta
   | MessageEnd
   | ToolLifecycleEvent<TInput, TOutput, TEmission, TError>
-  | ToolInputValidationFailed
   | TurnEnd<TInput>
 
 export type HarnessEvent<TInput = never, TOutput = never, TEmission = never, TError extends ToolError = never> =

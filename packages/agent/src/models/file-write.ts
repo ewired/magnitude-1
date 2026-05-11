@@ -68,10 +68,8 @@ export const fileWriteModel = defineStateModel(writeTool)<FileWriteState>({
             return state
         }
       }
-      case 'ToolInputDecodeFailed':
+      case 'ToolInputRejected':
         return { ...state, phase: 'error', errorMessage: event.issue.message }
-      case 'ToolInputValidationFailed':
-        return { ...state, phase: 'error', errorMessage: event.error }
       case 'ToolInputFieldComplete':
       default:
         return state

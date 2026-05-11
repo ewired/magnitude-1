@@ -41,10 +41,8 @@ export const reassignWorkerModel = defineStateModel(reassignWorkerTool)<Reassign
           default:
             return state
         }
-      case 'ToolInputDecodeFailed':
+      case 'ToolInputRejected':
         return { ...state, phase: 'error', errorMessage: event.issue.message }
-      case 'ToolInputValidationFailed':
-        return { ...state, phase: 'error', errorMessage: event.error }
       default:
         return state
     }

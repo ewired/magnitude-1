@@ -258,7 +258,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
           break
         }
 
-        case 'ToolInputValidationFailed': {
+        case 'ToolInputRejected': {
           const toolKey = toolCallKeys.get(event.toolCallId)
           if (!toolKey) break
           yield* emitToolEvent(event.toolCallId, event.providerToolCallId, toolKey, event)

@@ -297,7 +297,7 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
                     Effect.gen(function* () {
                       const issue: ValidationIssue = { path: [], message: e.message }
                       yield* emit({
-                        _tag: "ToolInputValidationFailed",
+                        _tag: "ToolInputRejected",
                         toolCallId: event.toolCallId,
                         providerToolCallId: event.providerToolCallId,
                         toolName: acc.toolName,
@@ -373,14 +373,12 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
               const receivedInput = parser?.partial ?? ({} as StreamingPartial<Record<string, unknown>>)
 
               yield* emit({
-                _tag: "ToolInputDecodeFailed",
+                _tag: "ToolInputRejected",
                 toolCallId: event.reason.toolCallId,
                 providerToolCallId: event.reason.providerToolCallId,
                 toolName: acc.toolName,
                 toolKey: acc.toolKey,
                 issue: event.reason.issue,
-                inputSchema,
-                receivedInput,
               })
 
               // No formatting — the reducer produces ToolResultEntry from this event

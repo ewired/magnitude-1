@@ -51,10 +51,8 @@ export const skillActivationModel = defineStateModel(skillTool)<SkillActivationS
             return state
         }
       }
-      case 'ToolInputDecodeFailed':
+      case 'ToolInputRejected':
         return { ...state, phase: 'error', errorDetail: event.issue.message }
-      case 'ToolInputValidationFailed':
-        return { ...state, phase: 'error', errorDetail: event.error }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

@@ -33,7 +33,7 @@ export type {
   ToolInputFieldChunk,
   ToolInputFieldComplete,
   ToolInputReady,
-  ToolInputDecodeFailed,
+  ToolInputRejected,
   ToolExecutionStarted,
   ToolExecutionEnded,
   ToolEmission,
@@ -45,7 +45,6 @@ export type {
   MessageEnd,
   TurnEnd,
   ToolLifecycleEvent,
-  ToolInputValidationFailed,
   HarnessEvent,
 } from "./events"
 

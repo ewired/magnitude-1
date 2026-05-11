@@ -37,10 +37,8 @@ export const fileViewModel = defineStateModel(viewTool)<FileViewState>({
             return state
         }
       }
-      case 'ToolInputDecodeFailed':
+      case 'ToolInputRejected':
         return { ...state, phase: 'error', errorMessage: event.issue.message }
-      case 'ToolInputValidationFailed':
-        return { ...state, phase: 'error', errorMessage: event.error }
       case 'ToolEmission':
       case 'ToolInputFieldComplete':
       default:

@@ -9,10 +9,8 @@ export const messageWorkerModel = defineStateModel(messageWorkerTool)({
       case 'ToolExecutionStarted': return { ...state, phase: 'executing' as const }
       case 'ToolExecutionEnded':
         return { ...state, phase: event.result._tag === 'Success' ? 'completed' as const : 'error' as const }
-      case 'ToolInputDecodeFailed':
+      case 'ToolInputRejected':
         return { ...state, phase: 'error' as const, errorMessage: event.issue.message }
-      case 'ToolInputValidationFailed':
-        return { ...state, phase: 'error' as const, errorMessage: event.error }
       default: return state
     }
   },

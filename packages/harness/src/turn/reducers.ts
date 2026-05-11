@@ -195,8 +195,7 @@ function canonicalAccumulatorStep(state: CanonicalAccumulator, event: HarnessEve
       }
     }
 
-    case "ToolInputDecodeFailed":
-    case "ToolInputValidationFailed": {
+    case "ToolInputRejected": {
       const chunks = state.toolCallInputChunks.get(event.toolCallId)
       const partialInput: JsonValue = chunks && Object.keys(chunks).length > 0
         ? extractPartialAsJson(chunks)
@@ -314,7 +313,7 @@ function engineStateStep(state: EngineState, event: HarnessEvent): EngineState {
       return { ...state, toolOutcomes }
     }
 
-    case "ToolInputValidationFailed": {
+    case "ToolInputRejected": {
       const deadToolCalls = new Set(state.deadToolCalls)
       deadToolCalls.add(event.toolCallId)
       return { ...state, deadToolCalls }
@@ -419,8 +418,7 @@ export function createToolHandleReducer(toolkit: Toolkit): Reducer<ToolHandleSta
       event._tag === "ToolInputFieldChunk" ||
       event._tag === "ToolInputFieldComplete" ||
       event._tag === "ToolInputReady" ||
-      event._tag === "ToolInputDecodeFailed" ||
-      event._tag === "ToolInputValidationFailed" ||
+      event._tag === "ToolInputRejected" ||
       event._tag === "ToolExecutionStarted" ||
       event._tag === "ToolExecutionEnded" ||
       event._tag === "ToolEmission"
