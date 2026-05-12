@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from 'effect'
 import type { BoundModel } from '@magnitudedev/ai'
-import type { MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError, ModelProfile } from '@magnitudedev/magnitude-client'
+import type { MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError, ModelProfile, MagnitudeAdditionalOptions } from '@magnitudedev/magnitude-client'
 import { MagnitudeClient } from '@magnitudedev/magnitude-client'
 import { AmbientServiceTag, type AmbientService } from '@magnitudedev/event-core'
 import type { RoleId } from '../agents/role-validation'
@@ -11,6 +11,10 @@ export interface AgentBoundModel {
   readonly roleId: RoleId
   readonly modelId: string
   readonly profile: ModelProfile
+}
+
+const LEADER_TRAITS: MagnitudeAdditionalOptions = {
+  traits: ['ATTENTIVE', 'PROACTIVE', 'RESPECTFUL', 'GROUNDED', 'STRATEGIC', 'INTROSPECTIVE'],
 }
 
 export interface AgentModelResolverService {
@@ -34,7 +38,10 @@ export const AgentModelResolverLive = () =>
             const ambientService = yield* AmbientServiceTag
             const configState = ambientService.getValue(ConfigAmbient)
             const roleConfig = getRoleConfig(configState, roleId)
-            const defaults = { maxTokens: roleConfig.profile.maxOutputTokens }
+            const defaults = {
+              maxTokens: roleConfig.profile.maxOutputTokens,
+              magnitudeAdditionalOptions: roleId === 'leader' ? LEADER_TRAITS : undefined,
+            }
             const capabilities = { vision: roleConfig.profile.capabilities.vision }
 
             return {

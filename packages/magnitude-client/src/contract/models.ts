@@ -32,3 +32,8 @@ export interface ModelListResponse {
   readonly object: "list"
   readonly data: readonly MagnitudeModelInfo[]
 }
+
+export type MagnitudeAdditionalOptions = {
+  /** Override the default trait labels used in grammar-constrained reasoning. */
+  traits?: string[]
+}

@@ -4,9 +4,10 @@ import {
   type ModelSpec,
   type StreamError,
   type ModelCapabilities as AIModelCapabilities,
+  Option,
 } from "@magnitudedev/ai"
 import { classifyMagnitudeConnectionError, type MagnitudeConnectionError } from "./errors"
-import type { RoleId, ModelCapabilities, MagnitudeModelInfo } from './contract'
+import type { RoleId, ModelCapabilities, MagnitudeModelInfo, MagnitudeAdditionalOptions } from './contract'
 
 /**
  * Model metadata needed by the agent runtime — a strict subset of MagnitudeModelInfo.
@@ -41,10 +42,16 @@ export interface MagnitudeCompatibleSpecConfig {
 }
 
 /** Call options supported by Magnitude model specs. */
-export type MagnitudeCallOptions = { maxTokens?: number }
+export type MagnitudeCallOptions = {
+  maxTokens?: number
+  magnitudeAdditionalOptions?: MagnitudeAdditionalOptions
+}
 
 const magnitudeOptions = {
   maxTokens: NativeChatCompletions.options.maxTokens,
+  magnitudeAdditionalOptions: Option.define(
+    (v: MagnitudeAdditionalOptions) => ({ magnitude_additional_options: v }),
+  ),
 } as const
 
 export function createMagnitudeCompatibleSpec(config: MagnitudeCompatibleSpecConfig) {
