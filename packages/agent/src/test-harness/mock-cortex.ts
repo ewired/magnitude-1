@@ -237,9 +237,7 @@ export const MockCortex = Worker.defineForked<AppEvent>()({
           chainId,
           roleId,
           defaultProseDest: resolveDefaultDest(forkId),
-          triggeredByUser: chainId === turnId,
           publish,
-          handleTaskDirective: () => Effect.succeed({ success: true }),
           identicalResponseTracker: (yield* ForkTrackersTag).get(forkId) ?? null,
           resolveToolKey: (toolName: string) => {
             for (const key of toolkit.keys) {

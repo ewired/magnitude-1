@@ -202,11 +202,11 @@ function findTaskByWorkerAgentId(state: TaskGraphState, agentId: string): TaskRe
   return undefined
 }
 
-function isTaskStatus(value: string): value is TaskStatus {
+export function isTaskStatus(value: string): value is TaskStatus {
   return value === 'pending' || value === 'completed'
 }
 
-function canTransition(current: TaskStatus, requested: TaskStatus): boolean {
+export function canTransition(current: TaskStatus, requested: TaskStatus): boolean {
   if (current === requested) return false
 
   switch (current) {

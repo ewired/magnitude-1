@@ -148,7 +148,7 @@ export { SessionContextProjection } from './projections/session-context'
 export type { SessionContextState } from './projections/session-context'
 
 
-export { TaskGraphProjection, getPrimaryRootTask, getSessionTitleFromTaskGraph } from './projections/task-graph'
+export { TaskGraphProjection, getPrimaryRootTask, getSessionTitleFromTaskGraph, canTransition, isTaskStatus } from './projections/task-graph'
 export type { TaskGraphState, TaskRecord, TaskStatus, TaskWorkerInfo } from './projections/task-graph'
 
 // Line-edit types

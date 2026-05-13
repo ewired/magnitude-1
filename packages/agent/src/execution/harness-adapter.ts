@@ -43,14 +43,7 @@ export interface HarnessAdapterConfig {
   readonly chainId: string
   readonly roleId: RoleId
   readonly defaultProseDest: MessageDestination
-  readonly triggeredByUser: boolean
   readonly publish: (event: AppEvent) => Effect.Effect<void>
-  readonly handleTaskDirective: (directive: {
-    readonly kind: 'message'
-    readonly defaultTopLevelDestination: 'user' | 'parent'
-    readonly triggeredByUser: boolean
-    readonly directUserRepliesSent: number
-  }) => Effect.Effect<{ success: boolean; directUserRepliesSent?: number }>
   readonly identicalResponseTracker: IdenticalResponseTracker | null
   /** Resolve a tool's model-facing name to the internal catalog key. */
   readonly resolveToolKey: (toolName: string) => ToolKey | undefined
@@ -69,9 +62,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
     forkId,
     turnId,
     defaultProseDest,
-    triggeredByUser,
     publish,
-    handleTaskDirective,
     resolveToolKey,
   } = config
 
@@ -84,7 +75,6 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
   let lastToolKey: ToolKey | null = null
   let hasToolErrors = false
   let hasAnyResponseContent = false
-  let directUserRepliesSent = 0
 
   // toolCallId → ToolKey tracking
   const toolCallKeys = new Map<string, ToolKey>()
@@ -168,28 +158,6 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
           currentMessageId = messageId
 
           const destination = resolveDestination()
-
-          // Run task directive for non-worker messages
-          if (destination.kind !== 'worker') {
-            const directiveResult = yield* handleTaskDirective({
-              kind: 'message',
-              defaultTopLevelDestination: destination.kind === 'user' ? 'user' : 'parent',
-              triggeredByUser,
-              directUserRepliesSent,
-            })
-
-            if (!directiveResult.success) {
-              currentMessageId = null
-              break
-            }
-
-            if (
-              directiveResult.directUserRepliesSent !== undefined
-              && typeof directiveResult.directUserRepliesSent === 'number'
-            ) {
-              directUserRepliesSent = directiveResult.directUserRepliesSent
-            }
-          }
 
           yield* publish({
             type: 'message_start',

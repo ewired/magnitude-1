@@ -10,7 +10,7 @@
  */
 
 import { Effect, Layer, Stream } from 'effect'
-import { Worker, AmbientServiceTag } from '@magnitudedev/event-core'
+import { Worker, AmbientServiceTag, Fork } from '@magnitudedev/event-core'
 import { logger } from '@magnitudedev/logger'
 import { createHarness } from '@magnitudedev/harness'
 import type { MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
@@ -49,9 +49,6 @@ function toObservationPart(part: ObservablePart): ObservationPart {
   }
 }
 import { isToolKey, type ToolKey } from '../tools/toolkits'
-
-import { handleMessageDirective } from '../tasks/operations/message'
-import { Fork } from '@magnitudedev/event-core'
 
 import { buildStandardHooks } from '../execution/harness-hooks'
 import { TurnContextTag } from '../engine/turn-context'
@@ -210,15 +207,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
           chainId,
           roleId,
           defaultProseDest,
-          triggeredByUser: chainId === turnId,
           publish,
-          handleTaskDirective: (directive) =>
-            handleMessageDirective(directive, {
-              forkId,
-              timestamp: Date.now(),
-              graph: { tasks: new Map() },
-              skills,
-            }),
           identicalResponseTracker: null,
           resolveToolKey: (toolName: string) => toolNameToKey.get(toolName),
         })

@@ -14,7 +14,7 @@ export interface AgentBoundModel {
 }
 
 const LEADER_TRAITS: MagnitudeAdditionalOptions = {
-  traits: ['ATTENTIVE', 'PROACTIVE', 'RESPECTFUL', 'GROUNDED', 'STRATEGIC', 'INTROSPECTIVE'],
+  traits: ['ATTENTIVE', 'STRATEGIC', 'PROACTIVE', 'RESPECTFUL', 'GROUNDED', 'INTROSPECTIVE'],
 }
 
 export interface AgentModelResolverService {
