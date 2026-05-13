@@ -14,7 +14,7 @@ describe('spawn-worker lifecycle integration', () => {
 
       // Turn 2 (root): spawn worker with initial instructions
       yield* h.script.next({
-        xml: '<magnitude:invoke tool="spawn_worker">\n<magnitude:parameter name="taskId">flow-task</magnitude:parameter>\n<magnitude:parameter name="agentId">flow-task</magnitude:parameter>\n<magnitude:parameter name="message">Write output.txt with content "hello"</magnitude:parameter>\n</magnitude:invoke>\n<magnitude:yield_user/>',
+        xml: '<magnitude:invoke tool="spawn_worker">\n<magnitude:parameter name="taskId">flow-task</magnitude:parameter>\n<magnitude:parameter name="role">engineer</magnitude:parameter>\n<magnitude:parameter name="agentId">flow-task</magnitude:parameter>\n<magnitude:parameter name="message">Write output.txt with content "hello"</magnitude:parameter>\n</magnitude:invoke>\n<magnitude:yield_user/>',
       }, null)
 
       // Turn 3 (worker): execute tool + respond to parent

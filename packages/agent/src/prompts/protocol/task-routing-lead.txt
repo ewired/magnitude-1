@@ -44,10 +44,11 @@ A task requires `id` and `title`. Use `parent` to nest under an existing task:
 
 <magnitude:invoke tool="spawn_worker">
 <magnitude:parameter name="id">impl-parser</magnitude:parameter>
+<magnitude:parameter name="role">engineer</magnitude:parameter>
 <magnitude:parameter name="message">Implement Unit A from the [plan]($M/plans/the-plan.md).</magnitude:parameter>
 </magnitude:invoke>
 
-`spawn_worker` creates a worker for a task. The `id` must match an existing task. The `message` parameter is the worker's initial instruction with the same semantics as a normal `<magnitude:message to="TASK-ID">...</magnitude:message>`.
+`spawn_worker` creates a worker for a task. The `id` must match an existing task. The `role` parameter is required and specifies the worker's role (e.g., engineer, scout, architect, critic, scientist, artisan). The `message` parameter is the worker's initial instruction with the same semantics as a normal `<magnitude:message to="TASK-ID">...</magnitude:message>`.
 
 If a worker already exists on that task, `spawn_worker` kills the old worker and spawns a new one.
 

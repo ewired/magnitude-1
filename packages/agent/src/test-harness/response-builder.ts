@@ -42,8 +42,8 @@ export class ResponseBuilder {
     return this
   }
 
-  spawnWorker(taskId: string, agentId: string, message: string): this {
-    this.tools.push(xmlInvoke('spawn_worker', { taskId, agentId }, message))
+  spawnWorker(taskId: string, role: string, agentId: string, message: string): this {
+    this.tools.push(xmlInvoke('spawn_worker', { taskId, role, agentId }, message))
     return this
   }
 
@@ -74,9 +74,9 @@ export class ResponseBuilder {
    * agentId equals the task id. The `type` parameter is accepted but ignored —
    * lead can only spawn workers in the current role's model.
    */
-  createAgent(taskId: string, agentId: string, title: string, message: string): this {
+  createAgent(taskId: string, agentId: string, title: string, role: string, message: string): this {
     this.tools.push(xmlInvoke('create_task', { taskId, title }))
-    this.tools.push(xmlInvoke('spawn_worker', { taskId, agentId, message }))
+    this.tools.push(xmlInvoke('spawn_worker', { taskId, role, agentId, message }))
     return this
   }
 

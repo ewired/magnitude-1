@@ -3,18 +3,18 @@ import { spawnWorkerTool } from '../tools/task-tools'
 
 export interface SpawnWorkerState extends BaseState {
   taskId?: string
+  role?: string
   agentId?: string
   message?: string
-  role?: string
   yield?: boolean
   title?: string
 }
 
 const initial: Omit<SpawnWorkerState, 'phase'> = {
   taskId: undefined,
+  role: undefined,
   agentId: undefined,
   message: undefined,
-  role: undefined,
   yield: undefined,
   title: undefined,
 }
@@ -40,7 +40,7 @@ export const spawnWorkerModel = defineStateModel(spawnWorkerTool)<SpawnWorkerSta
           taskId: event.input.taskId ?? state.taskId,
           agentId: event.input.agentId ?? state.agentId,
           message: event.input.message ?? state.message,
-          role: event.input.role ?? state.role,
+          role: event.input.role,
         }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {

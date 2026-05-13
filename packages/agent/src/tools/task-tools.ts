@@ -178,9 +178,9 @@ export const spawnWorkerTool = defineHarnessTool({
     description: 'Spawn a worker for a task id. The body is the worker\'s initial instruction (same mechanics as a normal message). Use <magnitude:message to="task-id"> for follow-up communications. Only use spawn_worker to create a new worker or replace the current one.',
     inputSchema: Schema.Struct({
       taskId: Schema.String.annotations({ description: 'Task ID to spawn a worker for' }),
+      role: Schema.String.annotations({ description: 'Worker role (e.g., engineer, scout, architect, critic, scientist, artisan).' }),
       agentId: Schema.String.annotations({ description: 'Unique agent ID for this worker. Use this ID to message or reassign the worker later.' }),
       message: Schema.String.annotations({ description: 'Initial instruction message for the worker' }),
-      role: Schema.optional(Schema.String.annotations({ description: 'Worker role (e.g., engineer, scout, architect, critic, scientist, artisan). Defaults to engineer.' })),
       yield: Schema.optional(Schema.Boolean.annotations({ description: 'Set true to wait for this worker to respond before doing anything else.' })),
     }),
     outputSchema: Schema.Struct({
@@ -221,14 +221,13 @@ export const spawnWorkerTool = defineHarnessTool({
   },
   execute: (input, _ctx) =>
     Effect.gen(function* () {
-      const roleStr = input.role ?? 'engineer'
-      if (!isSpawnableRole(roleStr)) {
+      if (!isSpawnableRole(input.role)) {
         return yield* Effect.fail({
           _tag: 'TaskToolError' as const,
-          message: `Invalid worker role "${roleStr}". Valid roles: ${getSpawnableRoles().join(', ')}`,
+          message: `Invalid worker role "${input.role}". Valid roles: ${getSpawnableRoles().join(', ')}`,
         })
       }
-      const role: RoleId = roleStr
+      const role: RoleId = input.role
 
       const execManager = yield* ExecutionManager
       const result = yield* runDirective({

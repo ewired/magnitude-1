@@ -24,7 +24,7 @@ function agentCreateTurn(agentId: string, _type: string, title: string, message:
   // worker for it.
   return response()
     .createTask(agentId, title)
-    .spawnWorker(agentId, agentId, message)
+    .spawnWorker(agentId, 'engineer', agentId, message)
     .yield()
 }
 
