@@ -226,7 +226,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
   const magnitudeClientLayer = Layer.succeed(
     MagnitudeClient,
-    createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey }),
+    createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey, sessionId: options.sessionId ?? undefined }),
   )
 
   // Enable tracing in debug mode

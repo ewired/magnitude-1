@@ -41,9 +41,6 @@ export interface ContextLimitPolicy extends Omit<Schema.Schema.Type<typeof Conte
 }
 
 export const MagnitudeConfigSchema = Schema.Struct({
-  // All fields here should be optional or optionalWith so they can have a generated default
-  machineId: Schema.optional(Schema.String),
-  telemetry: Schema.optional(Schema.Boolean),
   contextLimits: Schema.optional(ContextLimitPolicySchema),
 })
 

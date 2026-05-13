@@ -15,7 +15,6 @@
     "@magnitudedev/logger": "0.0.1",
     "@magnitudedev/ripgrep": "0.0.1",
     "@magnitudedev/shell-classifier": "0.0.1",
-    "@magnitudedev/telemetry": "0.0.1",
     "@magnitudedev/tools": "0.0.1",
     "@magnitudedev/tracing": "0.0.1",
     "@magnitudedev/xml-act": "0.0.1",

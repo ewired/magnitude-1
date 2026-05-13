@@ -56,9 +56,7 @@ import { ChatController } from './components/chat/chat-controller'
 import { useTasks } from './hooks/use-tasks'
 import { useLocalWidth } from './hooks/use-local-width'
 
-import { initTelemetry, trackSessionStart, SessionTracker } from '@magnitudedev/telemetry'
 
-import { setSessionTracker } from './utils/telemetry-state'
 import { TextAttributes, type KeyEvent } from '@opentui/core'
 
 import { createId } from '@magnitudedev/generate-id'
@@ -225,9 +223,7 @@ function AppInner({
     refreshRecentChats()
   }, [debugMode, refreshRecentChats])
 
-  useEffect(() => {
-    initTelemetry({ telemetryEnabled: true })
-  }, [])
+
 
   useEffect(() => {
     if (!auth.loaded || !auth.key) return
@@ -328,38 +324,10 @@ function AppInner({
       onClientReady?.(client)
       renderer.setTerminalTitle("Magnitude")
 
-      // Telemetry tracking state
-      const sessionTracker = new SessionTracker()
-      setSessionTracker(sessionTracker)
-
       // Log all events to event log file + collect for debug panel
       client.onEvent((event) => {
         if (debugMode && mounted) {
           setDebugEvents(prev => [...prev, event])
-        }
-
-        // Telemetry event tracking
-        if (event.type === 'session_initialized') {
-          trackSessionStart({
-            platform: event.context.platform,
-            shell: event.context.shell,
-            isResume: sessionSelection !== null && sessionSelection !== undefined,
-          })
-        }
-
-        if (event.type === 'user_message') {
-          sessionTracker.recordUserMessage()
-        }
-
-        if (event.type === 'turn_outcome') {
-          sessionTracker.recordTurn(event.providerId ?? null, event.modelId ?? null, event.inputTokens ?? 0, event.outputTokens ?? 0)
-        }
-
-        if (event.type === 'compaction_injected') {
-          sessionTracker.recordCompaction()
-        }
-        if (event.type === 'compaction_failed') {
-          sessionTracker.recordCompaction()
         }
       })
 

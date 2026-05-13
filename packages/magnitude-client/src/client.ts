@@ -2,6 +2,7 @@ import { Context, Effect, Duration } from "effect"
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
 import { Auth, type AuthApplicator } from "@magnitudedev/ai"
+import { CLIENT_PLATFORM, CLIENT_SHELL, HEADER_PLATFORM, HEADER_SHELL, HEADER_SESSION_ID } from "./client-headers"
 import { isEnvFlagOn } from "./env"
 import type { BalanceResponse, RoleId, UsagePeriod } from "./contract"
 import { createModelCatalog, type ModelCatalog } from "./catalog"
@@ -31,6 +32,7 @@ export class WebSearchError {
 export interface MagnitudeClientConfig {
   readonly apiKey?: string
   readonly endpoint?: string
+  readonly sessionId?: string
 }
 
 const DEFAULT_ENDPOINT = "https://app.magnitude.dev/api/v1"
@@ -73,23 +75,33 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
       : "No API key provided. Pass apiKey in config or set MAGNITUDE_API_KEY environment variable."
   )
   const endpoint = config?.endpoint ?? (useLocal ? LOCAL_ENDPOINT : DEFAULT_ENDPOINT)
+  const sessionId = config?.sessionId ?? null
   const auth = Auth.bearer(apiKey)
-  const catalog = createModelCatalog({ endpoint, auth })
+
+  // Compose auth with client headers so every request includes platform/shell/sessionId
+  const authWithHeaders: AuthApplicator = (headers) => {
+    auth(headers)
+    headers.set(HEADER_PLATFORM, CLIENT_PLATFORM)
+    headers.set(HEADER_SHELL, CLIENT_SHELL)
+    if (sessionId) headers.set(HEADER_SESSION_ID, sessionId)
+  }
+
+  const catalog = createModelCatalog({ endpoint, auth: authWithHeaders })
 
   return {
-    auth,
+    auth: authWithHeaders,
     catalog,
 
     role: (id: RoleId, options?: RoleOptions) => {
       const spec = createRoleSpec(id, endpoint, options?.capabilities)
-      return spec.bind({ auth, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
+      return spec.bind({ auth: authWithHeaders, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
     },
 
     /** Fetch balance + usage summary for the authenticated user */
     balance: (query?: BalanceQuery) => Effect.gen(function* () {
       const http = yield* HttpClient.HttpClient
       const headers = new Headers()
-      auth(headers)
+      authWithHeaders(headers)
       const headerRecord: Record<string, string> = {}
       headers.forEach((value, key) => { headerRecord[key] = value })
 
@@ -126,7 +138,7 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
         const http = yield* HttpClient.HttpClient
 
         const headers = new Headers()
-        auth(headers)
+        authWithHeaders(headers)
 
         const headerRecord: Record<string, string> = {}
         headers.forEach((value, key) => {

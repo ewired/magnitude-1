@@ -50,9 +50,6 @@ export interface StorageClient<TSlot extends string = string> {
       policy: ContextLimitPolicy
     ): Promise<void>
 
-    getTelemetryEnabled(): Promise<boolean>
-    setTelemetryEnabled(value: boolean): Promise<void>
-
     loadFull(): Promise<MagnitudeConfig>
     updateFull(
       fn: (c: MagnitudeConfig) => MagnitudeConfig
@@ -164,13 +161,6 @@ export async function createStorageClient<TSlot extends string = string>(options
         return run(Effect.flatMap(ConfigStorage, (s) => s.setContextLimitPolicy(policy)))
       },
 
-      getTelemetryEnabled() {
-        return run(Effect.flatMap(ConfigStorage, (s) => s.getTelemetryEnabled()))
-      },
-
-      setTelemetryEnabled(value) {
-        return run(Effect.flatMap(ConfigStorage, (s) => s.setTelemetryEnabled(value)))
-      },
 
       loadFull() {
         return run(Effect.flatMap(ConfigStorage, (s) => s.load()))
