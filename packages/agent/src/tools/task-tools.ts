@@ -175,7 +175,7 @@ export const updateTaskTool = defineHarnessTool({
 export const spawnWorkerTool = defineHarnessTool({
   definition: {
     name: 'spawn_worker',
-    description: 'Spawn a worker for a task id. The body is the worker\'s initial instruction (same mechanics as a normal message). Use <magnitude:message to="task-id"> for follow-up communications. Only use spawn_worker to create a new worker or replace the current one.',
+    description: 'Spawn a worker with a given role. Must be attached to a task. Only one worker can be assigned per task. Create another task for parallel work.',
     inputSchema: Schema.Struct({
       taskId: Schema.String.annotations({ description: 'Task ID to spawn a worker for' }),
       role: Schema.String.annotations({ description: 'Worker role (e.g., engineer, scout, architect, critic, scientist, artisan).' }),

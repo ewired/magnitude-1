@@ -3,7 +3,7 @@ import { WorkerBusTag, type WorkerBusService } from '@magnitudedev/event-core'
 import type { AppEvent } from '../../events'
 import { AgentStateReaderTag } from '../../tools/fork'
 import { TaskGraphStateReaderTag } from '../../tools/task-reader'
-import { agentNotFound, taskNotFound } from './errors'
+import { agentNotFound, taskNotFound, taskHasWorker } from './errors'
 import type { TaskDirectiveContext } from './handler'
 
 export interface ReassignWorkerDirective {
@@ -44,11 +44,8 @@ export const handleReassignWorkerDirective = (
 
     // Validate target task has no worker already
     if (targetTask.worker) {
-      return {
-        success: false as const,
-        code: 'task_has_worker' as const,
-        error: `Task "${directive.targetTaskId}" already has a worker assigned`,
-      }
+      const err = taskHasWorker(directive.targetTaskId)
+      return { success: false as const, code: err.code, error: err.message }
     }
 
     const bus = yield* WorkerBusTag<AppEvent>()

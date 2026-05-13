@@ -44,4 +44,8 @@ export function formatMissingAssignmentRoleError(taskId: string): string {
   return `Task assignment rejected: role is required when task "${taskId}" has no active worker.`
 }
 
+export function formatTaskHasWorkerError(taskId: string): string {
+  return `Task "${taskId}" already has a worker assigned. Only one worker may be assigned to a task. To work in parallel, create another task. To replace the worker, kill the existing one first.`
+}
+
 export const EMPTY_RESPONSE_ERROR = `Your response was empty. You must send a message and/or use tools.`

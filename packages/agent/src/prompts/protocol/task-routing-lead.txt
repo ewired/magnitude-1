@@ -50,7 +50,7 @@ A task requires `id` and `title`. Use `parent` to nest under an existing task:
 
 `spawn_worker` creates a worker for a task. The `id` must match an existing task. The `role` parameter is required and specifies the worker's role (e.g., engineer, scout, architect, critic, scientist, artisan). The `message` parameter is the worker's initial instruction with the same semantics as a normal `<magnitude:message to="TASK-ID">...</magnitude:message>`.
 
-If a worker already exists on that task, `spawn_worker` kills the old worker and spawns a new one.
+If a worker already exists on that task, `spawn_worker` errors. To work in parallel, create another task. To replace the worker, kill the existing one first.
 
 ### Killing workers
 

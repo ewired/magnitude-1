@@ -5,7 +5,7 @@ import { ConversationStateReaderTag } from '../../tools/memory-reader'
 import { TaskGraphStateReaderTag } from '../../tools/task-reader'
 import { buildAgentContext, buildConversationSummary } from '../../prompts'
 import { buildTaskAssignedValidated } from './builders'
-import { taskNotFound } from './errors'
+import { taskNotFound, taskHasWorker } from './errors'
 import type { TaskDirectiveContext } from './handler'
 import type { RoleId } from '../../agents/role-validation'
 
@@ -53,16 +53,9 @@ export const handleSpawnWorkerDirective = <R>(
     const { forkId: parentForkId } = yield* ForkContext
     const timestamp = Date.now()
 
-    let replacedWorker: { agentId: string; forkId: string } | undefined
     if (task.worker) {
-      replacedWorker = { agentId: task.worker.agentId, forkId: task.worker.forkId }
-      yield* bus.publish({
-        type: 'agent_killed',
-        forkId: task.worker.forkId,
-        parentForkId,
-        agentId: task.worker.agentId,
-        reason: `Respawned for task "${directive.id}"`,
-      })
+      const err = taskHasWorker(directive.id)
+      return { success: false, code: err.code, error: err.message } as const
     }
 
     const conversationReader = yield* ConversationStateReaderTag
@@ -88,7 +81,6 @@ export const handleSpawnWorkerDirective = <R>(
       workerRole: directive.role,
       message: directive.message,
       workerInfo: { agentId, forkId, role: directive.role },
-      replacedWorker,
     }, { forkId: parentForkId, timestamp, graph: { tasks: new Map() } }))
 
     return { success: true, title: task.title } as const

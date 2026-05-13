@@ -21,6 +21,7 @@ export type TaskOperationErrorCode =
   | 'empty_update_patch'
   | 'worker_not_found'
   | 'agent_not_found'
+  | 'task_has_worker'
 
 export interface TaskOperationErrorDetails {
   readonly code: TaskOperationErrorCode
@@ -73,6 +74,13 @@ export function workerNotFound(taskId: string): TaskOperationErrorDetails {
   return {
     code: 'worker_not_found',
     message: `Worker operation rejected: task "${taskId}" has no active worker.`,
+  }
+}
+
+export function taskHasWorker(taskId: string): TaskOperationErrorDetails {
+  return {
+    code: 'task_has_worker',
+    message: `Task "${taskId}" already has a worker assigned. Only one worker may be assigned to a task. To work in parallel, create another task. To replace the worker, kill the existing one first.`,
   }
 }
 

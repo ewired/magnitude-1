@@ -142,7 +142,7 @@ describe('task operation handlers validation', () => {
     expect(published.some((e) => e.type === 'agent_killed')).toBe(false)
   })
 
-  test('spawn_worker on assigned task kills existing worker first', async () => {
+  test('spawn_worker on assigned task returns error', async () => {
     const published: AppEvent[] = []
     const state = mkTaskState({
       tasks: new Map<string, TaskRecord>([
@@ -165,9 +165,12 @@ describe('task operation handlers validation', () => {
       spawnWorker: () => Effect.succeed('fork-3-new'),
     }, mkCtx()), state, published)
 
-    expect(result.success).toBe(true)
-    expect(published.some((e) => e.type === 'agent_killed')).toBe(true)
-    expect(published.some((e) => e.type === 'task_assigned')).toBe(true)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.code).toBe('task_has_worker')
+    }
+    expect(published.some((e) => e.type === 'agent_killed')).toBe(false)
+    expect(published.some((e) => e.type === 'task_assigned')).toBe(false)
   })
 
   test('kill_worker on task without worker errors', async () => {
