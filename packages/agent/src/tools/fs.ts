@@ -37,7 +37,7 @@ const FsErrorSchema = ToolErrorSchema('FsError', {})
 export const readTool = defineHarnessTool({
   definition: {
     name: 'read',
-    description: 'Read file content as string. Supports line-range reads via optional offset (1-indexed start line) and limit (max lines, default 2000). Use this instead of running cat, head, tail, or less in the shell.',
+    description: 'Read file text content. Use this instead of running cat, head, tail, or less in the shell. For reasonably sized files, prefer to simply read the whole thing rather than chaining together partial reads inefficiently.',
     inputSchema: Schema.Struct({
       path: Schema.String.annotations({
         description: 'Relative path to a file from cwd. Use tree instead for directories'
