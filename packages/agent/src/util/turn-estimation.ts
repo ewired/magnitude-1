@@ -23,8 +23,8 @@ function estimateResultTokens(result: ToolResult): number {
     }
     case "Error":
       return estimateText(result.error.message) + 30
-    case "Rejected":
-      return estimateText(JSON.stringify(result.rejection)) + 30
+    case "Denied":
+      return estimateText(typeof result.denial === 'string' ? result.denial : JSON.stringify(result.denial)) + 30
     case "Interrupted":
       return 10
     case "InputRejected":

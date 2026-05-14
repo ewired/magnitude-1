@@ -27,11 +27,11 @@ export class TurnAbort extends Data.TaggedError("TurnAbort")<{
 
 // ── Config ───────────────────────────────────────────────────────────
 
-export interface DispatchConfig<TStreamError = StreamError> {
+export interface DispatchConfig<TStreamError = StreamError, TDenial = unknown> {
   readonly events: Stream.Stream<ResponseStreamEvent<TStreamError>, never>
   readonly parsers: ReadonlyMap<ToolCallId, StreamingFieldParser>
   readonly toolkit: Toolkit
-  readonly hooks?: HarnessHooks<unknown>
+  readonly hooks?: HarnessHooks<unknown, TDenial>
   // Erased layer — createHarness enforces type coverage at compile time.
   readonly layer?: Layer.Layer<unknown>
   readonly initialEngineState?: EngineState
@@ -52,7 +52,7 @@ interface ToolCallAccumulator {
 
 // ── Dispatch ─────────────────────────────────────────────────────────
 
-export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStreamError>): Effect.Effect<void> {
+export function dispatch<TStreamError = StreamError, TDenial = unknown>(config: DispatchConfig<TStreamError, TDenial>): Effect.Effect<void> {
   const { toolkit, hooks, emit, initialEngineState } = config
 
   // Build lookup maps from toolkit
@@ -131,8 +131,11 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         })
 
         // afterExecute hook for cached results
+        // Note: cached results carry ToolResultErased (denial: unknown) but the hook
+        // signature expects ToolResult<unknown, ToolError, TDenial>. Cached results
+        // are inherently untyped, so we upcast here.
         if (hooks?.afterExecute) {
-          yield* provideLayer(hooks.afterExecute({ toolCallId, toolName, toolKey, input, result: cached.result }))
+          yield* provideLayer(hooks.afterExecute({ toolCallId, toolName, toolKey, input, result: cached.result as ToolResult<unknown, ToolError, TDenial> }))
         }
 
         // Fast-fail on cached error outcomes
@@ -152,14 +155,14 @@ export function dispatch<TStreamError = StreamError>(config: DispatchConfig<TStr
         ? yield* provideLayer(hooks.beforeExecute(hookCtx))
         : { _tag: "Proceed" as const }
 
-      if (decision._tag === "Reject") {
+      if (decision._tag === "Deny") {
         yield* emit({
           _tag: "ToolExecutionStarted",
           toolCallId, providerToolCallId, toolName, toolKey,
           input,
           cached: false,
         })
-        const result: ToolResult = { _tag: "Rejected", rejection: decision.rejection }
+        const result: ToolResult = { _tag: "Denied", denial: decision.denial }
         yield* emit({ _tag: "ToolExecutionEnded", toolCallId, providerToolCallId, toolName, toolKey, result })
         return yield* Effect.fail(new TurnAbort({ outcome: { _tag: "GateRejected", toolCallId, providerToolCallId, toolName } }))
       }

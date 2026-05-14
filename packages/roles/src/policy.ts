@@ -11,8 +11,8 @@ import type { PolicyRule, PolicyContext } from './types'
 
 type FullContext = ExecuteHookContext & { policyContext: PolicyContext }
 
-const proceed: InterceptorDecision = { _tag: 'Proceed' }
-const reject = (reason: string): InterceptorDecision => ({ _tag: 'Reject', rejection: reason })
+const proceed: InterceptorDecision<string> = { _tag: 'Proceed' }
+const deny = (message: string): InterceptorDecision<string> => ({ _tag: 'Deny', denial: message })
 
 function expandScratchpadPath(path: string, scratchpadPath: string): string {
   if (path === '$M' || path === '${M}') return scratchpadPath
@@ -39,7 +39,7 @@ export function denyForbiddenCommands(): PolicyRule {
     const input = ctx.input as { command: string }
     const classification = classifyShellCommand(input.command)
     if (classification.tier === 'forbidden') {
-      return Effect.succeed(reject(classification.reason ?? 'Forbidden command'))
+      return Effect.succeed(deny(classification.reason ?? 'Forbidden command'))
     }
     return Effect.succeed(null)
   }
@@ -54,7 +54,7 @@ export function denyMutatingGit(): PolicyRule {
     const input = ctx.input as { command: string }
     if (isGitAllowed(input.command)) return Effect.succeed(null)
 
-    return Effect.succeed(reject('Only read-only git commands are allowed'))
+    return Effect.succeed(deny('Only read-only git commands are allowed'))
   }
 }
 
@@ -72,7 +72,7 @@ export function denyWritesOutside(
     if (ctx.toolKey === 'shell') {
       const input = ctx.input as { command: string }
       if (!writesStayWithin(input.command, env, ...roots)) {
-        return Effect.succeed(reject('Command targets paths outside allowed directories'))
+        return Effect.succeed(deny('Command targets paths outside allowed directories'))
       }
       return Effect.succeed(null)
     }
@@ -82,7 +82,7 @@ export function denyWritesOutside(
       const expandedPath = expandScratchpadPath(input.path, policyContext.scratchpadPath)
       const fullPath = resolve(policyContext.cwd, expandedPath)
       if (!isPathWithin(fullPath, env, ...roots)) {
-        return Effect.succeed(reject('Cannot write files outside allowed directories'))
+        return Effect.succeed(deny('Cannot write files outside allowed directories'))
       }
       return Effect.succeed(null)
     }
@@ -114,7 +114,7 @@ export function denyMassDestructiveIn(
 
     const allRoots = [...nonProtectedRoots, ...protectedRoots]
     if (writesStayWithin(input.command, env, ...allRoots)) {
-      return Effect.succeed(reject('Mass-destructive operations are not allowed in protected directories'))
+      return Effect.succeed(deny('Mass-destructive operations are not allowed in protected directories'))
     }
 
     return Effect.succeed(null)
@@ -139,6 +139,6 @@ export function evaluatePolicy(
       const result = yield* rule(ctx)
       if (result !== null) return result
     }
-    return reject('No matching policy rule')
+    return deny('No matching policy rule')
   })
 }

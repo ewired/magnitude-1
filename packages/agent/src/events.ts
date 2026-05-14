@@ -385,7 +385,7 @@ export type ToolDisplay =
 export type ToolResult =
   | { readonly status: 'success'; readonly output: unknown; readonly display?: ToolDisplay }
   | { readonly status: 'error'; readonly message: string }
-  | { readonly status: 'rejected'; readonly message: string; readonly reason?: string }
+  | { readonly status: 'denied'; readonly denial: string }
   | { readonly status: 'interrupted' }
 
 export type ToolResultStatus = ToolResult['status']

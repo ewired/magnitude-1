@@ -43,7 +43,7 @@ export const skillActivationModel = defineStateModel(skillTool)<SkillActivationS
           }
           case 'Error':
             return { ...state, phase: 'error', errorDetail: event.result.error.message }
-          case 'Rejected':
+          case 'Denied':
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }

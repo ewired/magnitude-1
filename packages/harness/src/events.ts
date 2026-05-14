@@ -13,21 +13,25 @@ export interface ToolError {
 type ToolResultErased =
   | { readonly _tag: "Success"; readonly output: unknown }
   | { readonly _tag: "Error"; readonly error: ToolError }
-  | { readonly _tag: "Rejected"; readonly rejection: unknown }
+  | { readonly _tag: "Denied"; readonly denial: unknown }
   | { readonly _tag: "Interrupted" }
   | { readonly _tag: "InputRejected"; readonly issue: ValidationIssue; readonly partialInput: JsonValue }
 
-type ToolResultConcrete<TOutput, TError extends ToolError> =
+type ToolResultConcrete<TOutput, TError extends ToolError, TDenial> =
   | { readonly _tag: "Success"; readonly output: TOutput }
   | { readonly _tag: "Error"; readonly error: TError }
-  | { readonly _tag: "Rejected"; readonly rejection: unknown }
+  | { readonly _tag: "Denied"; readonly denial: TDenial }
   | { readonly _tag: "Interrupted" }
   | { readonly _tag: "InputRejected"; readonly issue: ValidationIssue; readonly partialInput: JsonValue }
 
-export type ToolResult<TOutput = never, TError extends ToolError = never> =
+export type ToolResult<
+  TOutput = never,
+  TError extends ToolError = never,
+  TDenial = unknown
+> =
   [TOutput] extends [never]
     ? ToolResultErased
-    : ToolResultConcrete<TOutput, [TError] extends [never] ? ToolError : TError>
+    : ToolResultConcrete<TOutput, [TError] extends [never] ? ToolError : TError, TDenial>
 
 // ── Tool Result Entry ────────────────────────────────────────────────
 

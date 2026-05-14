@@ -31,7 +31,7 @@ import { getAgentDefinition, getForkInfo } from '../agents/registry'
 import { getToolkitForRole } from '../tools/toolkits'
 import { createHarnessAdapter } from '../execution/harness-adapter'
 import { buildSystemPrompt } from '../prompts/system-prompt-builder'
-import { windowToPrompt } from '../prompts/window-to-prompt'
+import { windowToPrompt, createAgentFormatter } from '../prompts/window-to-prompt'
 import { createToolResultFormatter } from '@magnitudedev/harness'
 
 import { ExecutionManager } from '../execution/types'
@@ -181,7 +181,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // 6. Build prompt from memory
         // ──────────────────────────────────────────────────────────────────────
         const timezone = sessionCtx.context?.timezone ?? null
-        const formatter = createToolResultFormatter(toolkit)
+        const formatter = createAgentFormatter(createToolResultFormatter(toolkit))
         const rawPrompt = windowToPrompt(windowState, systemPrompt, timezone, agentState, formatter)
 
         // Resolve image descriptions — replaces ImageParts with text descriptions

@@ -241,7 +241,7 @@ describe('dispatch fast-fail', () => {
         {
           hooks: {
             beforeExecute: () =>
-              Effect.succeed({ _tag: 'Reject' as const, rejection: 'forbidden' }),
+              Effect.succeed({ _tag: 'Deny' as const, denial: 'forbidden' }),
           },
         },
       )

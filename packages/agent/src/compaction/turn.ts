@@ -22,6 +22,7 @@ import { getToolkitForRole } from '../tools/toolkits'
 import { buildSystemPrompt } from '../prompts/system-prompt-builder'
 import { buildCompactionPrompt } from './prompt'
 import { createToolResultFormatter } from '@magnitudedev/harness'
+import { createAgentFormatter } from '../prompts/window-to-prompt'
 import { resolveImageDescriptions } from '../util/describe-image'
 import { CompactionContextTag, type CompactResult } from './context'
 import { computeCompactionSizing } from './estimate'
@@ -139,7 +140,7 @@ export function runCompactionTurn(
 
       // Build compaction prompt: full window + reflection instruction appended
       const timezone = sessionCtx.context?.timezone ?? null
-      const formatter = createToolResultFormatter(toolkit)
+      const formatter = createAgentFormatter(createToolResultFormatter(toolkit))
       const compactionPrompt = buildCompactionPrompt(windowState, systemPrompt, timezone, agentStatus, formatter)
 
       // Resolve image descriptions for non-vision models (same pattern as Cortex)

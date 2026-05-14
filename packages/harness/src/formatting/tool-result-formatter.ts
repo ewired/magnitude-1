@@ -23,7 +23,7 @@ import type { ToolResultPart } from '@magnitudedev/ai'
 import type { ToolResultEntry, ToolResult } from '../events'
 import type { Toolkit } from '../tool/toolkit'
 import type { Schema } from 'effect'
-import { renderToolOutput, renderTagged, isImageValue, toImagePart } from './helpers'
+import { renderToolOutput, isImageValue, toImagePart, renderTagged } from './helpers'
 import { renderExpectedParams } from './schema-render'
 
 // ---------------------------------------------------------------------------
@@ -68,14 +68,16 @@ function formatResult(
     }
     case "Error":
       return [{ _tag: 'TextPart', text: `<tool_error>${result.error.message}</tool_error>` }]
-    case "Rejected":
-      return renderTagged('tool_rejected', result.rejection)
+    case "Denied":
+      return renderTagged('denied', result.denial)
     case "Interrupted":
       return [{ _tag: 'TextPart', text: '<tool_interrupted/>' }]
     case "InputRejected":
       return formatInputRejected(result, toolName, schemaLookup)
   }
 }
+
+
 
 function formatInputRejected(
   result: Extract<ToolResult, { _tag: "InputRejected" }>,

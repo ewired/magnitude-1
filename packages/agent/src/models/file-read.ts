@@ -33,7 +33,7 @@ export const fileReadModel = defineStateModel(readTool)<FileReadState>({
             return { ...state, phase: 'completed', lineCount: event.result.output.split('\n').length }
           case 'Error':
             return { ...state, phase: 'error', errorDetail: event.result.error.message }
-          case 'Rejected':
+          case 'Denied':
             return { ...state, phase: 'rejected' }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }

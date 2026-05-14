@@ -14,7 +14,13 @@ export const compactModel = defineStateModel(compactTool)<CompactState>({
       case 'ToolExecutionStarted':
         return { ...state, phase: 'executing' as const }
       case 'ToolExecutionEnded':
-        return { ...state, phase: event.result._tag === 'Success' ? 'completed' as const : 'error' as const }
+        switch (event.result._tag) {
+          case 'Success': return { ...state, phase: 'completed' as const }
+          case 'Error': return { ...state, phase: 'error' as const, errorMessage: event.result.error.message }
+          case 'Denied': return { ...state, phase: 'rejected' as const, errorMessage: String(event.result.denial) }
+          case 'Interrupted': return { ...state, phase: 'interrupted' as const }
+          default: return { ...state, phase: 'error' as const }
+        }
       case 'ToolInputRejected':
         return { ...state, phase: 'error' as const, errorMessage: event.issue.message }
       default:

@@ -39,8 +39,8 @@ export const updateTaskModel = defineStateModel(updateTaskTool)<UpdateTaskState>
             return { ...state, phase: 'completed', taskId: event.result.output.taskId, status: event.result.output.status }
           case 'Error':
             return { ...state, phase: 'error' }
-          case 'Rejected':
-            return { ...state, phase: 'rejected' }
+          case 'Denied':
+            return { ...state, phase: 'rejected', errorMessage: String(event.result.denial) }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
           default:

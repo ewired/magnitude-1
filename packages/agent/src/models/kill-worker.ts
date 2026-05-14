@@ -29,8 +29,8 @@ export const killWorkerModel = defineStateModel(killWorkerTool)<KillWorkerState>
             return { ...state, phase: 'completed', taskId: event.result.output.taskId }
           case 'Error':
             return { ...state, phase: 'error' }
-          case 'Rejected':
-            return { ...state, phase: 'rejected' }
+          case 'Denied':
+            return { ...state, phase: 'rejected', errorMessage: String(event.result.denial) }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
           default:

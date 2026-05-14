@@ -48,8 +48,8 @@ export const spawnWorkerModel = defineStateModel(spawnWorkerTool)<SpawnWorkerSta
             return { ...state, phase: 'completed', taskId: event.result.output.taskId, agentId: event.result.output.agentId, title: event.result.output.title }
           case 'Error':
             return { ...state, phase: 'error' }
-          case 'Rejected':
-            return { ...state, phase: 'rejected' }
+          case 'Denied':
+            return { ...state, phase: 'rejected', errorMessage: String(event.result.denial) }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
           default:

@@ -34,8 +34,8 @@ export const reassignWorkerModel = defineStateModel(reassignWorkerTool)<Reassign
             return { ...state, phase: 'completed', agentId: event.result.output.agentId, taskId: event.result.output.taskId }
           case 'Error':
             return { ...state, phase: 'error' }
-          case 'Rejected':
-            return { ...state, phase: 'rejected' }
+          case 'Denied':
+            return { ...state, phase: 'rejected', errorMessage: String(event.result.denial) }
           case 'Interrupted':
             return { ...state, phase: 'interrupted' }
           default:
