@@ -9,7 +9,7 @@ export type { StorageClient } from '@magnitudedev/storage'
 // Agent
 export { CodingAgent, createCodingAgentClient } from './coding-agent'
 export type { CreateClientOptions } from './coding-agent'
-export { fetchRoleProfiles, type RoleProfile } from './role-profiles'
+export { fetchRoleProfiles, fetchPublicRoleProfiles, type RoleProfile } from './role-profiles'
 export { fetchBalance, type BalanceResponse, type UsagePeriod, type FetchBalanceOptions } from './usage'
 
 // Errors
