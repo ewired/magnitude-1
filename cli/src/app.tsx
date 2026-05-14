@@ -66,6 +66,7 @@ import { useFilePanel } from './hooks/use-file-panel'
 import { useLazyClient } from './hooks/use-lazy-client'
 import { useMagnitudeAuth } from './hooks/use-magnitude-auth'
 import { MagnitudeLoginScreen } from './components/magnitude-login-screen'
+import { WindowsWarningScreen } from './components/windows-warning-screen'
 import { createRoles, ROLE_IDS, type RoleId } from '@magnitudedev/roles'
 
 export const getSelectedForkContentVersion = (
@@ -707,6 +708,21 @@ function AppInner({
     process.kill(process.pid, 'SIGINT')
   }, [])
 
+  if (process.platform === 'win32') {
+    return (
+      <WindowsWarningScreen onExit={exitApp} />
+    )
+  }
+
+  if (auth.loaded && !auth.key) {
+    return (
+      <MagnitudeLoginScreen
+        onSubmit={auth.save}
+        onExit={exitApp}
+      />
+    )
+  }
+
   const openRecentChats = useCallback(() => {
     refreshRecentChats()
     setShowRecentChatsOverlay(true)
@@ -1049,15 +1065,6 @@ function AppInner({
       taskMode: false,
     })
   }, [clientSend])
-
-  if (auth.loaded && !auth.key) {
-    return (
-      <MagnitudeLoginScreen
-        onSubmit={auth.save}
-        onExit={exitApp}
-      />
-    )
-  }
 
   if (!display) {
     return (
