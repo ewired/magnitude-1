@@ -17,6 +17,7 @@ import { buildSessionContextContent } from '../prompts/session-context'
 import { TASK_TREE_COMPLETION_REMINDER } from '../prompts/task-tree'
 import { SkillsAmbient } from '../ambient/skills-ambient'
 import { ConfigAmbient, getRoleConfig } from '../ambient/config-ambient'
+
 import { UserPresenceProjection } from '../projections/user-presence'
 import { UserMessageResolutionProjection } from '../projections/user-message-resolution'
 import { TaskGraphProjection, type TaskGraphState, type TaskRecord } from '../projections/task-graph'
@@ -802,7 +803,13 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
       const text = extractText(value.content)
       const imageAttachments: TimelineAttachment[] = (value.attachments ?? [])
         .filter((a): a is ImageAttachment => a.type === 'image')
-        .map(a => ({ kind: 'image' as const, image: { _tag: 'ImagePart' as const, data: a.base64, mediaType: a.mediaType, dimensions: { width: a.width, height: a.height } }, filename: a.filename }))
+        .map(a => {
+          return {
+            kind: 'image' as const,
+            image: { _tag: 'ImagePart' as const, data: a.base64, mediaType: a.mediaType, dimensions: { width: a.width, height: a.height } },
+            filename: a.filename,
+          }
+        })
       const mentionAttachments: TimelineAttachment[] = value.resolvedMentions.map(m => ({
         kind: 'mention' as const,
         ...m,

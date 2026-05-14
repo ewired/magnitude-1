@@ -38,6 +38,7 @@ export type MagnitudeErrorCode =
   | "upstream_unavailable"
   | "stream_interrupted"
   | "role_not_found"
+  | "utility_not_found"
 
 export type MagnitudeErrorDetails = InsufficientCreditsDetails
 

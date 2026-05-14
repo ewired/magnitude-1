@@ -229,3 +229,6 @@ export { createTraceListenerLayer, makeNoopTraceListener, makeTestTraceListener 
 export type { AgentTraceContext, TraceStore } from './tracing'
 export type { UserPart, TextPart, ImagePart, ImageMediaType } from '@magnitudedev/ai'
 export { textParts, textOf, hasImages, wrapTextParts } from './content'
+
+// Image description (vision preprocessing for non-vision models)
+export { configure as configureImageDescription, startImageDescription, cancelImageDescription, resolveImageDescriptions } from './util/describe-image'

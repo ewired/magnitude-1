@@ -49,6 +49,7 @@ function toObservationPart(part: ObservablePart): ObservationPart {
   }
 }
 import { isToolKey, type ToolKey } from '../tools/toolkits'
+import { resolveImageDescriptions } from '../util/describe-image'
 
 import { buildStandardHooks } from '../execution/harness-hooks'
 import { TurnContextTag } from '../engine/turn-context'
@@ -181,7 +182,13 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // ──────────────────────────────────────────────────────────────────────
         const timezone = sessionCtx.context?.timezone ?? null
         const formatter = createToolResultFormatter(toolkit)
-        const prompt = windowToPrompt(windowState, systemPrompt, timezone, agentState, formatter)
+        const rawPrompt = windowToPrompt(windowState, systemPrompt, timezone, agentState, formatter)
+
+        // Resolve image descriptions — replaces ImageParts with text descriptions
+        // from the vision preprocessing registry (started on image upload/paste).
+        const prompt = agentModel.profile.capabilities.vision
+          ? rawPrompt
+          : yield* Effect.promise(() => resolveImageDescriptions(rawPrompt))
 
         // ──────────────────────────────────────────────────────────────────────
         // 7. Build adapter

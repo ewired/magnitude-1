@@ -45,7 +45,7 @@ export const AgentModelResolverLive = () =>
             const capabilities = { vision: roleConfig.profile.capabilities.vision }
 
             return {
-              model: client.role(roleId, { defaults, capabilities, imagePlaceholders: { enabled: true } }),
+              model: client.role(roleId, { defaults, capabilities }),
               roleId,
               modelId: `role/${roleId}`,
               profile: roleConfig.profile,

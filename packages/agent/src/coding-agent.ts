@@ -72,6 +72,7 @@ import { AgentModelResolverLive } from './model/model-resolver'
 
 // Config & Auth
 import { MagnitudeClient, createMagnitudeClient, isEnvFlagOn } from '@magnitudedev/magnitude-client'
+import { configure as configureImageDescription } from './util/describe-image'
 import { createTraceListenerLayer } from './tracing/tracing'
 import type { StorageClient } from '@magnitudedev/storage'
 import { initLogger, logger } from '@magnitudedev/logger'
@@ -228,6 +229,10 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     MagnitudeClient,
     createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey, sessionId: options.sessionId ?? undefined }),
   )
+
+  // Configure image description module with the same endpoint/apiKey
+  // so it can call util/image without duplicating env var resolution
+  configureImageDescription({ endpoint: magnitudeEndpoint, apiKey })
 
   // Enable tracing in debug mode
   const traceSessionId = options.sessionId ?? new Date().toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, 'Z')
