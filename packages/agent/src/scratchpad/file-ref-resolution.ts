@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { existsSync } from 'node:fs'
 import { normalizeReferencedPath } from './file-refs'
+import { expandScratchpadPath } from '@magnitudedev/scratchpad'
 
 export interface ResolvedFileRef {
   resolvedPath: string
@@ -19,18 +20,16 @@ export function resolveFileRefPath(
   const normalized = normalizeReferencedPath(refPath)
   if (!normalized) return null
 
-  const scratchpadPrefix = normalized.startsWith('$M/') || normalized.startsWith('${M}/')
-  if (scratchpadPrefix) {
-    const innerPath = normalized.startsWith('${M}/')
-      ? normalized.slice('${M}/'.length)
-      : normalized.slice('$M/'.length)
-    const resolvedPath = path.resolve(scratchpadPath, innerPath)
+  const result = expandScratchpadPath(normalized, scratchpadPath)
+
+  if (result.expanded) {
     return {
-      resolvedPath,
-      displayPath: innerPath,
+      resolvedPath: result.path,
+      displayPath: result.displayPath,
     }
   }
 
+  // Non-scratchpad path — resolve relative to cwd
   const projectResolved = path.resolve(cwd, normalized)
   return {
     resolvedPath: projectResolved,

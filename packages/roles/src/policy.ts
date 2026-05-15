@@ -6,6 +6,7 @@ import {
   isPathWithin,
   writesStayWithin,
 } from '@magnitudedev/shell-classifier'
+import { expandScratchpadPath } from '@magnitudedev/scratchpad'
 import type { ExecuteHookContext, InterceptorDecision } from '@magnitudedev/harness'
 import type { PolicyRule, PolicyContext } from './types'
 
@@ -13,13 +14,6 @@ type FullContext = ExecuteHookContext & { policyContext: PolicyContext }
 
 const proceed: InterceptorDecision<string> = { _tag: 'Proceed' }
 const deny = (message: string): InterceptorDecision<string> => ({ _tag: 'Deny', denial: message })
-
-function expandScratchpadPath(path: string, scratchpadPath: string): string {
-  if (path === '$M' || path === '${M}') return scratchpadPath
-  if (path.startsWith('$M/')) return scratchpadPath + path.slice(2)
-  if (path.startsWith('${M}/')) return scratchpadPath + path.slice(4)
-  return path
-}
 
 function agentEnv(cwd: string, scratchpadPath: string): Record<string, string> {
   return {
@@ -79,7 +73,7 @@ export function denyWritesOutside(
 
     if (ctx.toolKey === 'fileWrite' || ctx.toolKey === 'fileEdit') {
       const input = ctx.input as { path: string }
-      const expandedPath = expandScratchpadPath(input.path, policyContext.scratchpadPath)
+      const { path: expandedPath } = expandScratchpadPath(input.path, policyContext.scratchpadPath)
       const fullPath = resolve(policyContext.cwd, expandedPath)
       if (!isPathWithin(fullPath, env, ...roots)) {
         return Effect.succeed(deny('Cannot write files outside allowed directories'))

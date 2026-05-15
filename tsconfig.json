@@ -19,7 +19,8 @@
       "@magnitudedev/tools": ["./packages/tools/src"],
       "@magnitudedev/xml-act": ["./packages/xml-act/src"],
       "@magnitudedev/ai": ["./packages/ai/src"],
-      "@magnitudedev/magnitude-client": ["./packages/magnitude-client/src"]
+      "@magnitudedev/magnitude-client": ["./packages/magnitude-client/src"],
+      "@magnitudedev/scratchpad": ["./packages/scratchpad/src"]
     },
     "plugins": [
       { "name": "@effect/language-service" }

@@ -17,7 +17,7 @@ import type { PolicyContext } from './types'
 import { agentEnv } from '../util/agent-env'
 import { editTool, writeTool } from '../tools/fs'
 import { shellTool } from '../tools/shell'
-import { expandScratchpadPath } from '../scratchpad/scratchpad-path'
+import { expandScratchpadPath } from '@magnitudedev/scratchpad'
 
 type ShellInput = Schema.Schema.Type<typeof shellTool.definition.inputSchema>
 type FileWriteInput = Schema.Schema.Type<typeof writeTool.definition.inputSchema>
@@ -119,7 +119,7 @@ function checkPathBounds(
   operation: string,
 ): Decision | null {
   if (ctx.disableCwdSafeguards) return null
-  const expandedPath = expandScratchpadPath(path, ctx.scratchpadPath)
+  const { path: expandedPath } = expandScratchpadPath(path, ctx.scratchpadPath)
   const fullPath = resolve(ctx.cwd, expandedPath)
   const env = agentEnv(ctx.cwd, ctx.scratchpadPath)
   if (!isPathWithin(fullPath, env, ...roots(ctx))) {

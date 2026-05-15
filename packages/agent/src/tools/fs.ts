@@ -8,7 +8,7 @@ import { resolve } from 'path'
 import { validateAndApply } from '../util/edit'
 import { WorkingDirectoryTag } from '../execution/working-directory'
 import { readImageFileForModel } from '../util/read-image-file'
-import { expandScratchpadPath } from '../scratchpad'
+import { expandScratchpadPath } from '@magnitudedev/scratchpad'
 import { Fs, resolveFsPath } from '../services/fs'
 import { ToolErrorSchema } from './errors'
 const ToolImageSchema = Schema.Struct({
@@ -40,7 +40,7 @@ export const readTool = defineHarnessTool({
     description: 'Read file text content. Use this instead of running cat, head, tail, or less in the shell. For reasonably sized files, prefer to simply read the whole thing rather than chaining together partial reads inefficiently.',
     inputSchema: Schema.Struct({
       path: Schema.String.annotations({
-        description: 'Relative path to a file from cwd. Use tree instead for directories'
+        description: 'Relative path to a file from cwd. Use $M/ prefix for scratchpad path. Use tree instead for directories'
       }),
       offset: Schema.optional(Schema.Number).annotations({
         description: '1-indexed start line (default: 1)'
@@ -58,7 +58,7 @@ export const readTool = defineHarnessTool({
       if (!input.path?.isFinal) return {}
       const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
       const fs = yield* Fs
-      const expandedPath = expandScratchpadPath(input.path.value, scratchpadPath)
+      const { path: expandedPath } = expandScratchpadPath(input.path.value, scratchpadPath)
       const fullPath = resolve(cwd, expandedPath)
       const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
       if (!exists) {
@@ -70,7 +70,7 @@ export const readTool = defineHarnessTool({
   execute: ({ path, offset, limit }, _ctx) => Effect.gen(function* () {
     const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const expandedPath = expandScratchpadPath(path, scratchpadPath)
+    const { path: expandedPath } = expandScratchpadPath(path, scratchpadPath)
     const fullPath = resolve(cwd, expandedPath)
     const content = yield* fs.readText(fullPath).pipe(
       Effect.catchAll(() => Effect.fail(fsError(`Failed to read ${path}`)))
@@ -113,7 +113,7 @@ export const writeTool = defineHarnessTool({
     description: 'Write content to file. Use this instead of running echo, tee, or heredocs in the shell.',
     inputSchema: Schema.Struct({
       path: Schema.String.annotations({
-        description: 'Relative path from cwd'
+        description: 'Relative path from cwd. Use $M/ prefix for scratchpad path.'
       }),
       content: Schema.String.annotations({
         description: 'File content to write'
@@ -130,7 +130,7 @@ export const writeTool = defineHarnessTool({
   execute: ({ path, content }, ctx) => Effect.gen(function* () {
     const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const expandedPath = expandScratchpadPath(path, scratchpadPath)
+    const { path: expandedPath } = expandScratchpadPath(path, scratchpadPath)
     const fullPath = resolve(cwd, expandedPath)
     yield* fs.writeFile(fullPath, content).pipe(
       Effect.catchAll(() => Effect.fail(fsError(`Failed to write ${path}`)))
@@ -150,7 +150,7 @@ export const editTool = defineHarnessTool({
     description: 'Edit a file by replacing exact text. The "old" parameter content must match the file exactly. Read the file first. Use this instead of running sed, perl, or awk in the shell.',
     inputSchema: Schema.Struct({
       path: Schema.String.annotations({
-        description: 'Relative path from cwd'
+        description: 'Relative path from cwd. Use $M/ prefix for scratchpad path.'
       }),
       old: Schema.String.annotations({
         description: 'Exact text to find in the file'
@@ -179,7 +179,7 @@ export const editTool = defineHarnessTool({
       if (path?.isFinal && !state.emitted) {
         const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
         const fs = yield* Fs
-        const expandedPath = expandScratchpadPath(path.value, scratchpadPath)
+        const { path: expandedPath } = expandScratchpadPath(path.value, scratchpadPath)
         const fullPath = resolve(cwd, expandedPath)
 
         const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
@@ -201,7 +201,7 @@ export const editTool = defineHarnessTool({
       if (path?.isFinal && input.old?.isFinal && state.emitted) {
         const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
         const fs = yield* Fs
-        const expandedPath = expandScratchpadPath(path.value, scratchpadPath)
+        const { path: expandedPath } = expandScratchpadPath(path.value, scratchpadPath)
         const fullPath = resolve(cwd, expandedPath)
         const content = yield* fs.readText(fullPath).pipe(Effect.catchAll(() => Effect.succeed('')))
 
@@ -218,7 +218,7 @@ export const editTool = defineHarnessTool({
   execute: ({ path, old: oldStr, new: newStr, replaceAll }, _ctx) => Effect.gen(function* () {
     const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const expandedPath = expandScratchpadPath(path, scratchpadPath)
+    const { path: expandedPath } = expandScratchpadPath(path, scratchpadPath)
     const fullPath = resolve(cwd, expandedPath)
 
     const content = yield* fs.readText(fullPath).pipe(
@@ -265,7 +265,7 @@ export const treeTool = defineHarnessTool({
     description: 'List directory structure with optional gitignore filtering. Use this instead of running ls, find, or tree in the shell.',
     inputSchema: Schema.Struct({
       path: Schema.String.annotations({
-        description: 'Relative path from cwd'
+        description: 'Relative path from cwd. Use $M/ prefix for scratchpad path.'
       }),
       recursive: Schema.optional(Schema.Boolean.annotations({
         description: 'Include subdirectories (default: true)'
@@ -286,7 +286,7 @@ export const treeTool = defineHarnessTool({
       if (!input.path?.isFinal) return {}
       const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
       const fs = yield* Fs
-      const expandedPath = expandScratchpadPath(input.path.value, scratchpadPath)
+      const { path: expandedPath } = expandScratchpadPath(input.path.value, scratchpadPath)
       const fullPath = resolve(cwd, expandedPath)
       const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
       if (!exists) {
@@ -298,7 +298,7 @@ export const treeTool = defineHarnessTool({
   execute: ({ path, gitignore, maxDepth }, _ctx) => Effect.gen(function* () {
     const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const expandedPath = expandScratchpadPath(path, scratchpadPath)
+    const { path: expandedPath } = expandScratchpadPath(path, scratchpadPath)
     const fullPath = resolve(cwd, expandedPath)
     const respectGitignore = gitignore ?? true
 
@@ -335,7 +335,7 @@ export const grepTool = defineHarnessTool({
         description: 'Regex pattern to search for'
       }),
       path: Schema.optional(Schema.String.annotations({
-        description: 'Directory to search in (default: cwd)'
+        description: 'Directory to search in (default: cwd). Use $M/ prefix for scratchpad path.'
       })),
       glob: Schema.optional(Schema.String.annotations({
         description: 'Glob pattern to filter files (e.g., "*.ts")'
@@ -354,7 +354,7 @@ export const grepTool = defineHarnessTool({
       if (!pathValue || !input.path?.isFinal) return {}
       const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
       const fs = yield* Fs
-      const expandedPath = expandScratchpadPath(pathValue, scratchpadPath)
+      const { path: expandedPath } = expandScratchpadPath(pathValue, scratchpadPath)
       const fullPath = resolve(cwd, expandedPath)
       const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
       if (!exists) {
@@ -366,11 +366,12 @@ export const grepTool = defineHarnessTool({
   execute: ({ pattern, path, glob, limit }, _ctx) => Effect.gen(function* () {
     const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
     const fs = yield* Fs
-    const resolvedPath = expandScratchpadPath(path ?? '', scratchpadPath) || undefined
+    const { path: resolvedPath } = expandScratchpadPath(path ?? '', scratchpadPath)
+    const resolved = resolvedPath || undefined
     const resolvedGlob = glob
     const resolvedLimit = limit ?? 50
 
-    const searchPath = resolvedPath
+    const searchPath = resolved
       ? resolve(cwd, resolvedPath)
       : cwd
 
@@ -390,7 +391,7 @@ export const viewTool = defineHarnessTool({
     description: 'Read an image file and return it as image output for visual inspection. Supports PNG, JPEG, WebP, GIF, and SVG files.',
     inputSchema: Schema.Struct({
       path: Schema.String.annotations({
-        description: 'Relative path to an image file from cwd'
+        description: 'Relative path to an image file from cwd. Use $M/ prefix for scratchpad path.'
       }),
     }),
     outputSchema: ToolImageSchema,
@@ -402,7 +403,7 @@ export const viewTool = defineHarnessTool({
       if (!input.path?.isFinal) return {}
       const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
       const fs = yield* Fs
-      const expandedPath = expandScratchpadPath(input.path.value, scratchpadPath)
+      const { path: expandedPath } = expandScratchpadPath(input.path.value, scratchpadPath)
       const fullPath = resolve(cwd, expandedPath)
       const exists = yield* fs.exists(fullPath).pipe(Effect.catchAll(() => Effect.succeed(false)))
       if (!exists) {

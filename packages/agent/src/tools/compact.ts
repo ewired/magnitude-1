@@ -5,7 +5,7 @@ import { resolve } from 'path'
 import * as fs from 'fs/promises'
 import { CompactionContextTag } from '../compaction/context'
 import { WorkingDirectoryTag } from '../execution/working-directory'
-import { expandScratchpadPath } from '../scratchpad/scratchpad-path'
+import { expandScratchpadPath } from '@magnitudedev/scratchpad'
 import { COMPACT_MAX_FILES, COMPACT_MAX_FILE_CHARS, CHARS_PER_TOKEN_LOWER } from '../constants'
 import { ToolErrorSchema } from './errors'
 
@@ -56,7 +56,7 @@ export const compactTool = defineHarnessTool({
 
     for (const filePath of filePaths) {
       if (remaining <= 0) break
-      const expandedPath = expandScratchpadPath(filePath, scratchpadPath)
+      const { path: expandedPath } = expandScratchpadPath(filePath, scratchpadPath)
       const fullPath = resolve(cwd, expandedPath)
       const readResult = yield* Effect.tryPromise({
         try: () => fs.readFile(fullPath, 'utf-8'),

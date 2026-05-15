@@ -89,6 +89,7 @@
         "@magnitudedev/magnitude-client": "workspace:*",
         "@magnitudedev/ripgrep": "workspace:*",
         "@magnitudedev/roles": "workspace:*",
+        "@magnitudedev/scratchpad": "workspace:*",
         "@magnitudedev/shell-classifier": "workspace:*",
         "@magnitudedev/skills": "workspace:*",
         "@magnitudedev/tools": "workspace:*",
@@ -237,9 +238,17 @@
         "@magnitudedev/ai": "workspace:*",
         "@magnitudedev/harness": "workspace:*",
         "@magnitudedev/magnitude-client": "workspace:*",
+        "@magnitudedev/scratchpad": "workspace:*",
         "@magnitudedev/shell-classifier": "workspace:*",
         "effect": "^3.19.6",
       },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+    },
+    "packages/scratchpad": {
+      "name": "@magnitudedev/scratchpad",
+      "version": "0.0.1",
       "devDependencies": {
         "@types/bun": "latest",
       },
@@ -594,6 +603,8 @@
     "@magnitudedev/ripgrep": ["@magnitudedev/ripgrep@workspace:packages/ripgrep"],
 
     "@magnitudedev/roles": ["@magnitudedev/roles@workspace:packages/roles"],
+
+    "@magnitudedev/scratchpad": ["@magnitudedev/scratchpad@workspace:packages/scratchpad"],
 
     "@magnitudedev/shell-classifier": ["@magnitudedev/shell-classifier@workspace:packages/shell-classifier"],
 
@@ -1719,6 +1730,8 @@
 
     "@magnitudedev/roles/@types/bun": ["@types/bun@1.3.14", "", { "dependencies": { "bun-types": "1.3.14" } }, "sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw=="],
 
+    "@magnitudedev/scratchpad/@types/bun": ["@types/bun@1.3.14", "", { "dependencies": { "bun-types": "1.3.14" } }, "sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw=="],
+
     "@magnitudedev/shell-classifier/@types/bun": ["@types/bun@1.3.14", "", { "dependencies": { "bun-types": "1.3.14" } }, "sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw=="],
 
     "@magnitudedev/skills/@types/bun": ["@types/bun@1.3.14", "", { "dependencies": { "bun-types": "1.3.14" } }, "sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw=="],
@@ -1824,6 +1837,8 @@
     "@magnitudedev/ripgrep/@types/bun/bun-types": ["bun-types@1.3.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ=="],
 
     "@magnitudedev/roles/@types/bun/bun-types": ["bun-types@1.3.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ=="],
+
+    "@magnitudedev/scratchpad/@types/bun/bun-types": ["bun-types@1.3.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ=="],
 
     "@magnitudedev/shell-classifier/@types/bun/bun-types": ["bun-types@1.3.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ=="],
 
