@@ -1,2 +1,2 @@
 export { JsonChatPersistence } from './json-chat-persistence'
-export { listAllSessions, loadSessionSummary, type SessionSummary } from './session-utils'
+export { listAllSessions, loadSessionMeta } from './session-utils'

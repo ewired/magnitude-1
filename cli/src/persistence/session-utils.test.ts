@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import { listAllSessions, loadSessionSummary } from './session-utils'
+import { listAllSessions, loadSessionMeta } from './session-utils'
 
 describe('session-utils', () => {
-  test('listAllSessions reads titles from metadata only', async () => {
+  test('listAllSessions reads chatName from metadata only', async () => {
     const storage = {
       sessions: {
         list: async () => ['a', 'b'],
@@ -27,10 +27,10 @@ describe('session-utils', () => {
 
     const result = await listAllSessions(storage)
 
-    expect(result.map((session) => session.title)).toEqual(['Beta', 'Alpha'])
+    expect(result.map((meta) => meta.chatName)).toEqual(['Beta', 'Alpha'])
   })
 
-  test('loadSessionSummary returns chatName from metadata', async () => {
+  test('loadSessionMeta returns chatName from metadata', async () => {
     const storage = {
       sessions: {
         readMeta: async () => ({
@@ -49,8 +49,8 @@ describe('session-utils', () => {
       },
     } as any
 
-    const result = await loadSessionSummary(storage, 'a')
+    const result = await loadSessionMeta(storage, 'a')
 
-    expect(result?.title).toBe('Stored Title')
+    expect(result?.chatName).toBe('Stored Title')
   })
 })

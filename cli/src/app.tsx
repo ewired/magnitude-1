@@ -6,7 +6,7 @@ import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph,
 import { matchKeyToChord } from './utils/chord'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
-import { JsonChatPersistence, loadSessionSummary } from './persistence'
+import { JsonChatPersistence, loadSessionMeta } from './persistence'
 
 import { MessageView } from './components/message-view'
 import { ErrorBoundary } from './components/error-boundary'
@@ -215,7 +215,7 @@ function AppInner({
   const [recentChats, setRecentChats] = useState<RecentChat[] | null>(null)
 
   const refreshRecentChats = useCallback(() => {
-    getRecentChats(storage).then(setRecentChats)
+    getRecentChats(storage, process.cwd()).then(setRecentChats)
   }, [storage])
 
   useEffect(() => {
@@ -405,9 +405,9 @@ function AppInner({
 
         if (!resolvedSessionId) return
 
-        const summary = await loadSessionSummary(storage, resolvedSessionId)
-        if (summary?.title) {
-          renderer.setTerminalTitle(summary.title)
+        const meta = await loadSessionMeta(storage, resolvedSessionId)
+        if (meta?.chatName) {
+          renderer.setTerminalTitle(meta.chatName)
         }
       })
     }

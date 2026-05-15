@@ -4,8 +4,8 @@
  * Uses centralized session utilities to load session summaries
  */
 
-import type { StorageClient } from '@magnitudedev/storage'
-import { listAllSessions, type SessionSummary } from '../persistence/session-utils'
+import type { StorageClient, StoredSessionMeta } from '@magnitudedev/storage'
+import { listAllSessions } from '../persistence/session-utils'
 
 export interface RecentChat {
   id: string
@@ -13,22 +13,25 @@ export interface RecentChat {
   lastMessage: string
   timestamp: number
   messageCount: number
+  workingDirectory: string
 }
 
 const MAX_RECENT_CHATS = 100
 
 /**
- * Get recent chats from all available sessions
+ * Get recent chats from sessions that were started in the given cwd.
  */
-export async function getRecentChats(storage: StorageClient, limit = MAX_RECENT_CHATS): Promise<RecentChat[]> {
-  const summaries = await listAllSessions(storage, limit)
+export async function getRecentChats(storage: StorageClient, cwd: string, limit = MAX_RECENT_CHATS): Promise<RecentChat[]> {
+  const metas = await listAllSessions(storage)
+  const filtered = metas.filter(m => m.workingDirectory === cwd)
   
-  return summaries.map(summary => ({
-    id: summary.sessionId,
-    title: summary.title,
-    lastMessage: summary.lastMessage,
-    timestamp: summary.timestamp,
-    messageCount: summary.messageCount,
+  return filtered.slice(0, limit).map(meta => ({
+    id: meta.sessionId,
+    title: meta.chatName,
+    lastMessage: meta.lastMessage ?? 'No messages yet',
+    timestamp: Date.parse(meta.updated) || Date.parse(meta.created),
+    messageCount: meta.messageCount,
+    workingDirectory: meta.workingDirectory,
   }))
 }
 
