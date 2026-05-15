@@ -1,5 +1,6 @@
 import { memo, useState, useEffect, useRef, useCallback } from 'react'
 import { TextAttributes } from '@opentui/core'
+import { useRenderer } from '@opentui/react'
 import { Button } from './button'
 import { useTheme } from '../hooks/use-theme'
 import { writeTextToClipboard } from '../utils/clipboard'
@@ -20,6 +21,7 @@ interface ErrorMessageProps {
 
 export const ErrorMessage = memo(function ErrorMessage({ tag, message, timestamp, cta, onAction }: ErrorMessageProps) {
   const theme = useTheme()
+  const renderer = useRenderer()
   const [isHovered, setIsHovered] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -88,11 +90,13 @@ export const ErrorMessage = memo(function ErrorMessage({ tag, message, timestamp
 
   const handleMouseOver = () => {
     setIsHovered(true)
+    if (!cta) renderer.setMousePointer('pointer')
   }
 
   const handleMouseOut = () => {
     mouseDownRef.current = false
     setIsHovered(false)
+    renderer.setMousePointer('default')
   }
 
   return (

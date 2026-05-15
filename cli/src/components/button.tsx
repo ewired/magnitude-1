@@ -1,6 +1,8 @@
 import React, { cloneElement, isValidElement, memo, useRef } from 'react'
+import { useRenderer } from '@opentui/react'
 
 import type { ReactElement, ReactNode } from 'react'
+import type { MousePointerStyle } from '@opentui/core'
 
 interface ElementProps {
   children?: ReactNode
@@ -47,6 +49,7 @@ interface ButtonProps {
   onMouseOut?: () => void
   style?: Record<string, unknown>
   children?: ReactNode
+  cursor?: MousePointerStyle
   // pass-through for box host props
   [key: string]: unknown
 }
@@ -61,8 +64,10 @@ interface ButtonProps {
  * When to use:
  * - Use `Button` for standard button-like interactions (primary choice for clickable controls)
  */
-export const Button = memo(function Button({ onClick, onMouseOver, onMouseOut, style, children, ...rest }: ButtonProps) {
+export const Button = memo(function Button({ onClick, onMouseOver, onMouseOut, style, children, cursor, ...rest }: ButtonProps) {
   const nonSelectableChildren = makeNodeTextNonSelectable(children)
+  const renderer = useRenderer()
+  const resolvedCursor = cursor ?? 'pointer'
 
   // Track whether mouse down occurred on this element to implement proper click detection
   // This prevents hover from triggering clicks in some terminals
@@ -80,7 +85,13 @@ export const Button = memo(function Button({ onClick, onMouseOver, onMouseOut, s
     pressStartedRef.current = false
   }
 
+  const handleMouseOverInternal = () => {
+    renderer.setMousePointer(resolvedCursor)
+    onMouseOver?.()
+  }
+
   const handlePointerLeave = () => {
+    renderer.setMousePointer('default')
     // Reset mouse down state when leaving the element
     pressStartedRef.current = false
     onMouseOut?.()
@@ -92,7 +103,7 @@ export const Button = memo(function Button({ onClick, onMouseOver, onMouseOut, s
       style={style}
       onMouseDown={handlePressStart}
       onMouseUp={handlePressEnd}
-      onMouseOver={onMouseOver}
+      onMouseOver={handleMouseOverInternal}
       onMouseOut={handlePointerLeave}
     >
       {nonSelectableChildren}

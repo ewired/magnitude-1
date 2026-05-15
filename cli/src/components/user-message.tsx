@@ -1,5 +1,6 @@
 import { memo, useState, useEffect, useRef } from 'react'
 import { TextAttributes } from '@opentui/core'
+import { useRenderer } from '@opentui/react'
 import stringWidth from 'string-width'
 import { useTheme } from '../hooks/use-theme'
 import { writeTextToClipboard } from '../utils/clipboard'
@@ -20,6 +21,7 @@ interface UserMessageProps {
 
 export const UserMessage = memo(function UserMessage({ content, timestamp, taskMode, attachments }: UserMessageProps) {
   const theme = useTheme()
+  const renderer = useRenderer()
   const [isHovered, setIsHovered] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -55,11 +57,13 @@ export const UserMessage = memo(function UserMessage({ content, timestamp, taskM
 
   const handleMouseOver = () => {
     setIsHovered(true)
+    renderer.setMousePointer('pointer')
   }
 
   const handleMouseOut = () => {
     mouseDownRef.current = false
     setIsHovered(false)
+    renderer.setMousePointer('default')
   }
 
   const hasAttachments = Boolean(attachments && attachments.length > 0)

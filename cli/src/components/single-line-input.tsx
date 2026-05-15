@@ -1,5 +1,5 @@
 import { type KeyEvent, decodePasteBytes } from '@opentui/core'
-import { useKeyboard } from '@opentui/react'
+import { useKeyboard, useRenderer } from '@opentui/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { usePasteHandler } from '../hooks/use-paste-handler'
@@ -29,6 +29,7 @@ export function SingleLineInput({
   masked = false,
 }: SingleLineInputProps) {
   const theme = useTheme()
+  const renderer = useRenderer()
   const [cursorPosition, setCursorPosition] = useState(value.length)
 
   const previousValueRef = useRef(value)
@@ -169,6 +170,8 @@ export function SingleLineInput({
     <box
       focusable={focused}
       focused={focused}
+      onMouseOver={() => renderer.setMousePointer('text')}
+      onMouseOut={() => renderer.setMousePointer('default')}
       onPaste={(event) => handlePasteEvent({ text: decodePasteBytes(event.bytes) })}
     >
       <text style={{ fg: isPlaceholder ? theme.muted : theme.foreground }}>

@@ -46,7 +46,8 @@ export const WizardHeader = memo(function WizardHeader({
         </text>
         <Button
           onClick={skipDisabled ? undefined : onSkip}
-          onMouseOver={() => !skipDisabled && setSkipHovered(true)}
+          cursor={skipDisabled ? 'not-allowed' : 'pointer'}
+          onMouseOver={() => { if (!skipDisabled) setSkipHovered(true) }}
           onMouseOut={() => setSkipHovered(false)}
         >
           <box style={{

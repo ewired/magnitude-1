@@ -1,6 +1,7 @@
 import React, { memo, useState } from 'react'
 import type { ImageAttachment } from '@magnitudedev/agent'
 import { TextAttributes } from '@opentui/core'
+import { useRenderer } from '@opentui/react'
 import { useTheme } from '../hooks/use-theme'
 import { fitAttachments, formatAttachmentLabel } from '../utils/attachment-overflow'
 
@@ -12,6 +13,7 @@ interface AttachmentsBarProps {
 
 export const AttachmentsBar = memo(function AttachmentsBar({ attachments, onRemove, maxWidth }: AttachmentsBarProps) {
   const theme = useTheme()
+  const renderer = useRenderer()
   const [hoveredRemoveIndex, setHoveredRemoveIndex] = useState<number | null>(null)
 
   if (attachments.length === 0) return null
@@ -29,8 +31,8 @@ export const AttachmentsBar = memo(function AttachmentsBar({ attachments, onRemo
           </text>
           <text
             style={{ fg: hoveredRemoveIndex === item.index ? theme.foreground : theme.muted }}
-            onMouseOver={() => setHoveredRemoveIndex(item.index)}
-            onMouseOut={() => setHoveredRemoveIndex((prev) => (prev === item.index ? null : prev))}
+            onMouseOver={() => { setHoveredRemoveIndex(item.index); renderer.setMousePointer('pointer') }}
+            onMouseOut={() => { setHoveredRemoveIndex((prev) => (prev === item.index ? null : prev)); renderer.setMousePointer('default') }}
             onMouseDown={() => onRemove(item.index)}
           >
             {'[x]'}

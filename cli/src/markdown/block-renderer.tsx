@@ -186,12 +186,19 @@ const SpanRenderer = memo(function SpanRenderer({
   })
 
   const handleMouseMove = useSafeEvent((event: OTMouseEvent) => {
-    setHoveredZone(hitTest(event))
+    const hit = hitTest(event)
+    setHoveredZone(hit)
+    if (hit !== null) {
+      renderer.setMousePointer('pointer')
+    } else {
+      renderer.setMousePointer('default')
+    }
   })
 
   const handleMouseOut = useSafeEvent(() => {
     setHoveredZone(null)
     pressStartedRef.current = null
+    renderer.setMousePointer('default')
   })
 
   if (hitZones.length === 0) {
@@ -250,6 +257,7 @@ function CodeBlockView({
   id?: string
 }) {
   const theme = useTheme()
+  const renderer = useRenderer()
   const [isHovered, setIsHovered] = useState(false)
   const [copied, setCopied] = useState(false)
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -272,8 +280,8 @@ function CodeBlockView({
     <box
       id={id}
       style={{ flexDirection: 'column', position: 'relative' }}
-      onMouseOver={() => setIsHovered(true)}
-      onMouseOut={() => setIsHovered(false)}
+      onMouseOver={() => { setIsHovered(true); renderer.setMousePointer('pointer') }}
+      onMouseOut={() => { setIsHovered(false); renderer.setMousePointer('default') }}
       onMouseDown={handleCopy}
     >
       <text style={{ fg: palette.codeBorderColor }}>
