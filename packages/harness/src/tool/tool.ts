@@ -19,13 +19,13 @@ export interface ToolContext<TEmission = never> {
 
 // --- StreamHook ---
 
-export interface StreamHook<TInput, TEmission, TStreamState, R = never> {
+export interface StreamHook<TInput, TEmission, TStreamState, RStream = never> {
   readonly initial: TStreamState
   readonly onInput: (
     input: StreamingPartial<TInput>,
     state: TStreamState,
     ctx: ToolContext<TEmission>
-  ) => Effect.Effect<TStreamState, StreamValidationError, R>
+  ) => Effect.Effect<TStreamState, StreamValidationError, RStream>
 }
 
 // --- HarnessTool (split into erased and concrete) ---
@@ -43,12 +43,13 @@ export interface HarnessToolConcrete<
   TOutput,
   TEmission,
   E,
-  R,
+  RExecute,
+  RStream = never,
   TStreamState = unknown,
 > {
   readonly definition: ToolDefinition<TInput, TOutput>
-  readonly execute: (input: TInput, ctx: ToolContext<TEmission>) => Effect.Effect<TOutput, E, R>
-  readonly stream?: StreamHook<TInput, TEmission, TStreamState, R>
+  readonly execute: (input: TInput, ctx: ToolContext<TEmission>) => Effect.Effect<TOutput, E, RExecute>
+  readonly stream?: StreamHook<TInput, TEmission, TStreamState, RStream>
   readonly emissionSchema?: [TEmission] extends [never] ? undefined : Schema.Schema<TEmission, any, never>
   readonly errorSchema?: [E] extends [never] ? undefined : Schema.Schema<E, any, never>
 }
@@ -58,10 +59,11 @@ export type HarnessTool<
   TOutput = never,
   TEmission = never,
   E = never,
-  R = never,
+  RExecute = never,
+  RStream = never,
 > = [TInput] extends [never]
   ? HarnessToolErased
-  : HarnessToolConcrete<TInput, TOutput, TEmission, E, R>
+  : HarnessToolConcrete<TInput, TOutput, TEmission, E, RExecute, RStream>
 
 // Note: HarnessToolConcrete is NOT structurally assignable to HarnessToolErased due to
 // function parameter contravariance (ToolContext<TEmission> vs unknown for ctx).
@@ -69,10 +71,10 @@ export type HarnessTool<
 
 // --- defineHarnessTool ---
 
-interface DefineHarnessToolConfig<TInput, TOutput, TEmission, E, R, TStreamState = unknown> {
+interface DefineHarnessToolConfig<TInput, TOutput, TEmission, E, RExecute, RStream, TStreamState = unknown> {
   readonly definition: ToolDefinition<TInput, TOutput>
-  readonly execute: (input: TInput, ctx: ToolContext<TEmission>) => Effect.Effect<TOutput, E, R>
-  readonly stream?: StreamHook<TInput, TEmission, TStreamState, R>
+  readonly execute: (input: TInput, ctx: ToolContext<TEmission>) => Effect.Effect<TOutput, E, RExecute>
+  readonly stream?: StreamHook<TInput, TEmission, TStreamState, RStream>
   readonly emissionSchema?: [TEmission] extends [never] ? undefined : Schema.Schema<TEmission, any, never>
   readonly errorSchema?: [E] extends [never] ? undefined : Schema.Schema<E, any, never>
 }
@@ -82,11 +84,12 @@ export function defineHarnessTool<
   TOutput,
   TEmission = never,
   E = never,
-  R = never,
+  RExecute = never,
+  RStream = never,
   TStreamState = unknown,
 >(
-  config: DefineHarnessToolConfig<TInput, TOutput, TEmission, E, R, TStreamState>
-): HarnessToolConcrete<TInput, TOutput, TEmission, E, R, TStreamState> {
+  config: DefineHarnessToolConfig<TInput, TOutput, TEmission, E, RExecute, RStream, TStreamState>
+): HarnessToolConcrete<TInput, TOutput, TEmission, E, RExecute, RStream, TStreamState> {
   return {
     definition: config.definition,
     execute: config.execute,

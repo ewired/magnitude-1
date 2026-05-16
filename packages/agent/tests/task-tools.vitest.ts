@@ -207,7 +207,7 @@ describe('task tool execute functions', () => {
 
     const result = await runOp(executeCancelTask({ taskId: 't1' }), state, published)
 
-    expect(result).toEqual({ taskId: 't1' })
+    expect(result).toEqual({ taskId: 't1', status: 'cancelled' })
     expect(published.some((e) => e.type === 'agent_killed')).toBe(true)
     expect(published.some((e) => e.type === 'task_cancelled')).toBe(true)
   })
@@ -231,7 +231,7 @@ describe('task tool execute functions', () => {
       published,
     )
 
-    expect(result).toEqual({ taskId: 't1' })
+    expect(result).toEqual({ taskId: 't1', status: 'cancelled' })
     expect(published.some((e) => e.type === 'task_cancelled')).toBe(true)
   })
 })

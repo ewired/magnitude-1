@@ -270,7 +270,7 @@ export const executeCancelTask = (input: { taskId: string }) =>
       timestamp: Date.now(),
     })
 
-    return { taskId: input.taskId }
+    return { taskId: input.taskId, status: 'cancelled' as const }
   })
 
 export const executeSpawnWorker = (input: {
@@ -517,10 +517,17 @@ export const spawnWorkerTool = defineHarnessTool({
       const taskReader = yield* TaskGraphStateReaderTag
       const graphState = yield* taskReader.getState()
 
-      if (!graphState.tasks.has(input.taskId.value)) {
+      const task = graphState.tasks.get(input.taskId.value)
+      if (!task) {
         const validIds = [...graphState.tasks.keys()].slice(0, 20).join(', ')
         return yield* new StreamValidationError({
           message: `Task not found: ${input.taskId.value}. Valid IDs: ${validIds}`,
+        })
+      }
+
+      if (task.worker) {
+        return yield* new StreamValidationError({
+          message: taskHasWorker(input.taskId.value),
         })
       }
 

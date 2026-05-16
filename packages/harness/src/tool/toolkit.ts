@@ -1,5 +1,5 @@
 import type { Effect } from "effect"
-import type { HarnessTool } from "./tool"
+import type { HarnessTool, HarnessToolConcrete } from "./tool"
 import type { StateModel } from "./state-model"
 
 // --- Helpers ---
@@ -38,9 +38,13 @@ export type ToolkitTool<T extends Toolkit, K extends ToolkitKeys<T>> =
 export type ToolkitState<T extends Toolkit, K extends ToolkitKeys<T>> =
   T["entries"][K] extends { state: infer S } ? S : undefined
 
-/** Extract the Effect R channel from a tool's execute signature. Uses (...args: infer _Args) to avoid contravariance issues with concrete parameter types. */
+/** Extract the combined Effect R requirements from a tool's execute and stream onInput signatures. */
 export type ToolRequirements<T> =
-  T extends { readonly execute: (...args: infer _Args) => Effect.Effect<unknown, unknown, infer R> } ? R : never
+  T extends HarnessToolConcrete<any, any, any, any, infer RExecute, infer RStream, any>
+    ? RExecute | RStream
+    : T extends { readonly execute: (...args: infer _Args) => Effect.Effect<unknown, unknown, infer R> }
+      ? R
+      : never
 
 export type ToolkitRequirements<T extends Toolkit> = {
   [K in ToolkitKeys<T>]: ToolRequirements<T["entries"][K]["tool"]>
