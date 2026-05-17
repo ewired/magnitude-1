@@ -883,6 +883,24 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         }
       }
 
+      if (event.outcome._tag === 'Overthinking') {
+        const { fork: stateWithBlock, thinkBlockId } = ensureThinkBlock(fork, event.timestamp)
+        const withIndicator = addStepToThinkBlock(stateWithBlock.messages, thinkBlockId, {
+          type: 'status_indicator' as const,
+          id: generateId(),
+          message: `Thinking exceeded ${event.outcome.limit} character limit — continuing with feedback`,
+          style: 'dim' as const,
+        })
+        const closedState = closeThinkBlock({ ...stateWithBlock, messages: withIndicator }, event.timestamp)
+        return {
+          ...closedState,
+          currentTurnId: null,
+          status: 'idle' as const,
+          streamingMessageId: null,
+          showButton: 'send' as const,
+        }
+      }
+
       const closedState = closeThinkBlock(fork, event.timestamp)
 
       if (event.outcome._tag === 'Completed') {

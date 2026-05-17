@@ -9,10 +9,11 @@ export function createArchitectRole(): RoleDefinition {
   return {
     id: 'architect',
     description: 'Plans structure and design',
-    prompt: definePrompt<'SKILLS_SECTION'>(architectPromptRaw),
+    prompt: definePrompt<'SKILLS_SECTION' | 'THINKING_LIMIT'>(architectPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',
     spawnable: true,
+    maxThoughtChars: 5000,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),

@@ -9,10 +9,11 @@ export function createScientistRole(): RoleDefinition {
   return {
     id: 'scientist',
     description: 'Debugs and diagnoses issues',
-    prompt: definePrompt<'SKILLS_SECTION'>(scientistPromptRaw),
+    prompt: definePrompt<'SKILLS_SECTION' | 'THINKING_LIMIT'>(scientistPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',
     spawnable: true,
+    maxThoughtChars: 5000,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),

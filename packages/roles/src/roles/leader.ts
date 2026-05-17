@@ -9,10 +9,11 @@ export function createLeaderRole(): RoleDefinition {
   return {
     id: 'leader',
     description: 'Coordinates tasks and workers',
-    prompt: definePrompt<'SKILLS_SECTION'>(leaderPromptRaw),
+    prompt: definePrompt<'SKILLS_SECTION' | 'THINKING_LIMIT'>(leaderPromptRaw),
     defaultRecipient: 'user',
     agentKind: 'lead',
     spawnable: false,
+    maxThoughtChars: 2500,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),

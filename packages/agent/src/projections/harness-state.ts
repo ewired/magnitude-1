@@ -111,6 +111,10 @@ export function translateTurnOutcome(event: TurnOutcomeEvent): HarnessEvent {
       }
       break
     }
+    case 'Overthinking': {
+      harnessOutcome = { _tag: 'ThoughtLimitExceeded', limit: agentOutcome.limit }
+      break
+    }
     default:
       // Agent-only errors (ConnectionFailure, ProviderNotReady, ContextWindowExceeded,
       // UnexpectedError) are filtered before this function is called.

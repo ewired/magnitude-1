@@ -14,6 +14,9 @@ export function renderFeedbackText(feedback: readonly TurnFeedback[]): string {
       case 'error':
         lines.push(`<error>${fb.message}</error>`)
         break
+      case 'overthinking':
+        lines.push(`<overthinking>${fb.message}</overthinking>`)
+        break
       case 'interrupted':
         lines.push('<interrupted>The user pressed ESC and has interrupted your turn.</interrupted>')
         break

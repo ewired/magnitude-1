@@ -9,10 +9,11 @@ export function createArtisanRole(): RoleDefinition {
   return {
     id: 'artisan',
     description: 'Crafts specialized implementations',
-    prompt: definePrompt<'SKILLS_SECTION'>(artisanPromptRaw),
+    prompt: definePrompt<'SKILLS_SECTION' | 'THINKING_LIMIT'>(artisanPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',
     spawnable: true,
+    maxThoughtChars: 2500,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),

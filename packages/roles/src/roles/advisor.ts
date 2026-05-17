@@ -9,10 +9,11 @@ export function createAdvisorRole(): RoleDefinition {
   return {
     id: 'advisor',
     description: 'Provides strategic guidance',
-    prompt: definePrompt<'SKILLS_SECTION'>(advisorPromptRaw),
+    prompt: definePrompt<'SKILLS_SECTION' | 'THINKING_LIMIT'>(advisorPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'peer',
     spawnable: true,
+    maxThoughtChars: 2500,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),

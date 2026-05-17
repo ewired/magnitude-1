@@ -218,6 +218,17 @@ export function presentConnectionError(err: MagnitudeConnectionError): ErrorPres
   }
 }
 
+function presentOverthinking(limit: number): ErrorPresentation {
+  const message = `Your thinking exceeded the ${limit} character limit. Remember that thinking in isolation has no value. Keep thinking concise and keep yourself grounded with tools and workers. Do not repeat any thinking you already conducted.`
+  return {
+    surface: 'inline',
+    severity: 'warning',
+    message,
+    llmFeedback: message,
+    retryable: true,
+  }
+}
+
 /**
  * Map a TurnOutcome to its presentation.
  *
@@ -262,6 +273,8 @@ export function present(outcome: TurnOutcome): ErrorPresentation {
         llmFeedback: outcome.message,
         retryable: false,
       }
+    case 'Overthinking':
+      return presentOverthinking(outcome.limit)
     case 'ToolInputValidationFailure':
       return SILENT
     case 'ToolExecutionError':

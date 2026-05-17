@@ -40,6 +40,7 @@ export interface HarnessConfig<
   readonly layer?: Layer.Layer<ToolkitRequirements<TToolkit> | RHooks>
   readonly initialState?: EngineState
   readonly mapStreamError: (error: TStreamError) => TurnOutcome
+  readonly maxThoughtChars?: number
 }
 
 // ── Harness ──────────────────────────────────────────────────────────
@@ -192,6 +193,7 @@ export function createHarness<
         initialEngineState: config.initialState,
         emit: emitEvent,
         mapStreamError: config.mapStreamError as (error: unknown) => TurnOutcome,
+        maxThoughtChars: config.maxThoughtChars,
       })
 
       // Fork the dispatch processing; enqueue END sentinel on completion.

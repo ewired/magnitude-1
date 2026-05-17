@@ -271,6 +271,7 @@ export type TurnOutcome =
   | { readonly _tag: 'OutputTruncated' }
   | { readonly _tag: 'SafetyStop'; readonly reason: SafetyStopReason }
   | { readonly _tag: 'Cancelled'; readonly reason: CancelledReason }
+  | { readonly _tag: 'Overthinking'; readonly limit: number }
   | { readonly _tag: 'UnexpectedError'; readonly message: string; readonly detail?: UnexpectedErrorDetail }
 
 /** Whether a turn outcome will chain-continue (start another turn automatically).
@@ -287,6 +288,7 @@ export function outcomeWillChainContinue(outcome: TurnOutcome): boolean {
     || outcome._tag === 'GateRejected'
     || outcome._tag === 'ConnectionFailure'
     || outcome._tag === 'ContextWindowExceeded'
+    || outcome._tag === 'Overthinking'
   )
 }
 

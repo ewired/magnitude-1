@@ -79,7 +79,7 @@ export type ToolInputDecodeFailure<TInput = never> =
 // ── Turn Outcome ─────────────────────────────────────────────────────
 
 interface TurnOutcomeBase {
-  readonly _tag: "Completed" | "OutputTruncated" | "ContentFiltered" | "SafetyStop" | "ToolInputDecodeFailure" | "ToolInputValidationFailure" | "ToolExecutionError" | "GateRejected" | "EngineDefect" | "Interrupted"
+  readonly _tag: "Completed" | "OutputTruncated" | "ContentFiltered" | "SafetyStop" | "ToolInputDecodeFailure" | "ToolInputValidationFailure" | "ToolExecutionError" | "GateRejected" | "EngineDefect" | "Interrupted" | "ThoughtLimitExceeded"
 }
 
 type TurnOutcomeConcrete<TInput> =
@@ -93,6 +93,7 @@ type TurnOutcomeConcrete<TInput> =
   | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
   | { readonly _tag: "Interrupted" }
+  | { readonly _tag: "ThoughtLimitExceeded"; readonly limit: number }
 
 type TurnOutcomeErased =
   | { readonly _tag: "Completed"; readonly toolCallsCount: number }
@@ -105,6 +106,7 @@ type TurnOutcomeErased =
   | { readonly _tag: "GateRejected"; readonly toolCallId: ToolCallId; readonly providerToolCallId: ProviderToolCallId; readonly toolName: string }
   | { readonly _tag: "EngineDefect"; readonly message: string }
   | { readonly _tag: "Interrupted" }
+  | { readonly _tag: "ThoughtLimitExceeded"; readonly limit: number }
 
 export type TurnOutcome<TInput = never> =
   [TInput] extends [never]

@@ -43,7 +43,10 @@ export function buildSystemPrompt(opts: {
 
   // The roles package prompt template expects SKILLS_SECTION as a runtime var.
   // Protocol and tool docs are injected via the agent-level template system.
-  const basePrompt = roleDef.prompt.render({ SKILLS_SECTION: skillsSection })
+  const basePrompt = roleDef.prompt.render({
+    SKILLS_SECTION: skillsSection,
+    THINKING_LIMIT: String(roleDef.maxThoughtChars ?? 3000),
+  })
 
   return basePrompt
     .replaceAll('{{RESPONSE_PROTOCOL}}', protocol)

@@ -9,10 +9,11 @@ export function createScoutRole(): RoleDefinition {
   return {
     id: 'scout',
     description: 'Explores and investigates codebase',
-    prompt: definePrompt<'SKILLS_SECTION'>(scoutPromptRaw),
+    prompt: definePrompt<'SKILLS_SECTION' | 'THINKING_LIMIT'>(scoutPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',
     spawnable: true,
+    maxThoughtChars: 2000,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),

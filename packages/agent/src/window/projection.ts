@@ -474,6 +474,12 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
           break
         }
 
+        case 'Overthinking': {
+          const fb = present(outcome).llmFeedback
+          if (fb) feedback.push({ kind: 'overthinking', message: fb })
+          break
+        }
+
         case 'ConnectionFailure':
         case 'ProviderNotReady':
         case 'ContextWindowExceeded':

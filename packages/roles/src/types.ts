@@ -31,8 +31,8 @@ export interface RoleDefinition {
   /** Short human-readable description of this role. */
   readonly description: string
 
-  /** System prompt template. Render with runtime vars (e.g. SKILLS_SECTION) to get final text. */
-  readonly prompt: PromptTemplate<'SKILLS_SECTION'>
+  /** System prompt template. Render with runtime vars (e.g. SKILLS_SECTION, THINKING_LIMIT) to get final text. */
+  readonly prompt: PromptTemplate<'SKILLS_SECTION' | 'THINKING_LIMIT'>
 
   /** Where messages go by default ('user' for lead, 'parent' for workers). */
   readonly defaultRecipient: 'user' | 'parent'
@@ -56,4 +56,7 @@ export interface RoleDefinition {
   readonly initialContext: {
     readonly parentConversation: boolean
   }
+
+  /** Maximum characters allowed in a single thinking block before mechanical abort. */
+  readonly maxThoughtChars?: number
 }

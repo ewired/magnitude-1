@@ -10,6 +10,7 @@ import type { StrategyId } from '../events'
 export type TurnFeedback =
   | { readonly kind: 'message_ack'; readonly destination: 'parent'; readonly chars: number }
   | { readonly kind: 'error'; readonly message: string }
+  | { readonly kind: 'overthinking'; readonly message: string }
   | { readonly kind: 'interrupted' }
 
 export interface CompletedTurn {

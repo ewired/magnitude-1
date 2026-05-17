@@ -403,6 +403,14 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
               }
               break
             }
+
+            case 'ThoughtLimitExceeded': {
+              executionResult = {
+                _tag: 'Overthinking',
+                limit: outcome.limit,
+              }
+              break
+            }
           }
 
           // ── Circuit breaker ──────────────────────────────────

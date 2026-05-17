@@ -157,6 +157,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
           mapStreamError: mapStreamErrorToOutcome,
           layer: turnLayer,
           initialState: hasRecoverableState ? engineState : undefined,
+          maxThoughtChars: agentDef.maxThoughtChars,
           hooks: buildStandardHooks({
             forkId,
             turnId,

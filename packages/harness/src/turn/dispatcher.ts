@@ -37,6 +37,7 @@ export interface DispatchConfig<TStreamError = StreamError, TDenial = unknown> {
   readonly initialEngineState?: EngineState
   readonly emit: (event: HarnessEvent) => Effect.Effect<void>
   readonly mapStreamError: (error: TStreamError) => TurnOutcome
+  readonly maxThoughtChars?: number
 }
 
 // ── Per-tool-call accumulator ────────────────────────────────────────
@@ -76,6 +77,7 @@ export function dispatch<TStreamError = StreamError, TDenial = unknown>(config: 
   // Mutable dispatch state (scoped to this dispatch invocation)
   const accumulators = new Map<ToolCallId, ToolCallAccumulator>()
   let toolCallCount = 0
+  let thoughtCharCount = 0
 
   // ── Provide layer to erased effect ───────────────────────────────
 
@@ -217,11 +219,20 @@ export function dispatch<TStreamError = StreamError, TDenial = unknown>(config: 
 
   function processEvent(event: ResponseStreamEvent<TStreamError>): Effect.Effect<void, TurnAbort> {
     switch (event._tag) {
-      case "thought_start":
+      case "thought_start": {
+        thoughtCharCount = 0
         return emit({ _tag: "ThoughtStart", level: event.level })
+      }
 
-      case "thought_delta":
+      case "thought_delta": {
+        thoughtCharCount += event.text.length
+        if (config.maxThoughtChars !== undefined && thoughtCharCount > config.maxThoughtChars) {
+          return Effect.fail(new TurnAbort({
+            outcome: { _tag: "ThoughtLimitExceeded", limit: config.maxThoughtChars },
+          }))
+        }
         return emit({ _tag: "ThoughtDelta", text: event.text })
+      }
 
       case "thought_end":
         return emit({ _tag: "ThoughtEnd" })

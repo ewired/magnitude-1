@@ -9,10 +9,11 @@ export function createCriticRole(): RoleDefinition {
   return {
     id: 'critic',
     description: 'Reviews code for quality',
-    prompt: definePrompt<'SKILLS_SECTION'>(criticPromptRaw),
+    prompt: definePrompt<'SKILLS_SECTION' | 'THINKING_LIMIT'>(criticPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',
     spawnable: true,
+    maxThoughtChars: 2500,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),

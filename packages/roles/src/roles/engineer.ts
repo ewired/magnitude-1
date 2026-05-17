@@ -9,10 +9,11 @@ export function createEngineerRole(): RoleDefinition {
   return {
     id: 'engineer',
     description: 'Implements code changes',
-    prompt: definePrompt<'SKILLS_SECTION'>(engineerPromptRaw),
+    prompt: definePrompt<'SKILLS_SECTION' | 'THINKING_LIMIT'>(engineerPromptRaw),
     defaultRecipient: 'parent',
     agentKind: 'worker',
     spawnable: true,
+    maxThoughtChars: 2500,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),
