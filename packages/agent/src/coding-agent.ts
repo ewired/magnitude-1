@@ -359,6 +359,13 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
       yield* hydrationContext.setHydrating(true)
 
+      // Publish toolkit BEFORE replaying events so that HarnessStateProjection
+      // can create tool handles and tool display renders correctly on replay.
+      yield* publishConfigFromCatalog(options.storage)
+      const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
+      yield* publishSkills(skills)
+      yield* publishToolkit(leaderToolkit)
+
       for (const event of events) {
         yield* Effect.promise(() => client.send(event))
       }
@@ -442,14 +449,6 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
       // NOTE: AgentStatusProjection is the source of truth for agent identity, metadata, and execution state.
       // AgentRoutingProjection handles message routing only. forkId remains the execution handle used by forked projections/workers.
-
-      // Publish config from catalog
-      yield* publishConfigFromCatalog(options.storage)
-
-      // Load skills from standard directories
-      const skills = yield* Effect.tryPromise(() => loadSkills(process.cwd()))
-      yield* publishSkills(skills)
-      yield* publishToolkit(leaderToolkit)
 
       // Persist all recovery events immediately so reopening the same session
       // again won't re-run recovery for already-terminated forks.
