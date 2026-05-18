@@ -21,9 +21,15 @@
     "@magnitude/markdown-cst": "0.0.1",
     "@magnitudedev/storage": "0.0.1",
     "@magnitudedev/skills": "0.0.1",
-    "@magnitudedev/roles": "0.0.1"
+    "@magnitudedev/roles": "0.0.1",
+    "@magnitudedev/ai": "0.0.1",
+    "@magnitudedev/harness": "0.0.1",
+    "@magnitudedev/magnitude-client": "0.0.1",
+    "@magnitudedev/scratchpad": "0.0.1"
   },
   "changesets": [
+    "early-beers-ask",
+    "eight-wombats-do",
     "fair-deserts-strive",
     "fine-things-invent",
     "hip-ads-sleep",

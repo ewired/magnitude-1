@@ -1,5 +1,13 @@
 # @magnitudedev/cli
 
+## 0.0.1-alpha.13
+
+### Patch Changes
+
+- [`79eeafc`](https://github.com/magnitudedev/magnitude/commit/79eeafcbb73970e50d4713c930a4fc78cb2980c7) Thanks [@anerli](https://github.com/anerli)! - response format overhaul, grammar, provider, etc
+
+- [`fa3975e`](https://github.com/magnitudedev/magnitude/commit/fa3975e80ef972c49b67daef3382b1f6588cba74) Thanks [@anerli](https://github.com/anerli)! - provider
+
 ## 0.0.1-alpha.12
 
 ### Patch Changes
