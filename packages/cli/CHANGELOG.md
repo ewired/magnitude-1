@@ -1,5 +1,11 @@
 # @magnitudedev/cli
 
+## 0.0.1-alpha.14
+
+### Patch Changes
+
+- [`8c51027`](https://github.com/magnitudedev/magnitude/commit/8c51027c7af629ca91f9a5c507c273729e3847e3) Thanks [@anerli](https://github.com/anerli)! - fix render crash
+
 ## 0.0.1-alpha.13
 
 ### Patch Changes
