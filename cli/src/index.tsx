@@ -1,5 +1,3 @@
-process.env.BAML_LOG = 'off';
-
 import fs from 'fs'
 import { createCliRenderer } from '@opentui/core'
 import { createRoot } from '@opentui/react'
