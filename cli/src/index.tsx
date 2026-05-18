@@ -64,6 +64,7 @@ async function main() {
         <StorageProvider client={storage}>
           <App
             sessionStart={sessionStart}
+            initialPrompt={promptArg}
             debug={opts.debug ?? false}
             onClientReady={(client) => {
               clientRef = client

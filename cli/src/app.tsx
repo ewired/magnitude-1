@@ -88,12 +88,20 @@ export type SessionStart =
   | { _tag: 'latest' }
   | { _tag: 'resume'; sessionId: string }
 
-export function App({ sessionStart, debug, onClientReady, onSessionId }: { sessionStart: SessionStart; debug: boolean; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void }) {
+export function App({ sessionStart, initialPrompt, debug, onClientReady, onSessionId }: { sessionStart: SessionStart; initialPrompt?: string; debug: boolean; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void }) {
   const [conversationKey, setConversationKey] = useState(0)
   const [sessionSelection, setSessionSelection] = useState<string | null | undefined>(
     sessionStart._tag === 'new' ? null : sessionStart._tag === 'latest' ? undefined : sessionStart.sessionId
   )
   const hasAnimatedRef = useRef(false)
+  const initialPromptSentRef = useRef(false)
+
+  const consumeInitialPrompt = useCallback(() => {
+    if (initialPromptSentRef.current) return null
+    if (!initialPrompt || initialPrompt.trim().length === 0) return null
+    initialPromptSentRef.current = true
+    return initialPrompt
+  }, [initialPrompt])
 
   const handleReset = useCallback(() => {
     hasAnimatedRef.current = true
@@ -117,6 +125,7 @@ export function App({ sessionStart, debug, onClientReady, onSessionId }: { sessi
       onResumeSession={handleResumeSession}
       onClientReady={onClientReady}
       onSessionId={onSessionId}
+      consumeInitialPrompt={consumeInitialPrompt}
     />
   )
 }
@@ -129,6 +138,7 @@ function AppInner({
   onResumeSession,
   onClientReady,
   onSessionId,
+  consumeInitialPrompt,
 }: {
   debugMode: boolean
   skipAnimation: boolean
@@ -137,6 +147,7 @@ function AppInner({
   onResumeSession: (sessionId: string) => void
   onClientReady?: (client: AgentClient | null) => void
   onSessionId?: (id: string) => void
+  consumeInitialPrompt: () => string | null
 }) {
   const renderer = useRenderer()
   const storage = useStorage()
@@ -1050,6 +1061,14 @@ function AppInner({
       taskMode: false,
     })
   }, [clientSend])
+
+  useEffect(() => {
+    if (!display) return
+    if (sessionSelection !== null && !client) return
+    const prompt = consumeInitialPrompt()
+    if (!prompt) return
+    handleSubmitViaClientBoundary({ forkId: null, message: prompt, attachments: [] })
+  }, [client, consumeInitialPrompt, display, handleSubmitViaClientBoundary, sessionSelection])
 
   if (process.platform === 'win32') {
     return (
