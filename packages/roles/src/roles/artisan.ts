@@ -13,7 +13,7 @@ export function createArtisanRole(): RoleDefinition {
     defaultRecipient: 'parent',
     agentKind: 'worker',
     spawnable: true,
-    maxThoughtChars: 2500,
+    maxThoughtChars: 20000,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),

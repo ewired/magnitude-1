@@ -13,7 +13,7 @@ export function createLeaderRole(): RoleDefinition {
     defaultRecipient: 'user',
     agentKind: 'lead',
     spawnable: false,
-    maxThoughtChars: 2500,
+    maxThoughtChars: 20000, // This is now just a fallback for if some reason grammar version doesn't trigger
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),

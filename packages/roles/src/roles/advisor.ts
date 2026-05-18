@@ -13,7 +13,7 @@ export function createAdvisorRole(): RoleDefinition {
     defaultRecipient: 'parent',
     agentKind: 'peer',
     spawnable: true,
-    maxThoughtChars: 2500,
+    maxThoughtChars: 20000,
     policy: [
       denyForbiddenCommands(),
       denyMutatingGit(),
