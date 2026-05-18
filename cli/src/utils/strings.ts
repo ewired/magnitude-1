@@ -482,6 +482,33 @@ export function formatFullTimestamp(ts: number): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * Expand a single-line spec by ±10 lines, clamped to [1, totalLines].
+ * If totalLines is unknown (undefined), clamps only to minimum of 1.
+ *
+ * Examples:
+ *   expandLineRange({ start: 42, end: 42 }, 200)  → { start: 32, end: 52 }
+ *   expandLineRange({ start: 5, end: 5 }, 100)    → { start: 1, end: 15 }
+ *   expandLineRange({ start: 1, end: 1 }, 50)     → { start: 1, end: 11 }
+ *   expandLineRange({ start: 100, end: 100 }, 50) → { start: 41, end: 50 }
+ *   expandLineRange({ start: 10, end: 20 }, 100)  → { start: 10, end: 20 }  // no change
+ */
+export function expandLineRange(
+  lineRange: { start: number; end: number },
+  totalLines?: number,
+): { start: number; end: number } {
+  // Only expand single-line specs (start === end)
+  if (lineRange.start !== lineRange.end) {
+    return lineRange;
+  }
+
+  const line = lineRange.start;
+  const start = Math.max(1, line - 10);
+  const end = totalLines !== undefined ? Math.min(totalLines, line + 10) : line + 10;
+
+  return { start, end };
+}
+
+/**
  * Resolve a raw path from an @mention to an absolute filesystem path.
  * Uses expandScratchpadPath for $M / ${M} scratchpad expansion,
  * then falls back to relative-to-cwd resolution.
@@ -500,26 +527,64 @@ function resolveCandidatePath(rawPath: string, cwd: string): string | null {
   return null
 }
 
+/**
+ * Split a mention token on the last colon to separate file path from an optional
+ * line range spec. E.g. "README.md:10-20" → { path: "README.md", lineRange: { start: 10, end: 20 } }
+ * Returns null if the line spec is invalid — in that case the whole token is the path.
+ */
+function parseLineRange(token: string): { path: string; lineRange?: { start: number; end: number } } | null {
+  const lastColon = token.lastIndexOf(':')
+  if (lastColon < 0) return null
+
+  const filePath = token.slice(0, lastColon)
+  const lineSpec = token.slice(lastColon + 1)
+
+  // Validate line spec: either "N" or "N-M" where N and M are positive integers
+  const match = lineSpec.match(/^(\d+)(-(\d+))?$/)
+  if (!match) return null
+
+  const start = parseInt(match[1], 10)
+  const end = match[3] ? parseInt(match[3], 10) : start
+
+  // Guard against zero or negative (0 is not a valid 1-indexed line)
+  if (start < 1 || end < 1 || end < start) return null
+
+  return { path: filePath, lineRange: { start, end } }
+}
+
 export function parseMentionsFromPrompt(
   text: string,
   cwd: string,
-): Array<{ type: 'mention'; path: string; contentType: 'text' | 'image' | 'directory' }> {
+): Array<{ type: 'mention'; path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } }> {
   const mentions: Array<{
     type: 'mention'
     path: string
     contentType: 'text' | 'image' | 'directory'
+    lineRange?: { start: number; end: number }
   }> = []
   const seen = new Set<string>()
   const regex = /(?:^|\s)@([^\s@]*)/g
   let match
 
   while ((match = regex.exec(text)) !== null) {
-    const rawPath = match[1]
-    if (!rawPath || seen.has(rawPath)) continue
+    const rawToken = match[1]
+    if (!rawToken) continue
 
-    const resolved = resolveCandidatePath(rawPath, cwd)
+    // Try to split off a line range spec from the last colon
+    const parsed = parseLineRange(rawToken)
+    const filePath = parsed?.path ?? rawToken
+    let lineRange = parsed?.lineRange
+    // Expand single-line specs by ±10 lines (upper clamp omitted since we don't know totalLines yet)
+    if (lineRange) {
+      lineRange = expandLineRange(lineRange)
+    }
+    const displayPath = lineRange ? filePath : rawToken
+
+    if (seen.has(displayPath)) continue
+
+    const resolved = resolveCandidatePath(filePath, cwd)
     if (!resolved) {
-      console.warn(`[mentions] Path not found: @${rawPath}`)
+      console.warn(`[mentions] Path not found: @${displayPath}`)
       continue
     }
 
@@ -529,9 +594,9 @@ export function parseMentionsFromPrompt(
       if (stat.isDirectory()) {
         contentType = 'directory'
       } else {
-        const extIdx = rawPath.lastIndexOf('.')
+        const extIdx = filePath.lastIndexOf('.')
         if (extIdx >= 0) {
-          const extension = rawPath.slice(extIdx).toLowerCase()
+          const extension = filePath.slice(extIdx).toLowerCase()
           if (IMAGE_EXTENSIONS.has(extension)) {
             contentType = 'image'
           }
@@ -541,8 +606,8 @@ export function parseMentionsFromPrompt(
       // If stat fails, default to 'text'
     }
 
-    seen.add(rawPath)
-    mentions.push({ type: 'mention', path: rawPath, contentType })
+    seen.add(displayPath)
+    mentions.push({ type: 'mention', path: displayPath, contentType, lineRange })
   }
 
   return mentions

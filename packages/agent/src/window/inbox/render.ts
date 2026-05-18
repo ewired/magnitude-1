@@ -102,7 +102,8 @@ function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_mess
 
     const truncated = attachment.truncated ? ' truncated="true"' : ''
     const originalBytes = attachment.originalBytes ? ` original_bytes="${attachment.originalBytes}"` : ''
-    builder.pushText(`\n<mention path="${attachment.path}" type="${attachment.contentType}"${truncated}${originalBytes}>${attachment.content ?? ''}</mention>`)
+    const lines = attachment.lineRange ? ` lines="${attachment.lineRange.start}-${attachment.lineRange.end}"` : ''
+    builder.pushText(`\n<mention path="${attachment.path}" type="${attachment.contentType}"${truncated}${originalBytes}${lines}>${attachment.content ?? ''}</mention>`)
   }
   return builder.build()
 }
