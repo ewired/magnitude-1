@@ -4,7 +4,7 @@
  * Generates compact tool reference documentation from tool definitions.
  * Walks Effect Schema AST directly.
  * 
- * Extracted from @magnitudedev/tools to remove that dependency.
+ * Tool docs renderer — walks Effect Schema AST directly.
  */
 
 import { SchemaAST as AST, Option } from 'effect'

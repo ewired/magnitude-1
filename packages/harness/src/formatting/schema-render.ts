@@ -2,7 +2,7 @@
  * Schema Renderer
  *
  * Renders Effect Schema AST as TypeScript-like type strings.
- * Adapted from @magnitudedev/tools render-tool-docs for use in parse error formatting.
+ * Renders Effect Schema AST as TypeScript-like type strings.
  */
 
 import { Schema, SchemaAST as AST, Option } from 'effect'

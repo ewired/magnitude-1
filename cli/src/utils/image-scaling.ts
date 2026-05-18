@@ -1,5 +1,4 @@
 import { logger } from '@magnitudedev/logger'
-import { Image } from '@magnitudedev/image'
 
 export interface ImagePayload {
   base64: string
@@ -48,9 +47,7 @@ export async function autoScaleImageAttachmentIfNeeded(input: ImagePayload): Pro
 
   try {
     const sourceBuffer = Buffer.from(input.base64, 'base64')
-    const sourceImage = Image.fromBuffer(sourceBuffer)
-
-    let bestCandidate: { buffer: Buffer; width: number; height: number; quality: number } | null = null
+    let bestCandidate: { base64: string; width: number; height: number; quality: number; bytes: number } | null = null
 
     const ratio = MAX_BASE64_BYTES / originalBytes
     const firstFactor = Math.min(1, Math.sqrt(ratio) * 0.85)
@@ -66,27 +63,40 @@ export async function autoScaleImageAttachmentIfNeeded(input: ImagePayload): Pro
     ]
 
     for (const attempt of attempts) {
-      const resized = sourceImage.resize(attempt.width, attempt.height)
-      const outputBuffer = resized.toJpeg(attempt.quality)
+      // Each attempt needs a fresh Bun.Image pipeline (terminals are single-use)
+      const img = new Bun.Image(sourceBuffer)
+      const outputBuffer = await img
+        .resize(attempt.width, attempt.height, { fit: 'inside' })
+        .jpeg({ quality: attempt.quality })
+        .buffer()
 
       if (outputBuffer.length === 0) continue
 
-      const candidate = { buffer: outputBuffer, width: resized.width, height: resized.height, quality: attempt.quality }
+      const outWidth = img.width
+      const outHeight = img.height
 
-      if (!bestCandidate || candidate.buffer.length < bestCandidate.buffer.length) {
+      const candidate = {
+        base64: outputBuffer.toString('base64'),
+        width: outWidth,
+        height: outHeight,
+        quality: attempt.quality,
+        bytes: outputBuffer.length,
+      }
+
+      if (!bestCandidate || candidate.bytes < bestCandidate.bytes) {
         bestCandidate = candidate
       }
 
       if (outputBuffer.length <= MAX_BASE64_BYTES) {
         return {
-          base64: outputBuffer.toString('base64'),
+          base64: candidate.base64,
           mime: 'image/jpeg',
-          width: resized.width,
-          height: resized.height,
+          width: candidate.width,
+          height: candidate.height,
           filename: input.filename,
           wasScaled: true,
           originalBytes,
-          finalBytes: outputBuffer.length,
+          finalBytes: candidate.bytes,
           selectedQuality: attempt.quality,
         }
       }
@@ -96,7 +106,7 @@ export async function autoScaleImageAttachmentIfNeeded(input: ImagePayload): Pro
       logger.warn(
         {
           originalBytes,
-          finalBytes: bestCandidate.buffer.length,
+          finalBytes: bestCandidate.bytes,
           width: bestCandidate.width,
           height: bestCandidate.height,
           quality: bestCandidate.quality,
@@ -105,14 +115,14 @@ export async function autoScaleImageAttachmentIfNeeded(input: ImagePayload): Pro
       )
 
       return {
-        base64: bestCandidate.buffer.toString('base64'),
+        base64: bestCandidate.base64,
         mime: 'image/jpeg',
         width: bestCandidate.width,
         height: bestCandidate.height,
         filename: input.filename,
         wasScaled: true,
         originalBytes,
-        finalBytes: bestCandidate.buffer.length,
+        finalBytes: bestCandidate.bytes,
         selectedQuality: bestCandidate.quality,
       }
     }

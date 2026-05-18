@@ -28,12 +28,6 @@ interface BuildPatch {
   patch: (content: string, platform: string, arch: string) => string
 }
 
-function getBamlNativePackage(platform: string, arch: string): string {
-  if (platform === 'darwin') return `@boundaryml/baml-darwin-${arch}`
-  if (platform === 'windows') return `@boundaryml/baml-win32-${arch}-msvc`
-  return `@boundaryml/baml-linux-${arch}-gnu`
-}
-
 function getOpentuiNativePackage(platform: string, arch: string): string {
   const p = platform === 'windows' ? 'win32' : platform
   return `@opentui/core-${p}-${arch}`
@@ -49,25 +43,11 @@ function findOpentuiIndexFile(): string {
 
 const BUILD_PATCHES: BuildPatch[] = [
   {
-    file: 'node_modules/@boundaryml/baml/native.js',
-    patch: (_content, platform, arch) =>
-      'const nativeBinding = require("' + getBamlNativePackage(platform, arch) + '");\n' +
-      'module.exports = nativeBinding;\n',
-  },
-  {
     file: findOpentuiIndexFile,
     patch: (content, platform, arch) =>
       content.replace(
         'var module = await import(`@opentui/core-${process.platform}-${process.arch}/index.ts`);',
         'var module = await import("' + getOpentuiNativePackage(platform, arch) + '/index.ts");',
-      ),
-  },
-  {
-    file: 'node_modules/patchright-core/lib/server/utils/nodePlatform.js',
-    patch: (content) =>
-      content.replace(
-        'const coreDir = import_path.default.dirname(require.resolve("../../../package.json"));',
-        'const coreDir = __dirname;',
       ),
   },
 ]
@@ -91,79 +71,6 @@ async function restoreBuildPatches(): Promise<void> {
     if (existsSync(resolved + '.bak')) {
       await copyFile(resolved + '.bak', resolved)
       await unlink(resolved + '.bak').catch(() => {})
-    }
-  }
-}
-
-// =============================================================================
-// WASM embedding
-// =============================================================================
-
-/**
- * Modules that load WASM via fs.readFileSync or similar patterns break inside
- * compiled Bun binaries (virtual filesystem /$bunfs/root/). We patch the JS
- * loaders to embed WASM binaries inline as base64 before building.
- */
-
-interface WasmPatchTarget {
-  /** Path to the .wasm file to embed */
-  wasmFile: string
-  /** JS files to patch, each with a find/replace pattern */
-  modules: {
-    file: string
-    pattern: string
-    getReplacement: (wasmBase64: string) => string
-  }[]
-}
-
-const WASM_PATCH_TARGETS: WasmPatchTarget[] = [
-  {
-    wasmFile: 'packages/image/pkg/magnitude_image_bg.wasm',
-    modules: [
-      {
-        file: 'packages/image/pkg/magnitude_image.js',
-        pattern: "const wasmBytes = require('fs').readFileSync(wasmPath);",
-        getReplacement: (b64) => 'const wasmBytes = Buffer.from("' + b64 + '","base64");',
-      },
-    ],
-  },
-]
-
-async function patchWasmModules(): Promise<void> {
-  for (const target of WASM_PATCH_TARGETS) {
-    const wasmPath = resolve(PROJECT_ROOT, target.wasmFile)
-    if (!existsSync(wasmPath)) continue
-
-    const wasmBinary = await readFile(wasmPath)
-    const wasmBase64 = wasmBinary.toString('base64')
-
-    for (const mod of target.modules) {
-      const modPath = resolve(PROJECT_ROOT, mod.file)
-      if (!existsSync(modPath)) continue
-
-      await copyFile(modPath, modPath + '.bak')
-
-      let content = await readFile(modPath, 'utf-8')
-      if (!content.includes(mod.pattern)) {
-        console.warn('  [patch] WARNING: Could not find "' + mod.pattern + '" in ' + mod.file + ', skipping')
-        continue
-      }
-
-      content = content.replace(mod.pattern, mod.getReplacement(wasmBase64))
-      await writeFile(modPath, content)
-      console.log('  [patch] ' + mod.file + ' (embedded ' + (wasmBinary.length / 1024).toFixed(0) + 'KB WASM)')
-    }
-  }
-}
-
-async function restoreWasmModules(): Promise<void> {
-  for (const target of WASM_PATCH_TARGETS) {
-    for (const mod of target.modules) {
-      const modPath = resolve(PROJECT_ROOT, mod.file)
-      if (existsSync(modPath + '.bak')) {
-        await copyFile(modPath + '.bak', modPath)
-        await unlink(modPath + '.bak').catch(() => {})
-      }
     }
   }
 }
@@ -202,10 +109,6 @@ async function build(target: string) {
   console.log('Generating CLI version...')
   await $`bun run ${resolve(PROJECT_ROOT, 'cli/scripts/generate-version.ts')}`
 
-  // Build WASM dependencies
-  console.log('Building @magnitudedev/image WASM...')
-  await $`cd ${resolve(PROJECT_ROOT, 'packages/image')} && wasm-pack build --target nodejs --out-dir pkg --release`.quiet()
-
   // Download ripgrep binary for embedding
   const rgBinDir = resolve(PROJECT_ROOT, 'packages/ripgrep/bin')
   const rgTarget = bunTargetToRipgrepTarget(target)
@@ -215,9 +118,8 @@ async function build(target: string) {
   const binDir = resolve(PROJECT_ROOT, 'bin')
   if (!existsSync(binDir)) await mkdir(binDir)
 
-  // Patch NAPI-RS loaders and WASM modules for compiled binary compatibility
+  // Patch NAPI-RS loaders for compiled binary compatibility
   await applyBuildPatches(platform, arch)
-  await patchWasmModules()
 
   try {
     const entrypoint = resolve(import.meta.dir, '..', 'src', 'index.tsx')
@@ -233,7 +135,6 @@ async function build(target: string) {
   } finally {
     // Always restore original files
     await restoreBuildPatches()
-    await restoreWasmModules()
   }
 
   // Ad-hoc codesign macOS binaries to prevent Gatekeeper "damaged" warnings

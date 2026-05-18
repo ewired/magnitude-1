@@ -2,9 +2,15 @@
  * Core types for the evals framework
  */
 
-import type { TestSandboxResult } from './test-sandbox'
-import type { ChatMessage } from '@magnitudedev/llm-core'
-export type { ChatMessage } from '@magnitudedev/llm-core'
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string | unknown[]
+}
+
+interface TestSandboxResult {
+  calls: unknown[]
+  events: unknown[]
+}
 
 
 /**

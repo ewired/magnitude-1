@@ -19,7 +19,7 @@ import type { ConversationState } from '../projections/conversation'
 import type { ApprovalStateService } from './approval-state'
 import type { ChatPersistence } from '../persistence/chat-persistence-service'
 import type { BoundObservable } from '../observables/types'
-import type { JsonSchema } from '@magnitudedev/llm-core'
+import type { JsonSchema } from '../prompts/fork-context'
 import type { AppEvent } from '../events'
 import type { ForkLayer } from './fork-layer'
 

@@ -53,7 +53,7 @@ export type ResolvedMention = {
 // Strategy & Response Types (defined here to avoid circular imports)
 // =============================================================================
 
-export type StrategyId = 'xml-act' | 'native'
+export type StrategyId = 'native'
 
 // =============================================================================
 // Work Agent Types

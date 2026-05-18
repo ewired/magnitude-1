@@ -14,8 +14,6 @@
     "@magnitudedev/agent": "workspace:*",
     "@magnitudedev/roles": "workspace:*",
     "@magnitudedev/event-core": "workspace:*",
-
-    "@magnitudedev/llm-core": "workspace:*",
     "ansis": "^3.17.0",
     "fontoxpath": "^3.34.0",
     "slimdom": "^4.3.5"

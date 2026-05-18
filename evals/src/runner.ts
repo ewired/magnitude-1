@@ -4,10 +4,13 @@
  */
 
 import { Effect, Layer, Stream } from 'effect'
-import { type ChatMessage, BamlClientHttpError, BamlValidationError } from '@magnitudedev/llm-core'
+import type { ChatMessage } from './types'
 import { ModelResolver, makeModelResolver, makeNoopTracer, CodingAgentChat } from '@magnitudedev/providers'
 import { isRunnableEval, type Eval, type ModelSpec, type ScenarioResult, type EvalRunResult, type Scenario, type CheckResult } from './types'
-import type { TestSandboxResult } from './test-sandbox'
+interface TestSandboxResult {
+  calls: unknown[]
+  events: unknown[]
+}
 import { generateModelReport, generateSummaryReport } from './results'
 import { getEvalProviderClient } from './provider-runtime'
 
@@ -54,17 +57,15 @@ export async function evaluateScenarioResponse(raw: string, scenario: Scenario):
  * Non-retryable: 4xx (except 408/429), validation errors.
  */
 function isRetryableError(error: unknown): boolean {
-  if (error instanceof BamlClientHttpError) {
-    const status = error.status_code
-    if (status !== undefined && status >= 400 && status < 500) {
+  // Check for HTTP status code on error objects
+  const status = (error as { status_code?: number }).status_code
+  if (typeof status === 'number') {
+    if (status >= 400 && status < 500) {
       // 429 (rate limit) and 408 (timeout) are retryable
       return status === 429 || status === 408
     }
     // 5xx and unknown status codes are retryable
     return true
-  }
-  if (error instanceof BamlValidationError) {
-    return false
   }
   // Unknown errors — retryable (network failures, etc.)
   return true
@@ -119,7 +120,7 @@ export async function callModel(
     } catch (error) {
       if (attempt < MAX_RETRIES && isRetryableError(error)) {
         const delay = BASE_DELAY_MS * Math.pow(BACKOFF_MULTIPLIER, attempt) * (0.5 + Math.random() * 0.5)
-        const status = error instanceof BamlClientHttpError ? ` (${error.status_code})` : ''
+        const status = typeof (error as { status_code?: number }).status_code === 'number' ? ` (${(error as { status_code: number }).status_code})` : ''
         console.warn(`  [retry ${attempt + 1}/${MAX_RETRIES}] ${modelSpec.provider}:${modelSpec.model}${status} — retrying in ${Math.round(delay)}ms`)
         await sleep(delay)
         continue

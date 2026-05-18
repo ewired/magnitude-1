@@ -58,7 +58,7 @@ describe('Event Serialization', () => {
         forkId: null,
         turnId: 'turn-123',
         chainId: 'chain-456',
-        strategyId: 'xml-act',
+        strategyId: 'native',
 
         result: {
           _tag: 'Completed',
@@ -348,7 +348,7 @@ describe('Event Serialization', () => {
         forkId: null,
         turnId: 'turn-1',
         chainId: 'chain-1',
-        strategyId: 'xml-act',
+        strategyId: 'native',
 
         result: {
           _tag: 'SystemError',

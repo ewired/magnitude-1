@@ -227,7 +227,7 @@ describe('ChatPersistenceService - JSON Backend', () => {
         forkId: null,
         turnId: 'turn-1',
         chainId: 'chain-1',
-        strategyId: 'xml-act',
+        strategyId: 'native',
 
         result: {
           success: true,

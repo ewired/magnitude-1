@@ -10,9 +10,7 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@magnitudedev/agent": ["../packages/agent/src"],
-      "@magnitudedev/llm-core": ["../packages/llm-core/src"],
-      "@magnitudedev/js-act": ["../packages/js-act/src"]
+      "@magnitudedev/agent": ["../packages/agent/src"]
     }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]

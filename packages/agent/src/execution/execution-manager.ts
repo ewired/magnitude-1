@@ -20,7 +20,7 @@ import { createApprovalState, ApprovalStateTag, type ApprovalStateService } from
 import { AgentStateReaderTag, type AgentStateReader } from '../tools/fork'
 import { AgentRegistryStateReaderTag, type AgentRegistryStateReader } from '../tools/agent-registry-reader'
 import { buildCloneContext, buildSpawnContext } from '../prompts/fork-context'
-import type { JsonSchema } from '@magnitudedev/llm-core'
+import type { JsonSchema } from '../prompts/fork-context'
 import { ConversationStateReaderTag, type ConversationStateReader } from '../tools/memory-reader'
 import { TaskGraphStateReaderTag, canCompleteRecord, getChildRecords, canAssignRecord, collectSubtreeRecords } from '../tools/task-reader'
 import { ConversationProjection, type ConversationState } from '../projections/conversation'

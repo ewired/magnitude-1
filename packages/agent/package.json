@@ -29,8 +29,6 @@
     "@magnitudedev/skills": "workspace:*",
     "@magnitudedev/ai": "workspace:*",
     "@magnitudedev/magnitude-client": "workspace:*",
-    "@magnitudedev/tools": "workspace:*",
-    "@magnitudedev/xml-act": "workspace:*",
     "ai": "^6.0.154",
     "effect": "^3.19.6",
     "ignore": "^7.0.5",
@@ -40,7 +38,6 @@
   },
   "devDependencies": {
     "@effect/vitest": "^0.25.0",
-    "@magnitudedev/llm-core": "workspace:*",
     "@magnitudedev/logger": "workspace:*",
     "@magnitudedev/tracing": "workspace:*",
     "@types/bun": "latest",

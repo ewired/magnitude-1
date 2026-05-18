@@ -58,6 +58,6 @@ We know this isn't for everyone. Some people want the flexibility. Some people w
 
 ## Acknowledgments
 
-Built on top of [BAML](https://boundaryml.com), [Effect](https://effect.website), and [OpenTUI](https://github.com/anomalyco/opentui).
+Built on top of [Effect](https://effect.website) and [OpenTUI](https://github.com/anomalyco/opentui).
 
 Inspired by other open source coding agents, including [OpenCode](https://github.com/anomalyco/opencode) and [Codex](https://github.com/openai/codex).

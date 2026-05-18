@@ -1,2 +1,0 @@
-var content = fs.read("src/utils/helpers.ts", { lines: true });
-inspect(content);
