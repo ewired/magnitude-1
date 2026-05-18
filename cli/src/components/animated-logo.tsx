@@ -13,7 +13,7 @@ export function AnimatedLogo() {
       ))}
       <text>{' '}</text>
       <text style={{ fg: theme.foreground }} attributes={TextAttributes.BOLD}>Magnitude</text>
-      <text style={{ fg: theme.muted }}>Open Source Coding Agent</text>
+      <text style={{ fg: theme.muted }}>Coding agent for open models</text>
     </box>
   )
 }

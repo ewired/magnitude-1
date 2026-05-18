@@ -54,7 +54,7 @@ function formatDollars(cents: number): string {
 }
 
 function insufficientCreditsMessage(balanceCents: number, requiredCents: number): string {
-  return `Insufficient credits. Balance: ${formatDollars(balanceCents)}. This request needs: ${formatDollars(requiredCents)}.`
+  return `Insufficient credits. Balance: ${formatDollars(balanceCents)} (needs ${formatDollars(requiredCents)}).\nCredits are reserved in advance to cover possible cost.`
 }
 
 function presentProviderNotReady(detail: ProviderNotReadyDetail): ErrorPresentation {
