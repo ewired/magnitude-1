@@ -708,21 +708,6 @@ function AppInner({
     process.kill(process.pid, 'SIGINT')
   }, [])
 
-  if (process.platform === 'win32') {
-    return (
-      <WindowsWarningScreen onExit={exitApp} />
-    )
-  }
-
-  if (auth.loaded && !auth.key) {
-    return (
-      <MagnitudeLoginScreen
-        onSubmit={auth.save}
-        onExit={exitApp}
-      />
-    )
-  }
-
   const openRecentChats = useCallback(() => {
     refreshRecentChats()
     setShowRecentChatsOverlay(true)
@@ -1065,6 +1050,21 @@ function AppInner({
       taskMode: false,
     })
   }, [clientSend])
+
+  if (process.platform === 'win32') {
+    return (
+      <WindowsWarningScreen onExit={exitApp} />
+    )
+  }
+
+  if (auth.loaded && !auth.key) {
+    return (
+      <MagnitudeLoginScreen
+        onSubmit={auth.save}
+        onExit={exitApp}
+      />
+    )
+  }
 
   if (!display) {
     return (
