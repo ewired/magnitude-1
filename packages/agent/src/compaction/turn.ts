@@ -144,8 +144,8 @@ export function runCompactionTurn(
       const compactionPrompt = buildCompactionPrompt(windowState, systemPrompt, timezone, agentStatus, formatter)
 
       // Resolve image descriptions for non-vision models (same pattern as Cortex)
-      const resolvedPrompt = agentModel.profile.capabilities.vision
-        ? compactionPrompt
+      const { prompt: resolvedPrompt } = agentModel.profile.capabilities.vision
+        ? { prompt: compactionPrompt }
         : yield* Effect.promise(() => resolveImageDescriptions(compactionPrompt))
 
       // Run turn (provide traceLayer so model call is tagged as "compact")

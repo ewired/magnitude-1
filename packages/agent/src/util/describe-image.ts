@@ -174,6 +174,16 @@ export function cancelImageDescription(imageDataUrl: string): void {
   descriptionRegistry.delete(imageDataUrl)
 }
 
+export interface ImageDescriptionReplacement {
+  readonly imageDataUrl: string
+  readonly description: string
+}
+
+export interface ResolvedPrompt {
+  readonly prompt: Prompt
+  readonly replacements: readonly ImageDescriptionReplacement[]
+}
+
 /**
  * Resolve all ImageParts in a prompt using cached descriptions from the registry.
  * Replaces each ImagePart with a TextPart containing the description.
@@ -183,16 +193,21 @@ export function cancelImageDescription(imageDataUrl: string): void {
  *
  * If a description hasn't been started yet (no `startImageDescription` call),
  * it falls back to the generic placeholder.
+ *
+ * Returns both the resolved prompt and a list of replacements made, so the
+ * caller can permanently replace ImageParts with TextParts in the timeline.
  */
-export async function resolveImageDescriptions(prompt: Prompt): Promise<Prompt> {
+export async function resolveImageDescriptions(prompt: Prompt): Promise<ResolvedPrompt> {
   let changed = false
+  const allReplacements: ImageDescriptionReplacement[] = []
 
   const messages: Message[] = []
 
   for (const msg of prompt.messages) {
     switch (msg._tag) {
       case 'UserMessage': {
-        const parts = await resolveParts(msg.parts)
+        const { parts, replacements } = await resolveParts(msg.parts)
+        allReplacements.push(...replacements)
         if (parts !== msg.parts) {
           changed = true
           messages.push({ ...msg, parts } as UserMessage)
@@ -202,7 +217,8 @@ export async function resolveImageDescriptions(prompt: Prompt): Promise<Prompt> 
         break
       }
       case 'ToolResultMessage': {
-        const parts = await resolveParts(msg.parts)
+        const { parts, replacements } = await resolveParts(msg.parts)
+        allReplacements.push(...replacements)
         if (parts !== msg.parts) {
           changed = true
           messages.push({ ...msg, parts } as ToolResultMessage)
@@ -218,12 +234,22 @@ export async function resolveImageDescriptions(prompt: Prompt): Promise<Prompt> 
     }
   }
 
-  if (!changed) return prompt
+  if (!changed) {
+    return { prompt, replacements: allReplacements }
+  }
 
-  return Prompt.from({
-    system: prompt.system,
-    messages: messages as any,
-  })
+  return {
+    prompt: Prompt.from({
+      system: prompt.system,
+      messages: messages as any,
+    }),
+    replacements: allReplacements,
+  }
+}
+
+interface ResolvedParts {
+  readonly parts: readonly (TextPart | ImagePart)[]
+  readonly replacements: readonly ImageDescriptionReplacement[]
 }
 
 /**
@@ -235,7 +261,7 @@ export async function resolveImageDescriptions(prompt: Prompt): Promise<Prompt> 
  */
 async function resolveParts(
   parts: readonly (TextPart | ImagePart)[],
-): Promise<readonly (TextPart | ImagePart)[]> {
+): Promise<ResolvedParts> {
   // First pass: collect all image indices and their description promises
   const imageIndices: number[] = []
   const pendingDescriptions: Promise<string>[] = []
@@ -260,7 +286,7 @@ async function resolveParts(
 
   // No images to resolve — return parts unchanged
   if (imageIndices.length === 0) {
-    return parts
+    return { parts, replacements: [] }
   }
 
   // Await all descriptions concurrently
@@ -268,13 +294,17 @@ async function resolveParts(
 
   // Build result array, replacing ImageParts with TextParts
   const result: (TextPart | ImagePart)[] = [...parts]
+  const replacements: ImageDescriptionReplacement[] = []
+
   for (let idx = 0; idx < imageIndices.length; idx++) {
     const i = imageIndices[idx]
     const part = parts[i] as ImagePart
     const description = descriptions[idx]
     const imageDataUrl = `data:${part.mediaType};base64,${part.data}`
 
-    // Clean up the registry entry after consumption
+    replacements.push({ imageDataUrl, description })
+
+    // Clean up the registry entry — the timeline now permanently carries the description
     descriptionRegistry.delete(imageDataUrl)
 
     result[i] = {
@@ -283,5 +313,5 @@ async function resolveParts(
     }
   }
 
-  return result
+  return { parts: result, replacements }
 }

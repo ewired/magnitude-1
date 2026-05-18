@@ -72,6 +72,92 @@ function extractText(parts: readonly UserPart[]): string {
     .join('')
 }
 
+/**
+ * Build a data URL key from an ImagePart, matching the key format used in
+ * the describe-image registry.
+ */
+function imagePartToDataUrl(image: { data: string; mediaType: string }): string {
+  return `data:${image.mediaType};base64,${image.data}`
+}
+
+/**
+ * Replace ImageParts with TextParts in timeline entries based on a map of
+ * image data URLs to their resolved descriptions.
+ *
+ * This permanently mutates image attachments (adding `description`) and
+ * observation parts (replacing ImagePart with TextPart) so that subsequent
+ * turns never re-trigger image description for the same image.
+ */
+function replaceImageDescriptionsInTimeline(
+  timeline: readonly TimelineEntry[],
+  descriptionMap: ReadonlyMap<string, string>,
+): TimelineEntry[] {
+  if (descriptionMap.size === 0) return [...timeline]
+
+  return timeline.map((entry): TimelineEntry => {
+    if (entry.kind === 'user_message') {
+      let changed = false
+      const newAttachments = entry.attachments.map((attachment): TimelineAttachment => {
+        if (attachment.kind !== 'image') return attachment
+        const dataUrl = imagePartToDataUrl(attachment.image)
+        const description = descriptionMap.get(dataUrl)
+        if (description && !attachment.description) {
+          changed = true
+          return { ...attachment, description }
+        }
+        return attachment
+      })
+      if (changed) {
+        return { ...entry, attachments: newAttachments }
+      }
+    }
+
+    if (entry.kind === 'observation') {
+      let changed = false
+      const newParts = entry.parts.map((part): UserPart => {
+        if (part._tag !== 'ImagePart') return part
+        const dataUrl = imagePartToDataUrl(part)
+        const description = descriptionMap.get(dataUrl)
+        if (description) {
+          changed = true
+          return { _tag: 'TextPart', text: `[User uploaded an image. Description: ${description}]` }
+        }
+        return part
+      })
+      if (changed) {
+        return { ...entry, parts: newParts }
+      }
+    }
+
+    return entry
+  })
+}
+
+/**
+ * Scan all messages in a fork and replace ImageParts with their resolved
+ * descriptions in context entries' timelines.
+ */
+function replaceImageDescriptionsInFork(
+  fork: ForkWindowState,
+  descriptionMap: ReadonlyMap<string, string>,
+): ForkWindowState {
+  if (descriptionMap.size === 0) return fork
+
+  let changed = false
+  const newMessages = fork.messages.map((msg): typeof msg => {
+    if (msg.type !== 'context') return msg
+    const newTimeline = replaceImageDescriptionsInTimeline(msg.timeline, descriptionMap)
+    if (newTimeline !== msg.timeline) {
+      changed = true
+      return { ...msg, timeline: newTimeline }
+    }
+    return msg
+  })
+
+  if (!changed) return fork
+  return { ...fork, messages: newMessages }
+}
+
 function appendTimeline(
   messages: readonly WindowEntry[],
   timeline: readonly TimelineEntry[],
@@ -560,6 +646,11 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
 
     interrupt: ({ fork }) => fork,
 
+    image_descriptions_resolved: ({ event, fork }) => {
+      if (event.replacements.length === 0) return fork
+      const descriptionMap = new Map(event.replacements.map(r => [r.imageDataUrl, r.description]))
+      return replaceImageDescriptionsInFork(fork, descriptionMap)
+    },
 
   },
 

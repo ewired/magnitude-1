@@ -648,6 +648,15 @@ export type SkillActivated =
 // Note: SkillStarted and SkillCompleted event types removed.
 // Skills are now activated via the `skill` tool which returns content directly.
 
+export interface ImageDescriptionsResolved {
+  readonly type: 'image_descriptions_resolved'
+  readonly forkId: string | null
+  readonly replacements: readonly {
+    readonly imageDataUrl: string
+    readonly description: string
+  }[]
+}
+
 export type AppEvent =
   | SessionInitialized
   | UserMessage
@@ -677,6 +686,7 @@ export type AppEvent =
   | ContextLimitHit
   | ToolApproved
   | ToolRejected
+  | ImageDescriptionsResolved
   // Task events
   | TaskCreated
   | TaskUpdated

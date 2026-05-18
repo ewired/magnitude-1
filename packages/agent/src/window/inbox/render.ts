@@ -87,7 +87,11 @@ function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_mess
   builder.pushText(`<magnitude:message from="user">${entry.text}</magnitude:message>`)
   for (const attachment of entry.attachments) {
     if (attachment.kind === 'image') {
-      builder.pushPart(attachment.image)
+      if (attachment.description) {
+        builder.pushText(`\n[User uploaded an image. Description: ${attachment.description}]`)
+      } else {
+        builder.pushPart(attachment.image)
+      }
       continue
     }
 

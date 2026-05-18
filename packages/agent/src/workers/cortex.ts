@@ -187,9 +187,19 @@ export const Cortex = Worker.defineForked<AppEvent>()({
 
         // Resolve image descriptions — replaces ImageParts with text descriptions
         // from the vision preprocessing registry (started on image upload/paste).
-        const prompt = agentModel.profile.capabilities.vision
-          ? rawPrompt
+        // The resolved replacements are published as an event so the WindowProjection
+        // can permanently replace ImageParts with TextParts in the stored timeline.
+        const { prompt, replacements } = agentModel.profile.capabilities.vision
+          ? { prompt: rawPrompt, replacements: [] as const }
           : yield* Effect.promise(() => resolveImageDescriptions(rawPrompt))
+
+        if (replacements.length > 0) {
+          yield* publish({
+            type: 'image_descriptions_resolved',
+            forkId,
+            replacements,
+          })
+        }
 
         // ──────────────────────────────────────────────────────────────────────
         // 7. Build adapter
