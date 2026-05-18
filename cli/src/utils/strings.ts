@@ -233,14 +233,18 @@ export function applyTextEditWithSegments(
 
 export function insertMentionSegment(
   input: InputValue,
-  mention: { path: string; contentType: 'text' | 'image' | 'directory' },
+  mention: { path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } },
   id: string,
   replaceStart: number,
   replaceEnd: number,
 ): InputValue {
   const safeStart = Math.max(0, Math.min(replaceStart, input.text.length))
   const safeEnd = Math.max(safeStart, Math.min(replaceEnd, input.text.length))
-  const placeholder = `@${mention.path}`
+  const lineRangeSuffix =
+    mention.lineRange && mention.contentType !== 'directory'
+      ? `:${mention.lineRange.start}-${mention.lineRange.end}`
+      : ''
+  const placeholder = `@${mention.path}${lineRangeSuffix}`
   const before = input.text.slice(0, safeStart)
   const after = input.text.slice(safeEnd)
   const removed = safeEnd - safeStart
@@ -277,6 +281,7 @@ export function insertMentionSegment(
         id,
         path: mention.path,
         contentType: mention.contentType,
+        lineRange: mention.lineRange,
         start: safeStart,
         end: safeStart + inserted,
       },
@@ -382,13 +387,14 @@ export function reconstituteInputTextWithMentions(
   input: InputValue,
 ): {
   text: string
-  mentions: Array<{ path: string; contentType: 'text' | 'image' | 'directory' }>
+  mentions: Array<{ path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } }>
 } {
   const text = reconstituteInputText(input)
   const seen = new Set<string>()
   const mentions: Array<{
     path: string
     contentType: 'text' | 'image' | 'directory'
+    lineRange?: { start: number; end: number }
   }> = []
 
   for (const segment of input.mentionSegments) {
@@ -399,6 +405,7 @@ export function reconstituteInputTextWithMentions(
     mentions.push({
       path: segment.path,
       contentType: segment.contentType,
+      lineRange: segment.lineRange,
     })
   }
 

@@ -4,6 +4,7 @@ import { statSync } from 'node:fs'
 
 import { resolveRgPath } from '@magnitudedev/ripgrep'
 import type { KeyEvent } from '@opentui/core'
+import { expandLineRange } from '../utils/strings'
 
 const CACHE_TTL_MS = 45_000
 const MAX_RESULTS = 40
@@ -35,11 +36,13 @@ export type MentionFileItem = {
   kind: 'file' | 'directory'
   contentType: 'text' | 'image' | 'directory'
   warning?: boolean
+  lineRange?: { start: number; end: number }
 }
 
 interface FileMentionsState {
   isOpen: boolean
   query: string
+  queryLineRange?: { start: number; end: number }
   items: MentionFileItem[]
   recentItems: MentionFileItem[]
   overflowCount: number
@@ -195,11 +198,30 @@ async function loadRecentFiles(indexedFiles: string[]): Promise<string[]> {
   return inflightRecentLoad
 }
 
-function detectQuery(inputText: string, cursorPosition: number): string | null {
+function parseQueryLineRange(query: string): { filePath: string; lineRange?: { start: number; end: number } } {
+  const lastColon = query.lastIndexOf(':')
+  if (lastColon < 0) return { filePath: query }
+
+  const filePath = query.slice(0, lastColon)
+  const lineSpec = query.slice(lastColon + 1)
+
+  const match = lineSpec.match(/^(\d+)(-(\d+))?$/)
+  if (!match) return { filePath }
+
+  const start = parseInt(match[1], 10)
+  const end = match[3] ? parseInt(match[3], 10) : start
+
+  if (start < 1 || end < 1 || end < start) return { filePath }
+
+  return { filePath, lineRange: { start, end } }
+}
+
+function detectQuery(inputText: string, cursorPosition: number): { filePath: string; lineRange?: { start: number; end: number } } | null {
   const left = inputText.slice(0, Math.max(0, cursorPosition))
   const match = left.match(/(?:^|\s)@([^\s@]*)$/)
   if (!match) return null
-  return match[1] ?? ''
+  const raw = match[1] ?? ''
+  return parseQueryLineRange(raw)
 }
 
 function toFileItem(pathValue: string, scratchpadPath: string): MentionFileItem {
@@ -243,14 +265,17 @@ export function useFileMentions(
   const [dismissedQuery, setDismissedQuery] = useState<string | null>(null)
   const justConfirmedRef = useRef(false)
 
-  const query = useMemo(() => detectQuery(inputText, cursorPosition), [inputText, cursorPosition])
-  const queryLower = (query ?? '').toLowerCase()
-  const isOpen = query !== null && query !== dismissedQuery && !justConfirmedRef.current
+  const queryResult = useMemo(() => detectQuery(inputText, cursorPosition), [inputText, cursorPosition])
+  const query = queryResult?.filePath ?? ''
+  // Expand single-line specs by ±10 lines (upper clamp omitted since we don't know totalLines yet)
+  const queryLineRange = queryResult?.lineRange ? expandLineRange(queryResult.lineRange) : undefined
+  const queryLower = query.toLowerCase()
+  const isOpen = queryResult !== null && queryResult.filePath !== dismissedQuery && !justConfirmedRef.current
 
   useEffect(() => {
-    if (query !== dismissedQuery) setDismissedQuery(null)
-    if (query === null) justConfirmedRef.current = false
-  }, [query, dismissedQuery])
+    if (queryResult?.filePath !== dismissedQuery) setDismissedQuery(null)
+    if (queryResult === null) justConfirmedRef.current = false
+  }, [queryResult, dismissedQuery])
 
   useEffect(() => {
     if (!isOpen) return
@@ -280,18 +305,23 @@ export function useFileMentions(
     if (!isOpen) return { items: [], recentItems: [], overflowCount: 0 }
 
     const directories = collectDirectories(indexedFiles)
+    // Attach lineRange only to non-directory items
+    const withLineRange = (item: MentionFileItem): MentionFileItem =>
+      item.kind !== 'directory' && queryLineRange ? { ...item, lineRange: queryLineRange } : item
+
     const allCandidates: MentionFileItem[] = [
       ...indexedFiles.map((filePath) => toFileItem(filePath, scratchpadPath!)),
       ...directories.map(toDirectoryItem),
     ]
 
     if (!queryLower) {
-      const recent = recentFiles.map((filePath) => toFileItem(filePath, scratchpadPath!))
+      const recent = recentFiles.map((filePath) => withLineRange(toFileItem(filePath, scratchpadPath!)))
       const recentSet = new Set(recent.map((item) => item.path))
       const rest = allCandidates
         .filter((item) => !(item.kind === 'file' && recentSet.has(item.path)))
         .sort((a, b) => a.path.localeCompare(b.path))
         .slice(0, MAX_RESULTS)
+        .map(withLineRange)
 
       const ranked = [...recent, ...rest]
       const visible = ranked.slice(0, MAX_VISIBLE_RESULTS)
@@ -308,14 +338,14 @@ export function useFileMentions(
       .filter(x => x.rank < 999)
       .sort((a, b) => (a.rank - b.rank) || a.item.path.localeCompare(b.item.path))
       .slice(0, MAX_RESULTS)
-      .map(x => x.item)
+      .map(x => withLineRange(x.item))
 
     return {
       items: ranked.slice(0, MAX_VISIBLE_RESULTS),
       recentItems: [],
       overflowCount: Math.max(0, ranked.length - MAX_VISIBLE_RESULTS),
     }
-  }, [isOpen, indexedFiles, recentFiles, queryLower, scratchpadPath])
+  }, [isOpen, indexedFiles, recentFiles, queryLower, scratchpadPath, queryLineRange])
 
   const prevSignatureRef = useRef<string>('')
   useEffect(() => {
@@ -399,6 +429,7 @@ export function useFileMentions(
   return {
     isOpen,
     query: query ?? '',
+    queryLineRange,
     items,
     recentItems,
     overflowCount,

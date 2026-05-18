@@ -320,14 +320,14 @@ export function ChatController(props: ChatControllerProps) {
     }
   }, [services])
 
-  const onSelectMention = useCallback((item: { path: string; contentType: 'text' | 'image' | 'directory' }) => {
+  const onSelectMention = useCallback((item: { path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } }) => {
     setInputValue(prev => {
       const left = prev.text.slice(0, Math.max(0, prev.cursorPosition))
       const match = left.match(/(?:^|\s)@([^\s@]*)$/)
       if (!match) return prev
       const atIndex = left.lastIndexOf('@')
       if (atIndex < 0) return prev
-      return insertMentionSegment(prev, { path: item.path, contentType: item.contentType }, createId(), atIndex, left.length)
+      return insertMentionSegment(prev, { path: item.path, contentType: item.contentType, lineRange: item.lineRange }, createId(), atIndex, left.length)
     })
   }, [])
 
@@ -493,6 +493,7 @@ export function ChatController(props: ChatControllerProps) {
         type: 'mention',
         path: mention.path,
         contentType: mention.contentType,
+        lineRange: mention.lineRange,
       }))
       handleSubmit(text, inputValue.text, mentionAttachments)
     }
