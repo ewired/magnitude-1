@@ -20,7 +20,7 @@ import { TurnProjection } from './projections/turn'
 import { HarnessStateProjection } from './projections/harness-state'
 import { WindowProjection } from './window'
 import { SubagentActivityProjection } from './projections/subagent-activity'
-import { DisplayProjection } from './projections/display'
+import { DisplayProjection } from './display'
 
 import { AgentRoutingProjection } from './projections/agent-routing'
 import { AgentStatusProjection } from './projections/agent-status'

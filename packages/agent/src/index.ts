@@ -100,7 +100,7 @@ export type {
 
 export {
   DisplayProjection,
-} from './projections/display'
+} from './display'
 export type {
   DisplayState,
   DisplayMessage,
@@ -119,7 +119,7 @@ export type {
   ForkActivityToolCounts,
   ApprovalRequestMessage,
   PendingInboundCommunicationDisplay,
-} from './projections/display'
+} from './display'
 
 export { TurnProjection } from './projections/turn'
 export type { ToolCall, TurnTrigger, PendingInboundCommunication, ForkTurnState } from './projections/turn'

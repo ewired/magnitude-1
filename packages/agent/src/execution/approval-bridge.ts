@@ -14,7 +14,7 @@
 
 import { Effect, SubscriptionRef } from 'effect'
 import { ExecutionManager } from './types'
-import { DisplayProjection, type ApprovalRequestMessage } from '../projections/display'
+import { DisplayProjection, type ApprovalRequestMessage } from '../display'
 import { isToolKey } from '../tools/toolkits'
 
 /**

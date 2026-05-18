@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { finalizeOpenToolStepsAsInterruptedInSteps } from '../display-interrupt'
+import { finalizeOpenToolStepsAsInterruptedInSteps } from '../helpers/interrupt'
 
 describe('display interrupt finalization helper used by display projection', () => {
   test('marks unfinished tool steps as interrupted and leaves finished/non-tool steps unchanged', () => {

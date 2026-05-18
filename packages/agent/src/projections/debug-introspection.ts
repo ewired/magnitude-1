@@ -7,7 +7,7 @@
 
 import { Effect, Stream, SubscriptionRef } from 'effect'
 import { AmbientServiceTag } from '@magnitudedev/event-core'
-import { DisplayProjection } from './display'
+import { DisplayProjection } from '../display'
 import { AgentRoutingProjection } from './agent-routing'
 import { AgentStatusProjection } from './agent-status'
 import { TurnProjection } from './turn'

@@ -10,7 +10,7 @@ import type { AppEvent } from '../../events'
 import { TurnProjection } from '../turn'
 import { AgentRoutingProjection } from '../agent-routing'
 import { AgentStatusProjection } from '../agent-status'
-import { DisplayProjection, type DisplayState, type DisplayMessage } from '../display'
+import { DisplayProjection, type DisplayState, type DisplayMessage } from '../../display'
 
 const ts = (n: number) => 1_700_100_000_000 + n
 

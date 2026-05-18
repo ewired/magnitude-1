@@ -21,10 +21,10 @@ import type { AppEvent } from '../src/events'
 import { TurnProjection } from '../src/projections/turn'
 import { AgentRoutingProjection } from '../src/projections/agent-routing'
 import { AgentStatusProjection } from '../src/projections/agent-status'
-import { DisplayProjection } from '../src/projections/display'
+import { DisplayProjection } from '../src/display'
 import { HarnessStateProjection } from '../src/projections/harness-state'
 import { UserMessageResolutionProjection } from '../src/projections/user-message-resolution'
-import type { DisplayState, ToolStep } from '../src/projections/display'
+import type { DisplayState, ToolStep } from '../src/display'
 
 const ts = (n: number) => 1_700_200_000_000 + n
 
