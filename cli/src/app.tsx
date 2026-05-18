@@ -22,6 +22,7 @@ import { useTheme } from './hooks/use-theme'
 import { SelectedFileProvider } from './hooks/use-file-viewer'
 
 import { BOX_CHARS } from './utils/ui-constants'
+import { parseMentionsFromPrompt } from './utils/strings'
 import { formatTokensCompact } from './utils/format-tokens'
 import { hasConversationActivity } from './utils/start-state'
 
@@ -1067,7 +1068,8 @@ function AppInner({
     if (sessionSelection !== null && !client) return
     const prompt = consumeInitialPrompt()
     if (!prompt) return
-    handleSubmitViaClientBoundary({ forkId: null, message: prompt, attachments: [] })
+    const attachments = parseMentionsFromPrompt(prompt, process.cwd())
+    handleSubmitViaClientBoundary({ forkId: null, message: prompt, attachments })
   }, [client, consumeInitialPrompt, display, handleSubmitViaClientBoundary, sessionSelection])
 
   if (process.platform === 'win32') {
