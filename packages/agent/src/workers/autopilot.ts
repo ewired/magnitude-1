@@ -32,7 +32,7 @@ import { AgentStatusProjection } from '../projections/agent-status'
 import { TurnProjection } from '../projections/turn'
 import { AutopilotStateProjection } from '../projections/autopilot-state'
 import { WindowProjection } from '../window'
-import { buildAutopilotSystemPrompt } from '../util/autopilot-prompts'
+import { autopilotPromptRaw } from '@magnitudedev/roles'
 import { autopilotWindowToPrompt } from '../window/render'
 import { AgentModelResolver } from '../model/model-resolver'
 import { autopilotToolkit } from '../tools/autopilot'
@@ -92,7 +92,7 @@ export const Autopilot = Worker.define<AppEvent>()({
       const modelResolver = yield* AgentModelResolver
       const autopilotModel = yield* modelResolver.resolveAutopilot()
 
-      const systemPrompt = buildAutopilotSystemPrompt()
+      const systemPrompt = autopilotPromptRaw
 
       // Build compaction-aware context from WindowProjection
       const windowState = yield* read(WindowProjection, null)

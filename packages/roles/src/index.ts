@@ -31,3 +31,7 @@ export {
   createArtisanRole,
   createAdvisorRole,
 } from './roles/index'
+
+// Autopilot prompt
+import autopilotPromptRaw from './prompts/autopilot.txt' with { type: 'text' }
+export { autopilotPromptRaw }
