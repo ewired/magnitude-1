@@ -30,17 +30,38 @@ function isPathAllowed(absolutePath: string, cwd: string, allowedPrefixes?: stri
   return allowedPrefixes.some(prefix => isPathUnderPrefix(absolutePath, prefix))
 }
 
-async function resolveTextMention(path: string, absolutePath: string, fs: Effect.Effect.Success<typeof Fs>): Promise<ResolvedMention> {
+async function resolveTextMention(
+  path: string,
+  absolutePath: string,
+  fs: Effect.Effect.Success<typeof Fs>,
+  lineRange?: { start: number; end: number }
+): Promise<ResolvedMention> {
   const buffer = await Effect.runPromise(fs.readFile(absolutePath))
   const originalBytes = buffer.byteLength
   const truncated = originalBytes > MAX_MENTION_TEXT_BYTES
   const contentBuffer = truncated ? buffer.subarray(0, MAX_MENTION_TEXT_BYTES) : buffer
+  let content = contentBuffer.toString('utf8')
+
+  if (lineRange) {
+    const lines = content.split('\n')
+    // Clamp to available lines (1-indexed, inclusive)
+    // The expanded range from CLI may exceed the file's actual line count — clamp end to lines.length
+    const start = Math.max(1, lineRange.start)
+    const end = Math.min(lines.length, lineRange.end)
+    if (start <= end) {
+      content = lines.slice(start - 1, end).join('\n')
+    } else {
+      content = ''
+    }
+  }
+
   return {
     path,
     contentType: 'text',
-    content: contentBuffer.toString('utf8'),
+    content,
     truncated: truncated || undefined,
     originalBytes,
+    lineRange: lineRange || undefined,
   }
 }
 
@@ -104,7 +125,7 @@ async function resolveMention(
     return resolveImageMention(attachment.path, absolutePath, fs)
   }
 
-  return resolveTextMention(attachment.path, absolutePath, fs)
+  return resolveTextMention(attachment.path, absolutePath, fs, attachment.lineRange)
 }
 
 export const FileMentionResolver = Worker.define<AppEvent>()({

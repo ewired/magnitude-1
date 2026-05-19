@@ -39,6 +39,7 @@ export type MentionAttachment = {
   readonly type: 'mention'
   readonly path: string
   readonly contentType: 'text' | 'image' | 'directory'
+  readonly lineRange?: { readonly start: number; readonly end: number }
 }
 
 export type ResolvedMention = {
@@ -48,6 +49,7 @@ export type ResolvedMention = {
   readonly error?: string
   readonly truncated?: boolean
   readonly originalBytes?: number
+  readonly lineRange?: { readonly start: number; readonly end: number }
 }
 // =============================================================================
 // Strategy & Response Types (defined here to avoid circular imports)

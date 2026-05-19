@@ -233,14 +233,18 @@ export function applyTextEditWithSegments(
 
 export function insertMentionSegment(
   input: InputValue,
-  mention: { path: string; contentType: 'text' | 'image' | 'directory' },
+  mention: { path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } },
   id: string,
   replaceStart: number,
   replaceEnd: number,
 ): InputValue {
   const safeStart = Math.max(0, Math.min(replaceStart, input.text.length))
   const safeEnd = Math.max(safeStart, Math.min(replaceEnd, input.text.length))
-  const placeholder = `@${mention.path}`
+  const lineRangeSuffix =
+    mention.lineRange && mention.contentType !== 'directory'
+      ? `:${mention.lineRange.start}-${mention.lineRange.end}`
+      : ''
+  const placeholder = `@${mention.path}${lineRangeSuffix}`
   const before = input.text.slice(0, safeStart)
   const after = input.text.slice(safeEnd)
   const removed = safeEnd - safeStart
@@ -277,6 +281,7 @@ export function insertMentionSegment(
         id,
         path: mention.path,
         contentType: mention.contentType,
+        lineRange: mention.lineRange,
         start: safeStart,
         end: safeStart + inserted,
       },
@@ -382,13 +387,14 @@ export function reconstituteInputTextWithMentions(
   input: InputValue,
 ): {
   text: string
-  mentions: Array<{ path: string; contentType: 'text' | 'image' | 'directory' }>
+  mentions: Array<{ path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } }>
 } {
   const text = reconstituteInputText(input)
   const seen = new Set<string>()
   const mentions: Array<{
     path: string
     contentType: 'text' | 'image' | 'directory'
+    lineRange?: { start: number; end: number }
   }> = []
 
   for (const segment of input.mentionSegments) {
@@ -399,6 +405,7 @@ export function reconstituteInputTextWithMentions(
     mentions.push({
       path: segment.path,
       contentType: segment.contentType,
+      lineRange: segment.lineRange,
     })
   }
 
@@ -475,6 +482,37 @@ export function formatFullTimestamp(ts: number): string {
   const minutes = date.getMinutes().toString().padStart(2, '0')
   const hours = date.getHours().toString().padStart(2, '0')
   return `${hours}:${minutes}:${seconds}`
+}
+
+// ---------------------------------------------------------------------------
+// Line range utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Expand a single-line spec by ±10 lines, clamped to [1, totalLines].
+ * If totalLines is unknown (undefined), clamps only to minimum of 1.
+ *
+ * Examples:
+ *   expandLineRange({ start: 42, end: 42 }, 200)  → { start: 32, end: 52 }
+ *   expandLineRange({ start: 5, end: 5 }, 100)    → { start: 1, end: 15 }
+ *   expandLineRange({ start: 1, end: 1 }, 50)     → { start: 1, end: 11 }
+ *   expandLineRange({ start: 100, end: 100 }, 50) → { start: 41, end: 50 }
+ *   expandLineRange({ start: 10, end: 20 }, 100)  → { start: 10, end: 20 }  // no change
+ */
+export function expandLineRange(
+  lineRange: { start: number; end: number },
+  totalLines?: number,
+): { start: number; end: number } {
+  // Only expand single-line specs (start === end)
+  if (lineRange.start !== lineRange.end) {
+    return lineRange;
+  }
+
+  const line = lineRange.start;
+  const start = Math.max(1, line - 10);
+  const end = totalLines !== undefined ? Math.min(totalLines, line + 10) : line + 10;
+
+  return { start, end };
 }
 
 // ---------------------------------------------------------------------------
