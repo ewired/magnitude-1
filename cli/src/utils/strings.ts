@@ -529,23 +529,37 @@ function resolveCandidatePath(rawPath: string, cwd: string): string | null {
 export function parseMentionsFromPrompt(
   text: string,
   cwd: string,
-): Array<{ type: 'mention'; path: string; contentType: 'text' | 'image' | 'directory' }> {
+): Array<{ type: 'mention'; path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } }> {
   const mentions: Array<{
     type: 'mention'
     path: string
     contentType: 'text' | 'image' | 'directory'
+    lineRange?: { start: number; end: number }
   }> = []
   const seen = new Set<string>()
   const regex = /(?:^|\s)@([^\s@]*)/g
   let match
 
   while ((match = regex.exec(text)) !== null) {
-    const rawPath = match[1]
-    if (!rawPath || seen.has(rawPath)) continue
+    const rawPathWithRange = match[1]
+    if (!rawPathWithRange || seen.has(rawPathWithRange)) continue
+
+    // Parse optional line range suffix: :start-end or :N
+    let rawPath = rawPathWithRange
+    let lineRange: { start: number; end: number } | undefined
+    const rangeMatch = rawPathWithRange.match(/:([\d]+)(?:-([\d]+))?$/)
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1], 10)
+      const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : start
+      if (!isNaN(start) && !isNaN(end) && start > 0 && end > 0) {
+        lineRange = expandLineRange({ start, end })
+        rawPath = rawPathWithRange.slice(0, rangeMatch.index)
+      }
+    }
 
     const resolved = resolveCandidatePath(rawPath, cwd)
     if (!resolved) {
-      console.warn(`[mentions] Path not found: @${rawPath}`)
+      console.warn(`[mentions] Path not found: @${rawPathWithRange}`)
       continue
     }
 
@@ -567,8 +581,8 @@ export function parseMentionsFromPrompt(
       // If stat fails, default to 'text'
     }
 
-    seen.add(rawPath)
-    mentions.push({ type: 'mention', path: rawPath, contentType })
+    seen.add(rawPathWithRange)
+    mentions.push({ type: 'mention', path: rawPath, contentType, lineRange })
   }
 
   return mentions
