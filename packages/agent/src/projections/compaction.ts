@@ -129,7 +129,6 @@ function recomputePolicy(
   tokenEstimate: number,
   limits: RoleConfig,
 ): CompactionState {
-  console.log('[COMPACTION] recomputePolicy:', { _tag: fork._tag, tokenEstimate, softCap: limits.softCap, hardCap: limits.hardCap })
   // During active compaction, preserve contextLimitBlocked so compaction_failed
   // can determine retry intent. isCompactionBlocking(_tag) governs system
   // blocking during compaction; contextLimitBlocked is only actionable when idle.

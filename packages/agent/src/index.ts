@@ -109,9 +109,14 @@ export type {
   AssistantMessageDisplay,
   ThinkBlockMessage,
   ThinkBlockStep,
+  ThinkingStep,
+  ToolStep,
   CommunicationStep,
+  StatusIndicatorStep,
   SubagentStartedStep,
   SubagentFinishedStep,
+  SubagentKilledStep,
+  SubagentUserKilledStep,
   InterruptedMessage,
   ErrorDisplayMessage,
   ForkResultMessage,
@@ -170,7 +175,19 @@ export { PermissionRejection } from './execution/permission-rejection'
 export { isToolKey, type ToolKey } from './tools/toolkits'
 export type { ToolHandle } from './tools/tool-handle'
 export type { ToolState } from './models'
-export type { FileEditState, FileWriteState } from './models'
+export type {
+  FileReadState,
+  FileWriteState,
+  FileEditState,
+  FileSearchState,
+  FileTreeState,
+  ShellState,
+  WebSearchState,
+  WebFetchState,
+  SpawnWorkerState,
+  SkillActivationState,
+  ReassignWorkerState,
+} from './models'
 export { globalTools } from './tools/globals'
 export { shellTool } from './tools/shell'
 export { readTool, writeTool, editTool, treeTool, grepTool, fsTools } from './tools/fs'
@@ -185,6 +202,7 @@ export { TurnController } from './workers/turn-controller'
 export { AgentLifecycle } from './workers/agent-lifecycle'
 export { LifecycleCoordinator } from './workers/lifecycle-coordinator'
 export { Autopilot } from './workers/autopilot'
+export type { AutopilotState } from './projections/autopilot-state'
 export { ApprovalWorker } from './workers/approval-worker'
 
 export { SessionTitleWorker } from './workers/session-title-worker'

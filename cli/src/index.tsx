@@ -9,6 +9,7 @@ import { CLI_VERSION } from './version'
 import { StorageProvider } from './providers/storage-provider'
 import { isLightBackground } from './utils/theme'
 import { installGracefulShutdownHandlers } from './utils/graceful-shutdown'
+import { runHeadless } from './commands/headless'
 
 async function main() {
   // Initialize theme store before rendering (defaults to dark)
@@ -21,8 +22,28 @@ async function main() {
     .option('--debug', 'Enable debug mode with debug panel')
     .option('--autopilot', 'Launch with autopilot enabled')
     .option('--prompt <text>', 'Start session with an initial user message')
+    .option('--headless', 'Run in headless mode (no TUI, output to stdout)')
 
     .action(async (opts) => {
+
+      const storage = await createStorageClient({ cwd: process.cwd(), currentVersion: CLI_VERSION })
+      const sessionStart: SessionStart = opts.resume === undefined
+        ? { _tag: 'new' }
+        : opts.resume === true
+          ? { _tag: 'latest' }
+          : { _tag: 'resume', sessionId: opts.resume }
+
+      // Headless mode: skip TUI entirely
+      if (opts.headless) {
+        const exitCode = await runHeadless({
+          storage,
+          debug: opts.debug ?? false,
+          autopilot: opts.autopilot ?? true, // default ON in headless
+          initialPrompt: opts.prompt,
+          sessionStart,
+        })
+        process.exit(exitCode)
+      }
 
       const renderer = await createCliRenderer({
         exitOnCtrlC: false, // We handle Ctrl+C manually for two-tap exit
@@ -53,13 +74,6 @@ async function main() {
           fs.writeSync(1, `\nResume this session with:\nmagnitude --resume ${activeSessionId}\n`)
         }
       )
-
-      const storage = await createStorageClient({ cwd: process.cwd(), currentVersion: CLI_VERSION })
-      const sessionStart: SessionStart = opts.resume === undefined
-        ? { _tag: 'new' }
-        : opts.resume === true
-          ? { _tag: 'latest' }
-          : { _tag: 'resume', sessionId: opts.resume }
 
       createRoot(renderer).render(
         <StorageProvider client={storage}>

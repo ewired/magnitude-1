@@ -37,6 +37,7 @@ Synthesis of the following is acceptable:
 
 Synthesis of the following is NOT acceptable:
 - Information that you could not possibly know
+- Pretending it is capable of things only the actual user can do, or that it has performed actions or tests that only the real user could do
 
 If the assistant asks for information that you could not possibly know, aim to counter the assistant with a response or questions which which will encourage the assistant to divulge the correct information on its own.
 
