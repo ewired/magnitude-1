@@ -29,12 +29,13 @@ type QueueItem = HarnessEvent | typeof END
 // ── Config ───────────────────────────────────────────────────────────
 
 export interface HarnessConfig<
+  TCallOptions = unknown,
   TToolkit extends Toolkit<any> = Toolkit<any>,
   RHooks = never,
   TInitialError = ConnectionError,
   TStreamError = StreamError,
 > {
-  readonly model: BoundModel<any, TInitialError, TStreamError>
+  readonly model: BoundModel<TCallOptions, TInitialError, TStreamError>
   readonly toolkit: TToolkit
   readonly hooks?: HarnessHooks<RHooks>
   readonly layer?: Layer.Layer<ToolkitRequirements<TToolkit> | RHooks>
@@ -45,12 +46,13 @@ export interface HarnessConfig<
 
 // ── Harness ──────────────────────────────────────────────────────────
 
-export interface Harness<TInitialError = ConnectionError> {
+export interface Harness<TCallOptions, TInitialError = ConnectionError> {
   /** Stream a model response, dispatch tool calls, and produce events.
    *  Returns a LiveTurn whose events stream is driven by the harness —
    *  the consumer reads events, reducers update refs automatically. */
   readonly runTurn: (
     prompt: Prompt,
+    options?: TCallOptions,
   ) => Effect.Effect<
     LiveTurn,
     TInitialError,
@@ -88,11 +90,12 @@ export interface ReplayTurn {
 // ── createHarness ────────────────────────────────────────────────────
 
 export function createHarness<
+  TCallOptions,
   TToolkit extends Toolkit<any>,
   RHooks = never,
   TInitialError = ConnectionError,
   TStreamError = StreamError,
->(config: HarnessConfig<TToolkit, RHooks, TInitialError, TStreamError>): Harness<TInitialError> {
+>(config: HarnessConfig<TCallOptions, TToolkit, RHooks, TInitialError, TStreamError>): Harness<TCallOptions, TInitialError> {
   const { toolkit, hooks, model } = config
 
   // Build tool definitions array from toolkit
@@ -156,6 +159,7 @@ export function createHarness<
 
   function runTurn(
     prompt: Prompt,
+    options?: TCallOptions,
   ): Effect.Effect<
     LiveTurn,
     TInitialError,
@@ -175,7 +179,8 @@ export function createHarness<
       })()
 
       // Get the model stream + parsers (may fail with ConnectionError)
-      const { events: modelEvents, parsers } = yield* model.stream(prompt, toolDefs, { generateToolCallId })
+      const streamOpts = { generateToolCallId, ...options } as TCallOptions & { generateToolCallId?: () => ToolCallId }
+      const { events: modelEvents, parsers } = yield* model.stream(prompt, toolDefs, streamOpts)
 
       const stateRef = yield* makeStateRef(
         config.initialState ? { engine: config.initialState } : undefined,

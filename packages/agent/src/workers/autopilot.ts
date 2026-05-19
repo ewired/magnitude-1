@@ -132,7 +132,7 @@ export const Autopilot = Worker.define<AppEvent>()({
 
         // runTurn returns Effect<LiveTurn>, NOT a Stream directly.
         // LiveTurn.events is the Stream we consume.
-        const liveTurn = yield* harness.runTurn(prompt).pipe(
+        const liveTurn = yield* harness.runTurn(prompt, { toolChoice: "required" }).pipe(
           Effect.catchAll((err) =>
             Effect.gen(function* () {
               logger.error({ err }, '[Autopilot] Connection error')
