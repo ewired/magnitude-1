@@ -88,7 +88,7 @@ export type SessionStart =
   | { _tag: 'latest' }
   | { _tag: 'resume'; sessionId: string }
 
-export function App({ sessionStart, debug, autopilot, onClientReady, onSessionId }: { sessionStart: SessionStart; debug: boolean; autopilot?: boolean; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void }) {
+export function App({ sessionStart, debug, autopilot, initialPrompt, onClientReady, onSessionId }: { sessionStart: SessionStart; debug: boolean; autopilot?: boolean; initialPrompt?: string; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void }) {
   const [conversationKey, setConversationKey] = useState(0)
   const [sessionSelection, setSessionSelection] = useState<string | null | undefined>(
     sessionStart._tag === 'new' ? null : sessionStart._tag === 'latest' ? undefined : sessionStart.sessionId
@@ -118,6 +118,7 @@ export function App({ sessionStart, debug, autopilot, onClientReady, onSessionId
       onClientReady={onClientReady}
       onSessionId={onSessionId}
       autopilot={autopilot ?? false}
+      initialPrompt={initialPrompt ?? undefined}
     />
   )
 }
@@ -131,6 +132,7 @@ function AppInner({
   onClientReady,
   onSessionId,
   autopilot,
+  initialPrompt,
 }: {
   debugMode: boolean
   skipAnimation: boolean
@@ -140,6 +142,7 @@ function AppInner({
   onClientReady?: (client: AgentClient | null) => void
   onSessionId?: (id: string) => void
   autopilot: boolean
+  initialPrompt?: string
 }) {
   const renderer = useRenderer()
   const storage = useStorage()
@@ -441,6 +444,24 @@ function AppInner({
       c?.dispose()
     }
   }, [debugMode, onClientReady, onSessionId, renderer, sessionSelection, setClientFactory, setLazyClient, storage, auth.loaded, auth.key])
+
+  // ── Send initial prompt if --prompt flag was provided ──────────────────
+  const initialPromptSentRef = useRef(false)
+  useEffect(() => {
+    if (!initialPrompt || initialPromptSentRef.current || !auth.loaded || !auth.key) return
+    initialPromptSentRef.current = true
+    clientSend({
+      type: 'user_message',
+      messageId: createId(),
+      timestamp: Date.now(),
+      forkId: null,
+      content: textParts(initialPrompt),
+      attachments: [],
+      mode: 'text',
+      synthetic: false,
+      taskMode: false,
+    })
+  }, [initialPrompt, auth.loaded, auth.key, clientSend])
 
   // Subscribe to display state for selected fork
   useEffect(() => {

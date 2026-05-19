@@ -127,7 +127,12 @@ export const Autopilot = Worker.define<AppEvent>()({
 
         // runTurn returns Effect<LiveTurn>, NOT a Stream directly.
         // LiveTurn.events is the Stream we consume.
-        const liveTurn = yield* harness.runTurn(prompt, { toolChoice: "required" }).pipe(
+        const liveTurn = yield* harness.runTurn(prompt, {
+          toolChoice: "required",
+          magnitudeAdditionalOptions: {
+            turn_constraints: { message: "forbid" },
+          },
+        }).pipe(
           Effect.retry({
             schedule: connectionRetrySchedule,
             while: (err: MagnitudeConnectionError) => isRetryableConnectionError(err),

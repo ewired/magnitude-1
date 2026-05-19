@@ -20,9 +20,9 @@ async function main() {
     .option('--resume [id]', 'Resume the most recent chat session or a specific session by ID')
     .option('--debug', 'Enable debug mode with debug panel')
     .option('--autopilot', 'Launch with autopilot enabled')
+    .option('--prompt <text>', 'Start session with an initial user message')
 
-    .argument('[prompt]')
-    .action(async (promptArg, opts) => {
+    .action(async (opts) => {
 
       const renderer = await createCliRenderer({
         exitOnCtrlC: false, // We handle Ctrl+C manually for two-tap exit
@@ -67,6 +67,7 @@ async function main() {
             sessionStart={sessionStart}
             debug={opts.debug ?? false}
             autopilot={opts.autopilot ?? false}
+            initialPrompt={opts.prompt ?? undefined}
             onClientReady={(client) => {
               clientRef = client
             }}

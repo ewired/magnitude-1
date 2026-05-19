@@ -61,7 +61,15 @@ export type AllowedToolsToolChoice = {
   }
 }
 
+export type TurnConstraintMessage = "force" | "allow" | "forbid"
+
+export type TurnConstraints = {
+  message?: TurnConstraintMessage
+}
+
 export type MagnitudeAdditionalOptions = {
   /** Override the default trait labels used in grammar-constrained reasoning. */
   traits?: string[]
+  /** Controls whether message/prose content is required, optional, or forbidden. */
+  turn_constraints?: TurnConstraints
 }
