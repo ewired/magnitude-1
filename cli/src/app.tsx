@@ -94,6 +94,14 @@ export function App({ sessionStart, debug, autopilot, initialPrompt, onClientRea
     sessionStart._tag === 'new' ? null : sessionStart._tag === 'latest' ? undefined : sessionStart.sessionId
   )
   const hasAnimatedRef = useRef(false)
+  const initialPromptSentRef = useRef(false)
+
+  const consumeInitialPrompt = useCallback(() => {
+    if (initialPromptSentRef.current) return null
+    if (!initialPrompt || initialPrompt.trim().length === 0) return null
+    initialPromptSentRef.current = true
+    return initialPrompt
+  }, [initialPrompt])
 
   const handleReset = useCallback(() => {
     hasAnimatedRef.current = true
@@ -118,7 +126,7 @@ export function App({ sessionStart, debug, autopilot, initialPrompt, onClientRea
       onClientReady={onClientReady}
       onSessionId={onSessionId}
       autopilot={autopilot ?? false}
-      initialPrompt={initialPrompt ?? undefined}
+      consumeInitialPrompt={consumeInitialPrompt}
     />
   )
 }
@@ -132,7 +140,7 @@ function AppInner({
   onClientReady,
   onSessionId,
   autopilot,
-  initialPrompt,
+  consumeInitialPrompt,
 }: {
   debugMode: boolean
   skipAnimation: boolean
@@ -142,7 +150,7 @@ function AppInner({
   onClientReady?: (client: AgentClient | null) => void
   onSessionId?: (id: string) => void
   autopilot: boolean
-  initialPrompt?: string
+  consumeInitialPrompt: () => string | null
 }) {
   const renderer = useRenderer()
   const storage = useStorage()
@@ -444,24 +452,6 @@ function AppInner({
       c?.dispose()
     }
   }, [debugMode, onClientReady, onSessionId, renderer, sessionSelection, setClientFactory, setLazyClient, storage, auth.loaded, auth.key])
-
-  // ── Send initial prompt if --prompt flag was provided ──────────────────
-  const initialPromptSentRef = useRef(false)
-  useEffect(() => {
-    if (!initialPrompt || initialPromptSentRef.current || !auth.loaded || !auth.key) return
-    initialPromptSentRef.current = true
-    clientSend({
-      type: 'user_message',
-      messageId: createId(),
-      timestamp: Date.now(),
-      forkId: null,
-      content: textParts(initialPrompt),
-      attachments: [],
-      mode: 'text',
-      synthetic: false,
-      taskMode: false,
-    })
-  }, [initialPrompt, auth.loaded, auth.key, clientSend])
 
   // Subscribe to display state for selected fork
   useEffect(() => {
@@ -1209,6 +1199,15 @@ function AppInner({
       taskMode: false,
     })
   }, [clientSend])
+
+  // ── Send initial prompt if --prompt flag was provided ──────────────────
+  useEffect(() => {
+    if (!display) return
+    if (sessionSelection !== null && !client) return
+    const prompt = consumeInitialPrompt()
+    if (!prompt) return
+    handleSubmitViaClientBoundary({ forkId: null, message: prompt, attachments: [] })
+  }, [client, consumeInitialPrompt, display, handleSubmitViaClientBoundary, sessionSelection])
 
   if (process.platform === 'win32') {
     return (
