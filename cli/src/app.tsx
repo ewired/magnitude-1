@@ -88,7 +88,7 @@ export type SessionStart =
   | { _tag: 'latest' }
   | { _tag: 'resume'; sessionId: string }
 
-export function App({ sessionStart, debug, autopilot, initialPrompt, onClientReady, onSessionId }: { sessionStart: SessionStart; debug: boolean; autopilot?: boolean; initialPrompt?: string; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void }) {
+export function App({ sessionStart, debug, autopilot, initialPrompt, onClientReady, onSessionId, disableShellSafeguards, disableCwdSafeguards }: { sessionStart: SessionStart; debug: boolean; autopilot?: boolean; initialPrompt?: string; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void; disableShellSafeguards?: boolean; disableCwdSafeguards?: boolean }) {
   const [conversationKey, setConversationKey] = useState(0)
   const [sessionSelection, setSessionSelection] = useState<string | null | undefined>(
     sessionStart._tag === 'new' ? null : sessionStart._tag === 'latest' ? undefined : sessionStart.sessionId
@@ -119,6 +119,8 @@ export function App({ sessionStart, debug, autopilot, initialPrompt, onClientRea
       onSessionId={onSessionId}
       autopilot={autopilot ?? false}
       initialPrompt={initialPrompt ?? undefined}
+      disableShellSafeguards={disableShellSafeguards ?? false}
+      disableCwdSafeguards={disableCwdSafeguards ?? false}
     />
   )
 }
@@ -133,6 +135,8 @@ function AppInner({
   onSessionId,
   autopilot,
   initialPrompt,
+  disableShellSafeguards,
+  disableCwdSafeguards,
 }: {
   debugMode: boolean
   skipAnimation: boolean
@@ -143,6 +147,8 @@ function AppInner({
   onSessionId?: (id: string) => void
   autopilot: boolean
   initialPrompt?: string
+  disableShellSafeguards: boolean
+  disableCwdSafeguards: boolean
 }) {
   const renderer = useRenderer()
   const storage = useStorage()
@@ -332,6 +338,8 @@ function AppInner({
         debug: debugMode,
         sessionId: activeSessionId,
         magnitudeApiKey: auth.key ?? undefined,
+        disableShellSafeguards,
+        disableCwdSafeguards,
       })
     }
 

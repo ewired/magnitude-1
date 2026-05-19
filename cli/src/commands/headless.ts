@@ -36,6 +36,8 @@ export interface RunHeadlessOptions {
   autopilot: boolean
   initialPrompt?: string
   sessionStart: SessionStart
+  disableShellSafeguards: boolean
+  disableCwdSafeguards: boolean
 }
 
 // ── Runner ─────────────────────────────────────────────────────────────
@@ -77,6 +79,8 @@ export async function runHeadless(options: RunHeadlessOptions): Promise<number> 
   const client = await createCodingAgentClient({
     persistence: persistenceLayer, storage, debug,
     sessionId: activeSessionId, magnitudeApiKey: apiKey,
+    disableShellSafeguards: options.disableShellSafeguards,
+    disableCwdSafeguards: options.disableCwdSafeguards,
   })
 
   // ── 2. State ────────────────────────────────────────────────────

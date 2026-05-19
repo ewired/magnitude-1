@@ -23,6 +23,8 @@ async function main() {
     .option('--autopilot', 'Launch with autopilot enabled')
     .option('--prompt <text>', 'Start session with an initial user message')
     .option('--headless', 'Run in headless mode (no TUI, output to stdout)')
+    .option('--disable-shell-safeguards', 'Disable shell command classification safeguards')
+    .option('--disable-cwd-safeguards', 'Disable working directory boundary safeguards')
 
     .action(async (opts) => {
 
@@ -41,6 +43,8 @@ async function main() {
           autopilot: opts.autopilot ?? true, // default ON in headless
           initialPrompt: opts.prompt,
           sessionStart,
+          disableShellSafeguards: opts.disableShellSafeguards ?? false,
+          disableCwdSafeguards: opts.disableCwdSafeguards ?? false,
         })
         process.exit(exitCode)
       }
@@ -82,6 +86,8 @@ async function main() {
             debug={opts.debug ?? false}
             autopilot={opts.autopilot ?? false}
             initialPrompt={opts.prompt ?? undefined}
+            disableShellSafeguards={opts.disableShellSafeguards ?? false}
+            disableCwdSafeguards={opts.disableCwdSafeguards ?? false}
             onClientReady={(client) => {
               clientRef = client
             }}
