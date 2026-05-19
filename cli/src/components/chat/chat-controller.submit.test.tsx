@@ -82,6 +82,8 @@ function makeProps(overrides: Partial<ChatControllerProps> = {}): ChatController
       widgetNavActive: false,
       isSubagentView: false,
       supportsVision: true,
+      autopilotEnabled: false,
+      autopilotGenerating: false,
     },
     services: {
       submitUserMessageToFork: mock(() => {}),
@@ -107,6 +109,7 @@ function makeProps(overrides: Partial<ChatControllerProps> = {}): ChatController
       requestIdleSubagentClose: mock(() => {}),
       requestActiveSubagentKill: mock(() => {}),
       showToast: mock(() => {}),
+      toggleAutopilot: mock(() => {}),
     },
     displayMessages: [],
     tasks: [],

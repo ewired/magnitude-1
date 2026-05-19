@@ -197,6 +197,8 @@ function makeProps(): ChatControllerProps {
       widgetNavActive: false,
       isSubagentView: false,
       supportsVision: false,
+      autopilotEnabled: false,
+      autopilotGenerating: false,
     },
     services: {
       submitUserMessageToFork: noop,
@@ -214,6 +216,7 @@ function makeProps(): ChatControllerProps {
       requestIdleSubagentClose: noop,
       requestActiveSubagentKill: noop,
       showToast: noop,
+      toggleAutopilot: noop,
     },
     displayMessages: [],
     tasks: [makeTask()],

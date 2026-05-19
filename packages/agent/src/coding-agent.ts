@@ -21,6 +21,7 @@ import { HarnessStateProjection } from './projections/harness-state'
 import { WindowProjection } from './window'
 import { SubagentActivityProjection } from './projections/subagent-activity'
 import { DisplayProjection } from './display'
+import { AutopilotStateProjection } from './projections/autopilot-state'
 
 import { AgentRoutingProjection } from './projections/agent-routing'
 import { AgentStatusProjection } from './projections/agent-status'
@@ -110,6 +111,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
     DisplayProjection,
     ConversationProjection,
     UserPresenceProjection,
+    AutopilotStateProjection,
   ],
 
   workers: [
@@ -147,6 +149,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
       agentStatus: AgentStatusProjection,
       taskGraph: TaskGraphProjection,
       taskWorker: TaskWorkerProjection,
+      autopilotState: AutopilotStateProjection,
     }
   }
 })

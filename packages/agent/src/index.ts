@@ -47,7 +47,7 @@ export type {
   ToolResult,
   ToolDisplay,
   Interrupt,
-  AutopilotMessageGenerated,
+  AutopilotOutcome,
   AutopilotToggled,
   ToolApproved,
   ToolRejected,

@@ -18,6 +18,7 @@ interface ChatSurfaceKeyboardProps {
   pendingApproval: boolean
   onApprove: () => void
   onReject: () => void
+  onToggleAutopilot?: () => void
 }
 
 export function ChatSurfaceKeyboard({
@@ -36,6 +37,7 @@ export function ChatSurfaceKeyboard({
   pendingApproval,
   onApprove,
   onReject,
+  onToggleAutopilot,
 }: ChatSurfaceKeyboardProps) {
   useKeyboard(
     useCallback((key: KeyEvent) => {
@@ -45,6 +47,13 @@ export function ChatSurfaceKeyboard({
       const isCtrlC = key.ctrl && key.name === 'c' && !key.meta && !key.option
 
       if (isBlockingOverlayActive) return
+
+      const isCtrlA = key.ctrl && key.name === 'a' && !key.meta && !key.option
+      if (isCtrlA && onToggleAutopilot) {
+        key.preventDefault()
+        onToggleAutopilot()
+        return
+      }
 
       if (isCtrlC && composerHasContent) {
         key.preventDefault()
@@ -117,6 +126,7 @@ export function ChatSurfaceKeyboard({
       pendingApproval,
       onApprove,
       onReject,
+      onToggleAutopilot,
     ]),
   )
 

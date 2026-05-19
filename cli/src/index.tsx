@@ -19,6 +19,7 @@ async function main() {
     .version(CLI_VERSION)
     .option('--resume [id]', 'Resume the most recent chat session or a specific session by ID')
     .option('--debug', 'Enable debug mode with debug panel')
+    .option('--autopilot', 'Launch with autopilot enabled')
 
     .argument('[prompt]')
     .action(async (promptArg, opts) => {
@@ -65,6 +66,7 @@ async function main() {
           <App
             sessionStart={sessionStart}
             debug={opts.debug ?? false}
+            autopilot={opts.autopilot ?? false}
             onClientReady={(client) => {
               clientRef = client
             }}

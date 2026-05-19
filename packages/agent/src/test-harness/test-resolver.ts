@@ -1,4 +1,5 @@
 import { Effect, Layer } from 'effect'
+import * as HttpClient from '@effect/platform/HttpClient'
 import { AgentModelResolver } from '../model/model-resolver'
 import { createTestBoundModel, type TestModelConfig } from './test-model'
 import type { RoleId } from '../agents/role-validation'
@@ -18,8 +19,16 @@ export function makeTestModelResolver(config: TestModelConfig = {}): Layer.Layer
     resolve: (roleId: RoleId) =>
       Effect.succeed({
         model: bound,
-        roleId,
+        modelSource: { type: 'role', roleId },
         modelId: 'test-model',
+        profile: DEFAULT_TEST_PROFILE,
+      }),
+
+    resolveAutopilot: () =>
+      Effect.succeed({
+        model: bound,
+        modelSource: { type: 'utility', modelId: 'test-autopilot' },
+        modelId: 'test-autopilot',
         profile: DEFAULT_TEST_PROFILE,
       }),
   })

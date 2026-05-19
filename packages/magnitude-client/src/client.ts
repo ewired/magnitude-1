@@ -6,7 +6,7 @@ import { CLIENT_PLATFORM, CLIENT_SHELL, HEADER_PLATFORM, HEADER_SHELL, HEADER_SE
 import { isEnvFlagOn } from "./env"
 import type { BalanceResponse, RoleId, UsagePeriod } from "./contract"
 import { createModelCatalog, type ModelCatalog } from "./catalog"
-import { createRoleSpec, type MagnitudeCallOptions, type MagnitudeStreamError } from "./models"
+import { createRoleSpec, createMagnitudeCompatibleSpec, type MagnitudeCallOptions, type MagnitudeStreamError } from "./models"
 import type { MagnitudeConnectionError } from "./errors"
 import type { BoundModel, ModelCapabilities as AIModelCapabilities, ImagePlaceholderConfig } from "@magnitudedev/ai"
 
@@ -54,6 +54,7 @@ export interface MagnitudeClientShape {
   readonly auth: AuthApplicator
   readonly catalog: ModelCatalog
   readonly role: (id: RoleId, options?: RoleOptions) => BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>
+  readonly model: (id: string, options?: RoleOptions) => BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>
   readonly webSearch: (
     query: string,
     schema?: Record<string, unknown>
@@ -94,6 +95,11 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
 
     role: (id: RoleId, options?: RoleOptions) => {
       const spec = createRoleSpec(id, endpoint, options?.capabilities)
+      return spec.bind({ auth: authWithHeaders, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
+    },
+
+    model: (id: string, options?: RoleOptions) => {
+      const spec = createMagnitudeCompatibleSpec({ modelId: id, endpoint })
       return spec.bind({ auth: authWithHeaders, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
     },
 

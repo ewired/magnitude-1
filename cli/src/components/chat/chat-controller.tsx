@@ -13,6 +13,7 @@ import { SlashCommandMenu } from '../slash-command-menu'
 import { MultilineInput, type MultilineInputHandle } from '../multiline-input'
 import { AttachmentsBar } from '../attachments-bar'
 import { ContextUsageBar } from '../context-usage-bar'
+import { AutopilotIndicator } from '../autopilot-indicator'
 import { useFileMentions } from '../../hooks/use-file-mentions'
 import { useSlashCommands } from '../../hooks/use-slash-commands'
 import { readClipboardBitmap, readClipboardText } from '../../utils/clipboard'
@@ -552,6 +553,7 @@ export function ChatController(props: ChatControllerProps) {
         pendingApproval={env.pendingApproval}
         onApprove={onApprove}
         onReject={onReject}
+        onToggleAutopilot={services.toggleAutopilot}
       />
 
       <box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
@@ -629,6 +631,11 @@ export function ChatController(props: ChatControllerProps) {
 
       <box style={{ paddingLeft: 2, paddingRight: 2, flexShrink: 0, height: 1, minHeight: 1, maxHeight: 1, flexDirection: 'row', justifyContent: 'space-between' }}>
         <box style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
+          <AutopilotIndicator
+            enabled={env.autopilotEnabled}
+            generating={env.autopilotGenerating}
+            onToggle={services.toggleAutopilot}
+          />
           {attachments.length > 0 ? (
             <AttachmentsBar attachments={attachments} onRemove={removeAttachment} maxWidth={env.attachmentsMaxWidth} />
           ) : nextEscWillKillAll ? (

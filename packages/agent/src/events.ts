@@ -398,11 +398,19 @@ export type ToolResultStatus = ToolResult['status']
 // Autopilot Events
 // =============================================================================
 
-/** Autopilot generated a continuation message for the user to review */
-export interface AutopilotMessageGenerated {
-  readonly type: 'autopilot_message_generated'
+/** Autopilot started generating a continuation message */
+export interface AutopilotGenerationStarted {
+  readonly type: 'autopilot_generation_started'
   readonly forkId: string | null
-  readonly content: string
+}
+
+/** Autopilot generation completed with success or error */
+export interface AutopilotOutcome {
+  readonly type: 'autopilot_outcome'
+  readonly forkId: string | null
+  readonly result:
+    | { readonly _tag: 'success'; readonly content: string }
+    | { readonly _tag: 'error'; readonly message: string }
 }
 
 /** Autopilot enabled/disabled by user */
@@ -673,7 +681,8 @@ export type AppEvent =
   | MessageEnd
   | RawResponseChunk
   | ToolEvent
-  | AutopilotMessageGenerated
+  | AutopilotGenerationStarted
+  | AutopilotOutcome
   | AutopilotToggled
   | Wake
   | WindowFocusChanged

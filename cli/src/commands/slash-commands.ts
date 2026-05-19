@@ -15,6 +15,7 @@ export const SLASH_COMMANDS: SlashCommandDefinition[] = [
   { id: 'init',     label: 'init',     description: 'Generate AGENTS.md for this project' },
   { id: 'settings',      label: 'settings',      description: 'Open settings', aliases: ['s'] },
   { id: 'usage',         label: 'usage',         description: 'View usage limits' },
+  { id: 'autopilot',     label: 'autopilot',     description: 'Toggle autopilot mode' },
 ]
 
 let skillCommands: SlashCommandDefinition[] = []

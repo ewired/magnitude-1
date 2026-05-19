@@ -35,8 +35,8 @@ import { useSelectionAutoCopy } from './utils/clipboard'
 import { useRecentChatsNavigation } from './hooks/use-recent-chats-navigation'
 
 import { AppOverlays } from './components/app-overlays'
-
-
+import { AutopilotIndicator } from './components/autopilot-indicator'
+import { AutopilotPreviewMessage } from './components/autopilot-preview-message'
 
 import { getRecentChats, type RecentChat } from './data/recent-chats'
 import { logger, initLogger, subscribeToLogs, clearSessionLog, getSessionLogPath, type LogEntry } from '@magnitudedev/logger'
@@ -88,7 +88,7 @@ export type SessionStart =
   | { _tag: 'latest' }
   | { _tag: 'resume'; sessionId: string }
 
-export function App({ sessionStart, debug, onClientReady, onSessionId }: { sessionStart: SessionStart; debug: boolean; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void }) {
+export function App({ sessionStart, debug, autopilot, onClientReady, onSessionId }: { sessionStart: SessionStart; debug: boolean; autopilot?: boolean; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void }) {
   const [conversationKey, setConversationKey] = useState(0)
   const [sessionSelection, setSessionSelection] = useState<string | null | undefined>(
     sessionStart._tag === 'new' ? null : sessionStart._tag === 'latest' ? undefined : sessionStart.sessionId
@@ -117,6 +117,7 @@ export function App({ sessionStart, debug, onClientReady, onSessionId }: { sessi
       onResumeSession={handleResumeSession}
       onClientReady={onClientReady}
       onSessionId={onSessionId}
+      autopilot={autopilot ?? false}
     />
   )
 }
@@ -129,6 +130,7 @@ function AppInner({
   onResumeSession,
   onClientReady,
   onSessionId,
+  autopilot,
 }: {
   debugMode: boolean
   skipAnimation: boolean
@@ -137,6 +139,7 @@ function AppInner({
   onResumeSession: (sessionId: string) => void
   onClientReady?: (client: AgentClient | null) => void
   onSessionId?: (id: string) => void
+  autopilot: boolean
 }) {
   const renderer = useRenderer()
   const storage = useStorage()
@@ -178,6 +181,20 @@ function AppInner({
   const [isCompacting, setIsCompacting] = useState(false)
   const turnStartTimeRef = useRef<number | null>(null)
   const hasAnimatedRef = useRef(skipAnimation)
+
+  // ── Autopilot state (TUI-only countdown) ──────────────────────────────
+  const [autopilotEnabled, setAutopilotEnabled] = useState(false)
+  const [autopilotGenerating, setAutopilotGenerating] = useState(false)
+  const [autopilotCountdown, setAutopilotCountdown] = useState<{
+    content: string | null
+    startTime: number | null
+    isRunning: boolean
+  }>({ content: null, startTime: null, isRunning: false })
+  const [autopilotRetainedContent, setAutopilotRetainedContent] = useState<string | null>(null)
+
+  // Refs for stale closure prevention
+  const countdownRunningRef = useRef(false)
+  const isRunningRef = useRef(false)
 
   const formatFooterTokens = formatTokensCompact
   const tokenUsage = tokenEstimate > 0 ? tokenEstimate : null
@@ -367,6 +384,11 @@ function AppInner({
         }
       })
 
+      // Initial autopilot toggle if --autopilot flag was passed
+      if (autopilot) {
+        client.send({ type: 'autopilot_toggled', forkId: null, enabled: true })
+      }
+
 
       client.state.taskGraph.subscribe((state) => {
         if (!mounted) return
@@ -475,6 +497,113 @@ function AppInner({
 
     return () => { unsubWindow(); unsubCompaction() }
   }, [client])
+
+  // ── Autopilot state subscription ──────────────────────────────────────
+  useEffect(() => {
+    if (!client) return
+
+    const unsub = client.state.autopilotState.subscribe((state) => {
+      setAutopilotEnabled(state.enabled)
+      setAutopilotGenerating(state.generating)
+      setAutopilotRetainedContent(state.pendingContent)
+
+      if (state.pendingContent && !countdownRunningRef.current) {
+        // New preview generated — start countdown
+        countdownRunningRef.current = true
+        isRunningRef.current = true
+        setAutopilotCountdown({
+          content: state.pendingContent,
+          startTime: Date.now(),
+          isRunning: true,
+        })
+      }
+
+      if (!state.pendingContent && countdownRunningRef.current) {
+        // Preview consumed — stop countdown
+        countdownRunningRef.current = false
+        isRunningRef.current = false
+        setAutopilotCountdown({ content: null, startTime: null, isRunning: false })
+      }
+
+      // Autopilot disabled — cancel any active countdown
+      if (!state.enabled && countdownRunningRef.current) {
+        countdownRunningRef.current = false
+        isRunningRef.current = false
+        setAutopilotCountdown({ content: null, startTime: null, isRunning: false })
+      }
+    })
+
+    return unsub
+  }, [client])
+
+  // ── Autopilot countdown timer (3s) ────────────────────────────────────
+  useEffect(() => {
+    if (!autopilotCountdown.isRunning || !autopilotCountdown.startTime) return
+
+    const interval = setInterval(() => {
+      // Check ref — prevents send after user cancellation
+      if (!isRunningRef.current) {
+        clearInterval(interval)
+        return
+      }
+
+      const elapsed = Date.now() - autopilotCountdown.startTime!
+      if (elapsed >= 3000) {
+        isRunningRef.current = false
+        countdownRunningRef.current = false
+        clearInterval(interval)
+        setAutopilotCountdown({ content: null, startTime: null, isRunning: false })
+
+        // Send synthetic user_message
+        if (client && autopilotCountdown.content) {
+          client.send({
+            type: 'user_message',
+            messageId: createId(),
+            timestamp: Date.now(),
+            forkId: null,
+            content: [{ _tag: 'TextPart' as const, text: autopilotCountdown.content }],
+            attachments: [],
+            mode: 'text',
+            synthetic: true,
+            taskMode: false,
+          })
+        }
+      }
+    }, 100)
+
+    return () => {
+      isRunningRef.current = false
+      clearInterval(interval)
+    }
+  }, [autopilotCountdown.isRunning, autopilotCountdown.startTime, autopilotCountdown.content, client])
+
+  // ── User typing override: cancel countdown ──────────────────────────────
+  useEffect(() => {
+    if (composerHasContent && countdownRunningRef.current) {
+      isRunningRef.current = false
+      countdownRunningRef.current = false
+      setAutopilotCountdown({ content: null, startTime: null, isRunning: false })
+    }
+  }, [composerHasContent])
+
+  // ── User clears input: restore preview ────────────────────────────────
+  useEffect(() => {
+    if (
+      !composerHasContent &&
+      autopilotRetainedContent &&
+      !countdownRunningRef.current &&
+      autopilotEnabled
+    ) {
+      // Re-instate preview with fresh timer
+      countdownRunningRef.current = true
+      isRunningRef.current = true
+      setAutopilotCountdown({
+        content: autopilotRetainedContent,
+        startTime: Date.now(),
+        isRunning: true,
+      })
+    }
+  }, [composerHasContent, autopilotRetainedContent, autopilotEnabled])
 
   const subscribeForkCompaction = useCallback((forkId: string, cb: (state: CompactionState) => void) => {
     if (!client) return () => {}
@@ -807,6 +936,14 @@ function AppInner({
     setSettingsOpen(false)
   }, [])
 
+  const toggleAutopilot = useCallback(() => {
+    clientSend({
+      type: 'autopilot_toggled',
+      forkId: null,
+      enabled: !autopilotEnabled,
+    })
+  }, [clientSend, autopilotEnabled])
+
   const commandContext: CommandContext = useMemo(() => ({
     resetConversation,
     showSystemMessage: (msg: string) => showEphemeral(msg, theme.error, 8000),
@@ -817,7 +954,8 @@ function AppInner({
     initProject,
     openSettings,
     openUsage,
-  }), [resetConversation, showEphemeral, theme.error, exitApp, openRecentChats, enterBashMode, activateSkill, initProject, openSettings, openUsage])
+    toggleAutopilot,
+  }), [resetConversation, showEphemeral, theme.error, exitApp, openRecentChats, enterBashMode, activateSkill, initProject, openSettings, openUsage, toggleAutopilot])
 
 
 
@@ -1267,6 +1405,12 @@ function AppInner({
             </box>
           )}
           {chatScrollbox}
+          {autopilotCountdown.isRunning && autopilotCountdown.content && autopilotCountdown.startTime && (
+            <AutopilotPreviewMessage
+              content={autopilotCountdown.content}
+              startTime={autopilotCountdown.startTime}
+            />
+          )}
           <ChatController
             isBlockingOverlayActive={isBlockingOverlayActive}
             env={{
@@ -1288,6 +1432,8 @@ function AppInner({
               widgetNavActive,
               isSubagentView: selectedForkId !== null,
               supportsVision: activeModelSupportsVision,
+              autopilotEnabled,
+              autopilotGenerating,
             }}
             services={{
               submitUserMessageToFork: ({ forkId, message, attachments }) => handleSubmitViaClientBoundary({ forkId, message, attachments }),
@@ -1355,6 +1501,7 @@ function AppInner({
                 })
               },
               showToast: (message: string) => showEphemeral(message, theme.error, 5000),
+              toggleAutopilot,
             }}
             displayMessages={(activeDisplay ?? display).messages}
             tasks={tasks}

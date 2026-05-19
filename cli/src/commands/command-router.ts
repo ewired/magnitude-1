@@ -21,6 +21,8 @@ export interface CommandContext {
   openSettings: () => void
   /** Open the usage overlay */
   openUsage: () => void
+  /** Toggle autopilot mode */
+  toggleAutopilot: () => void
 }
 
 /**
@@ -136,6 +138,10 @@ export function routeSlashCommand(input: string, ctx: CommandContext): boolean {
 
     case 'usage':
       ctx.openUsage()
+      return true
+
+    case 'autopilot':
+      ctx.toggleAutopilot()
       return true
 
     default:

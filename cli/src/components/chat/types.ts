@@ -22,6 +22,8 @@ export type ChatControllerEnv = {
   widgetNavActive: boolean
   isSubagentView: boolean
   supportsVision: boolean
+  autopilotEnabled: boolean
+  autopilotGenerating: boolean
 }
 
 export type ChatControllerServices = {
@@ -46,6 +48,7 @@ export type ChatControllerServices = {
   requestIdleSubagentClose: (payload: { forkId: string; agentId: string }) => void
   requestActiveSubagentKill: (payload: { forkId: string; agentId: string }) => void
   showToast: (message: string) => void
+  toggleAutopilot: () => void
 }
 
 
