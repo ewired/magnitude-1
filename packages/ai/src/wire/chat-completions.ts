@@ -46,6 +46,31 @@ export type ChatMessage =
       readonly content: string | readonly ChatContentPart[]
     }
 
+export interface ChatNamedFunctionToolChoice {
+  readonly type: "function"
+  readonly function: {
+    readonly name: string
+  }
+}
+
+export interface ChatAllowedToolsToolChoice {
+  readonly type: "allowed_tools"
+  readonly allowed_tools: {
+    readonly mode: "auto" | "required"
+    readonly tools: ReadonlyArray<{
+      readonly type: "function"
+      readonly function: { readonly name: string }
+    }>
+  }
+}
+
+export type ChatToolChoice =
+  | "auto"
+  | "none"
+  | "required"
+  | ChatNamedFunctionToolChoice
+  | ChatAllowedToolsToolChoice
+
 export interface ChatTool {
   readonly type: "function"
   readonly function: {
@@ -59,7 +84,7 @@ export interface ChatCompletionsRequest {
   readonly model: string
   readonly messages: readonly ChatMessage[]
   readonly tools?: readonly ChatTool[]
-  readonly tool_choice?: "auto" | "none" | "required"
+  readonly tool_choice?: ChatToolChoice
   readonly max_tokens?: number
   readonly stop?: readonly string[]
   readonly temperature?: number

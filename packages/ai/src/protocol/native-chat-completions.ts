@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import type { OptionDef, InferCallOptions } from "../options/option"
 import { Option, applyOptionDefs } from "../options/option"
-import type { ChatCompletionsRequest } from "../wire/chat-completions"
+import type { ChatCompletionsRequest, ChatToolChoice } from "../wire/chat-completions"
 import { ChatCompletionsStreamChunk } from "../wire/chat-completions"
 import { nativeChatCompletionsCodec } from "../codec/native-chat-completions/index"
 import type { HttpConnectionFailure, StreamFailure } from "../errors/failure"
@@ -27,6 +27,9 @@ const options = {
   ),
   topP: Option.define(
     (v: number) => ({ top_p: v }),
+  ),
+  toolChoice: Option.define(
+    (v: ChatToolChoice) => ({ tool_choice: v }),
   ),
 } as const
 
@@ -145,7 +148,12 @@ function model<
         ...promptFragment,
       } as ChatCompletionsRequest
 
-      // 4. Apply compose if provided
+      // 4. Default tool_choice to "auto" when tools are present and no explicit choice
+      if (wire.tools && wire.tools.length > 0 && !wire.tool_choice) {
+        wire = { ...wire, tool_choice: "auto" }
+      }
+
+      // 5. Apply compose if provided
       if (config.compose) {
         wire = config.compose(wire, callOptions) as ChatCompletionsRequest
       }

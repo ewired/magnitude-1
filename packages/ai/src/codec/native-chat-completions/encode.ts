@@ -175,7 +175,6 @@ export function encodePrompt(
     ...(encodedTools.length > 0
       ? {
           tools: encodedTools,
-          tool_choice: "auto" as const,
         }
       : {}),
   }

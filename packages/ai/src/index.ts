@@ -49,7 +49,7 @@ export { defaultClassifyConnectionError, defaultClassifyStreamError } from "./er
 export type { HttpConnectionFailure, StreamFailure } from "./errors/failure"
 
 // Wire types
-export type { ChatCompletionsRequest, ChatCompletionsStreamChunk } from "./wire/chat-completions"
+export type { ChatCompletionsRequest, ChatCompletionsStreamChunk, ChatToolChoice, ChatNamedFunctionToolChoice, ChatAllowedToolsToolChoice } from "./wire/chat-completions"
 
 // Codec
 export type { Codec } from "./codec/codec"
