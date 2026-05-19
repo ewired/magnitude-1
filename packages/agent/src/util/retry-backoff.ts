@@ -9,6 +9,7 @@
  * All three must agree on the timing math, so it lives here.
  */
 
+import { Schedule } from "effect"
 import type { TurnOutcome } from '../events'
 
 export const MAX_RETRIES = 5
@@ -41,3 +42,20 @@ export function getRetryAfterHint(outcome: TurnOutcome): number | undefined {
 
 export const TERMINAL_RETRY_EXHAUSTED_MESSAGE =
   'Lost connection to Magnitude. Check your network and try again.'
+
+/**
+ * Effect Schedule for connection-failure retries.
+ * Exponential backoff from BASE_DELAY_MS, capped at MAX_DELAY_MS,
+ * up to MAX_RETRIES attempts.
+ *
+ * Used by Autopilot, CompactionWorker, and any other non-fork workers
+ * that need self-contained retries. Cortex uses computeDelayMs +
+ * projection triggers instead.
+ */
+export const connectionRetrySchedule = Schedule.intersect(
+  Schedule.recurs(MAX_RETRIES - 1),
+  Schedule.exponential(`${BASE_DELAY_MS} millis`, 2).pipe(
+    Schedule.either(Schedule.spaced(`${MAX_DELAY_MS} millis`)),
+    Schedule.map((_) => undefined),
+  ),
+)

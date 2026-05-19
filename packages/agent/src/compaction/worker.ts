@@ -6,7 +6,7 @@
  * 2. Event handler (turn_outcome): finalizes compaction when concurrent turn completes
  */
 
-import { Effect, Schedule } from 'effect'
+import { Effect } from 'effect'
 import { Worker, AmbientServiceTag } from '@magnitudedev/event-core'
 import { logger } from '@magnitudedev/logger'
 import type { MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
@@ -23,22 +23,14 @@ import { ConfigAmbient, getRoleConfig } from '../ambient/config-ambient'
 
 import { isRetryableConnectionError } from '../errors/classify'
 import { presentConnectionError } from '../errors/present'
-import { MAX_RETRIES, BASE_DELAY_MS, MAX_DELAY_MS } from '../util/retry-backoff'
+import { connectionRetrySchedule } from '../util/retry-backoff'
 
 import { computeCompactionSizing } from './estimate'
 import { runCompactionTurn, type CompactionTurnResult } from './turn'
 
 // =============================================================================
-// Retry schedule — same constants as Cortex
+// Retry predicate
 // =============================================================================
-
-const retrySchedule = Schedule.intersect(
-  Schedule.recurs(MAX_RETRIES - 1),
-  Schedule.exponential(`${BASE_DELAY_MS} millis`, 2).pipe(
-    Schedule.either(Schedule.spaced(`${MAX_DELAY_MS} millis`)),
-    Schedule.map((_) => undefined),
-  ),
-)
 
 /**
  * Predicate: should we retry this error?
@@ -117,7 +109,7 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
         // 5. Run agentic compaction turn with retry
         const result: CompactionTurnResult = yield* runCompactionTurn(forkId, roleId, windowState, roleConfig.softCap, publish, read, agentState).pipe(
           Effect.retry({
-            schedule: retrySchedule,
+            schedule: connectionRetrySchedule,
             while: (err) => {
               if (!isRetryable(err)) return false
               logger.warn({ forkId, error: String(err) }, '[CompactionWorker] Retryable error, retrying')

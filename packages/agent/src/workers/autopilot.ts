@@ -26,6 +26,7 @@ import { Worker } from '@magnitudedev/event-core'
 import { createHarness, type HarnessEvent } from '@magnitudedev/harness'
 import { logger } from '@magnitudedev/logger'
 import { Prompt } from '@magnitudedev/ai'
+import type { MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
 
 import type { AppEvent } from '../events'
 import { AgentStatusProjection } from '../projections/agent-status'
@@ -36,7 +37,8 @@ import { buildAutopilotSystemPrompt } from '../util/autopilot-prompts'
 import { buildConversationSummary } from '../prompts/agents'
 import { AgentModelResolver } from '../model/model-resolver'
 import { autopilotToolkit } from '../tools/autopilot'
-import { mapStreamErrorToOutcome } from '../errors'
+import { isRetryableConnectionError, mapConnectionErrorToOutcome, mapStreamErrorToOutcome } from '../errors'
+import { connectionRetrySchedule, TERMINAL_RETRY_EXHAUSTED_MESSAGE } from '../util/retry-backoff'
 
 // =============================================================================
 // Concurrent call guard
@@ -133,13 +135,25 @@ export const Autopilot = Worker.define<AppEvent>()({
         // runTurn returns Effect<LiveTurn>, NOT a Stream directly.
         // LiveTurn.events is the Stream we consume.
         const liveTurn = yield* harness.runTurn(prompt, { toolChoice: "required" }).pipe(
-          Effect.catchAll((err) =>
+          Effect.retry({
+            schedule: connectionRetrySchedule,
+            while: (err: MagnitudeConnectionError) => isRetryableConnectionError(err),
+          }),
+          Effect.catchAll((err: MagnitudeConnectionError) =>
             Effect.gen(function* () {
-              logger.error({ err }, '[Autopilot] Connection error')
+              const classified = mapConnectionErrorToOutcome(err)
+              const message =
+                classified._tag === 'ConnectionFailure'
+                  ? TERMINAL_RETRY_EXHAUSTED_MESSAGE
+                  : err instanceof Error
+                    ? err.message
+                    : String(err)
+
+              logger.error({ err }, '[Autopilot] Connection error after retries')
               yield* publish({
                 type: 'autopilot_outcome',
                 forkId: null,
-                result: { _tag: 'error', message: err instanceof Error ? err.message : String(err) },
+                result: { _tag: 'error', message },
               })
               return null
             }),
