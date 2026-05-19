@@ -72,19 +72,19 @@ function renderAgentAtom(atom: AgentAtom): string {
       })
     case 'message': {
       const dir = atom.direction === 'to_lead' ? 'to="lead"' : atom.direction === 'from_user' ? 'from="user"' : 'from="lead"'
-      return `<magnitude:message ${dir}>${atom.text}</magnitude:message>`
+      return `<message ${dir}>${atom.text}</message>`
     }
     case 'error':
       return `<error>${atom.message}</error>`
     case 'idle':
       // xml-act yield tag — kept as literal string for history rendering
-      return '<' + 'magnitude:yield_user/>'
+      return '<' + 'yield_user/>'
   }
 }
 
 function renderUserMessageParts(entry: Extract<TimelineEntry, { kind: 'user_message' }>): UserPart[] {
   const builder = new ContentBuilder()
-  builder.pushText(`<magnitude:message from="user">${entry.text}</magnitude:message>`)
+  builder.pushText(`<message from="user">${entry.text}</message>`)
   for (const attachment of entry.attachments) {
     if (attachment.kind === 'image') {
       if (attachment.description) {
@@ -113,9 +113,9 @@ function renderTimelineTextLines(
 ): string[] {
   switch (entry.kind) {
     case 'user_message':
-      return [`<magnitude:message from="user">${entry.text}</magnitude:message>`]
+      return [`<message from="user">${entry.text}</message>`]
     case 'parent_message':
-      return [`<magnitude:message from="parent">${entry.text}</magnitude:message>`]
+      return [`<message from="parent">${entry.text}</message>`]
     case 'user_bash_command':
       return [
         `<user_bash_command cwd="${entry.cwd}" exit_code="${entry.exitCode}">\n<command>${entry.command}</command>\n<stdout>${entry.stdout}</stdout>\n<stderr>${entry.stderr}</stderr>\n</user_bash_command>`,

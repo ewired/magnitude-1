@@ -25,16 +25,15 @@ import { Effect, Stream, Cause } from 'effect'
 import { Worker } from '@magnitudedev/event-core'
 import { createHarness, type HarnessEvent } from '@magnitudedev/harness'
 import { logger } from '@magnitudedev/logger'
-import { Prompt } from '@magnitudedev/ai'
 import type { MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
 
 import type { AppEvent } from '../events'
 import { AgentStatusProjection } from '../projections/agent-status'
 import { TurnProjection } from '../projections/turn'
 import { AutopilotStateProjection } from '../projections/autopilot-state'
-import { ConversationProjection } from '../projections/conversation'
+import { WindowProjection } from '../window'
 import { buildAutopilotSystemPrompt } from '../util/autopilot-prompts'
-import { buildConversationSummary } from '../prompts/agents'
+import { autopilotWindowToPrompt } from '../window/render'
 import { AgentModelResolver } from '../model/model-resolver'
 import { autopilotToolkit } from '../tools/autopilot'
 import { isRetryableConnectionError, mapConnectionErrorToOutcome, mapStreamErrorToOutcome } from '../errors'
@@ -95,20 +94,14 @@ export const Autopilot = Worker.define<AppEvent>()({
 
       const systemPrompt = buildAutopilotSystemPrompt()
 
-      // Build conversation context (same mechanism as sub-agents)
-      const conversationState = yield* read(ConversationProjection)
-      const conversationSummary = buildConversationSummary(conversationState.entries)
-
-      const userPrompt = conversationSummary
-        ? `Here is the recent conversation:\n\n${conversationSummary}\n\nGenerate the next user message.`
-        : 'Generate the next user message to continue the conversation.'
-
-      const prompt = Prompt.from({
-        system: systemPrompt,
-        messages: [
-          { _tag: 'UserMessage' as const, parts: [{ _tag: 'TextPart' as const, text: userPrompt }] },
-        ],
-      })
+      // Build compaction-aware context from WindowProjection
+      const windowState = yield* read(WindowProjection, null)
+      const prompt = autopilotWindowToPrompt(
+        windowState,
+        systemPrompt,
+        null,
+        agentStatus,
+      )
 
       // Run harness turn
       // createHarness returns a Harness. runTurn(prompt) returns
