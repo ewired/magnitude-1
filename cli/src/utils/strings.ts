@@ -1,5 +1,9 @@
 import stringWidth from 'string-width'
+import { existsSync, statSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { InputMentionSegment, InputPasteSegment, InputValue } from '../types/store'
+import { IMAGE_EXTENSIONS } from '../hooks/use-file-mentions'
+import { expandScratchpadPath } from '@magnitudedev/scratchpad'
 
 // Re-export InputValue type for backwards compatibility
 export type { InputValue } from '../types/store'
@@ -471,6 +475,77 @@ export function formatFullTimestamp(ts: number): string {
   const minutes = date.getMinutes().toString().padStart(2, '0')
   const hours = date.getHours().toString().padStart(2, '0')
   return `${hours}:${minutes}:${seconds}`
+}
+
+// ---------------------------------------------------------------------------
+// @mention parsing for CLI prompts
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a raw path from an @mention to an absolute filesystem path.
+ * Uses expandScratchpadPath for $M / ${M} scratchpad expansion,
+ * then falls back to relative-to-cwd resolution.
+ * Returns null if the path does not exist on disk.
+ */
+function resolveCandidatePath(rawPath: string, cwd: string): string | null {
+  const scratchpadPath = process.env.M
+  if (scratchpadPath) {
+    const expanded = expandScratchpadPath(rawPath, scratchpadPath)
+    if (expanded.expanded && existsSync(expanded.path))
+      return expanded.path
+  }
+  if (existsSync(rawPath)) return rawPath
+  const relativePath = resolve(cwd, rawPath)
+  if (existsSync(relativePath)) return relativePath
+  return null
+}
+
+export function parseMentionsFromPrompt(
+  text: string,
+  cwd: string,
+): Array<{ type: 'mention'; path: string; contentType: 'text' | 'image' | 'directory' }> {
+  const mentions: Array<{
+    type: 'mention'
+    path: string
+    contentType: 'text' | 'image' | 'directory'
+  }> = []
+  const seen = new Set<string>()
+  const regex = /(?:^|\s)@([^\s@]*)/g
+  let match
+
+  while ((match = regex.exec(text)) !== null) {
+    const rawPath = match[1]
+    if (!rawPath || seen.has(rawPath)) continue
+
+    const resolved = resolveCandidatePath(rawPath, cwd)
+    if (!resolved) {
+      console.warn(`[mentions] Path not found: @${rawPath}`)
+      continue
+    }
+
+    let contentType: 'text' | 'image' | 'directory' = 'text'
+    try {
+      const stat = statSync(resolved)
+      if (stat.isDirectory()) {
+        contentType = 'directory'
+      } else {
+        const extIdx = rawPath.lastIndexOf('.')
+        if (extIdx >= 0) {
+          const extension = rawPath.slice(extIdx).toLowerCase()
+          if (IMAGE_EXTENSIONS.has(extension)) {
+            contentType = 'image'
+          }
+        }
+      }
+    } catch {
+      // If stat fails, default to 'text'
+    }
+
+    seen.add(rawPath)
+    mentions.push({ type: 'mention', path: rawPath, contentType })
+  }
+
+  return mentions
 }
 
 

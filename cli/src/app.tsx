@@ -22,6 +22,7 @@ import { useTheme } from './hooks/use-theme'
 import { SelectedFileProvider } from './hooks/use-file-viewer'
 
 import { BOX_CHARS } from './utils/ui-constants'
+import { parseMentionsFromPrompt } from './utils/strings'
 import { formatTokensCompact } from './utils/format-tokens'
 import { hasConversationActivity } from './utils/start-state'
 
@@ -450,13 +451,14 @@ function AppInner({
   useEffect(() => {
     if (!initialPrompt || initialPromptSentRef.current || !auth.loaded || !auth.key) return
     initialPromptSentRef.current = true
+    const attachments = parseMentionsFromPrompt(initialPrompt, process.cwd())
     clientSend({
       type: 'user_message',
       messageId: createId(),
       timestamp: Date.now(),
       forkId: null,
       content: textParts(initialPrompt),
-      attachments: [],
+      attachments,
       mode: 'text',
       synthetic: false,
       taskMode: false,
