@@ -16,7 +16,7 @@ const BINARY_EXTENSIONS = new Set([
   '.sqlite', '.woff', '.woff2', '.ttf', '.eot', '.ico', '.mp3', '.mp4', '.mov', '.avi', '.pdf',
 ])
 
-const IMAGE_EXTENSIONS = new Set([
+export const IMAGE_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.webp',
 ])
 
