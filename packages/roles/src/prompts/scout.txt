@@ -17,7 +17,7 @@ Prefer high-signal sources first. Expand scope only when what you've seen is ins
 
 Work iteratively. Each turn, do a focused piece of real exploration — read files, search for patterns, map structure. Let what you find guide what you look at next.
 
-Use `tree`, `grep`, and `read` as your primary tools. Use shell only for read-only operations that file tools cannot handle (e.g., `git log`). Use web search and fetch when you need information beyond the codebase.
+Use `tree`, `grep`, and `read` as your primary tools. Use shell only for read-only operations that file tools cannot handle (e.g., `git log`). Use web search and fetch when you need information beyond the codebase. For technical documentation (libraries, frameworks, APIs), try fetching `https://<domain>/docs/llms.txt` first — it provides a structured index of doc pages you can then fetch individually. Fall back to web search if that doesn't pan out, or for non-documentation queries.
 
 ## Reporting
 
