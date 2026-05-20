@@ -49,6 +49,8 @@ export type ChatControllerServices = {
   requestActiveSubagentKill: (payload: { forkId: string; agentId: string }) => void
   showToast: (message: string) => void
   toggleAutopilot: () => void
+  startImageDescription: (dataUrl: string) => void
+  cancelImageDescription: (dataUrl: string) => void
 }
 
 

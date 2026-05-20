@@ -70,10 +70,11 @@ import { collectSessionContext } from './util/collect-session-context'
 // Engine layers
 
 import { AgentModelResolverLive } from './model/model-resolver'
+import { ImageDescriptionServiceLive } from './util/describe-image'
 
 // Config & Auth
 import { MagnitudeClient, createMagnitudeClient, isEnvFlagOn } from '@magnitudedev/magnitude-client'
-import { configure as configureImageDescription } from './util/describe-image'
+
 import { createTraceListenerLayer } from './tracing/tracing'
 import type { StorageClient } from '@magnitudedev/storage'
 import { initLogger, logger } from '@magnitudedev/logger'
@@ -228,14 +229,13 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
   const magnitudeEndpoint = options.magnitudeEndpoint ?? process.env.MAGNITUDE_ENDPOINT ?? (useLocal ? 'http://localhost:3000/api/v1' : 'https://app.magnitude.dev/api/v1')
 
-  const magnitudeClientLayer = Layer.succeed(
-    MagnitudeClient,
-    createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey, sessionId: options.sessionId ?? undefined }),
+  const magnitudeClient = createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey, sessionId: options.sessionId ?? undefined })
+  const magnitudeClientLayer = Layer.succeed(MagnitudeClient, magnitudeClient)
+  const agentModelResolverLayer = Layer.provide(AgentModelResolverLive(), magnitudeClientLayer)
+  const imageDescriptionServiceLayer = Layer.provide(
+    ImageDescriptionServiceLive,
+    Layer.mergeAll(agentModelResolverLayer, FetchHttpClient.layer),
   )
-
-  // Configure image description module with the same endpoint/apiKey
-  // so it can call util/image without duplicating env var resolution
-  configureImageDescription({ endpoint: magnitudeEndpoint, apiKey })
 
   // Enable tracing in debug mode
   const traceSessionId = options.sessionId ?? new Date().toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, 'Z')
@@ -259,8 +259,9 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     EffectLoggerLayer,
     Layer.provide(ExecutionManagerLive, ephemeralSessionContextLayer),
 
-    Layer.provide(AgentModelResolverLive(), magnitudeClientLayer),
+    agentModelResolverLayer,
     magnitudeClientLayer,
+    imageDescriptionServiceLayer,
 
     FetchHttpClient.layer,
     FsLive,
@@ -510,5 +511,3 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     refreshConfig,
   }
 }
-
-

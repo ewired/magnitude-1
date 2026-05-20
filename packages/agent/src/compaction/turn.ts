@@ -23,7 +23,7 @@ import { buildSystemPrompt } from '../prompts/system-prompt-builder'
 import { buildCompactionPrompt } from './prompt'
 import { createToolResultFormatter } from '@magnitudedev/harness'
 import { createAgentFormatter } from '../prompts/window-to-prompt'
-import { resolveImageDescriptions } from '../util/describe-image'
+import { ImageDescriptionServiceTag } from '../util/describe-image'
 import { CompactionContextTag, type CompactResult } from './context'
 import { computeCompactionSizing } from './estimate'
 
@@ -144,9 +144,10 @@ export function runCompactionTurn(
       const compactionPrompt = buildCompactionPrompt(windowState, systemPrompt, timezone, agentStatus, formatter)
 
       // Resolve image descriptions for non-vision models (same pattern as Cortex)
+      const imageDescriptionService = yield* ImageDescriptionServiceTag
       const { prompt: resolvedPrompt } = agentModel.profile.capabilities.vision
         ? { prompt: compactionPrompt }
-        : yield* Effect.promise(() => resolveImageDescriptions(compactionPrompt))
+        : yield* imageDescriptionService.resolve(compactionPrompt)
 
       // Run turn (provide traceLayer so model call is tagged as "compact")
       const liveTurn = yield* Effect.provide(harness.runTurn(resolvedPrompt), traceLayer)

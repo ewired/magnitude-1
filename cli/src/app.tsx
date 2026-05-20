@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
-import { Layer, Cause } from 'effect'
+import { Effect, Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId } from '@magnitudedev/agent'
 import { matchKeyToChord } from './utils/chord'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
@@ -988,6 +988,36 @@ function AppInner({
 
 
 
+  const handleStartImageDescription = useCallback((dataUrl: string) => {
+    const effect = Effect.flatMap(ImageDescriptionServiceTag, service => service.start(dataUrl))
+    if (client) {
+      client.runEffect(effect).catch((err) => {
+        logger.error({ err: err instanceof Error ? err.message : String(err) }, '[describe-image] Failed to start image description')
+      })
+      return
+    }
+    ensureClientReady()
+      .then(({ client }) => client.runEffect(effect))
+      .catch((err) => {
+        logger.error({ err: err instanceof Error ? err.message : String(err) }, '[describe-image] Failed to start image description')
+      })
+  }, [client, ensureClientReady])
+
+  const handleCancelImageDescription = useCallback((dataUrl: string) => {
+    const effect = Effect.flatMap(ImageDescriptionServiceTag, service => service.cancel(dataUrl))
+    if (client) {
+      client.runEffect(effect).catch((err) => {
+        logger.error({ err: err instanceof Error ? err.message : String(err) }, '[describe-image] Failed to cancel image description')
+      })
+      return
+    }
+    ensureClientReady()
+      .then(({ client }) => client.runEffect(effect))
+      .catch((err) => {
+        logger.error({ err: err instanceof Error ? err.message : String(err) }, '[describe-image] Failed to cancel image description')
+      })
+  }, [client, ensureClientReady])
+
   const handleInterruptFork = useCallback((forkId: string | null) => {
     if (!client) return
     logger.info({ forkId }, 'Sending interrupt event')
@@ -1531,6 +1561,8 @@ function AppInner({
               },
               showToast: (message: string) => showEphemeral(message, theme.error, 5000),
               toggleAutopilot,
+              startImageDescription: handleStartImageDescription,
+              cancelImageDescription: handleCancelImageDescription,
             }}
             displayMessages={(activeDisplay ?? display).messages}
             tasks={tasks}

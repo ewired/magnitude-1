@@ -249,4 +249,12 @@ export type { UserPart, TextPart, ImagePart, ImageMediaType } from '@magnitudede
 export { textParts, textOf, hasImages, wrapTextParts } from './content'
 
 // Image description (vision preprocessing for non-vision models)
-export { configure as configureImageDescription, startImageDescription, cancelImageDescription, resolveImageDescriptions } from './util/describe-image'
+export {
+  ImageDescriptionServiceTag,
+  ImageDescriptionServiceLive,
+} from './util/describe-image'
+export type {
+  ImageDescriptionService,
+  ImageDescriptionReplacement,
+  ResolvedPrompt,
+} from './util/describe-image'

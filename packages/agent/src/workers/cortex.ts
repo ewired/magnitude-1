@@ -49,7 +49,7 @@ function toObservationPart(part: ObservablePart): ObservationPart {
   }
 }
 import { isToolKey, type ToolKey } from '../tools/toolkits'
-import { resolveImageDescriptions } from '../util/describe-image'
+import { ImageDescriptionServiceTag } from '../util/describe-image'
 
 import { buildStandardHooks } from '../execution/harness-hooks'
 import { TurnContextTag } from '../engine/turn-context'
@@ -189,9 +189,10 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // from the vision preprocessing registry (started on image upload/paste).
         // The resolved replacements are published as an event so the WindowProjection
         // can permanently replace ImageParts with TextParts in the stored timeline.
+        const imageDescriptionService = yield* ImageDescriptionServiceTag
         const { prompt, replacements } = agentModel.profile.capabilities.vision
           ? { prompt: rawPrompt, replacements: [] as const }
-          : yield* Effect.promise(() => resolveImageDescriptions(rawPrompt))
+          : yield* imageDescriptionService.resolve(rawPrompt)
 
         if (replacements.length > 0) {
           yield* publish({
@@ -310,5 +311,4 @@ export const Cortex = Worker.defineForked<AppEvent>()({
     },
   },
 })
-
 

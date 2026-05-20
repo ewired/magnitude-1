@@ -31,5 +31,13 @@ export function makeTestModelResolver(config: TestModelConfig = {}): Layer.Layer
         modelId: 'test-autopilot',
         profile: DEFAULT_TEST_PROFILE,
       }),
+
+    resolveImage: () =>
+      Effect.succeed({
+        model: bound,
+        modelSource: { type: 'utility', modelId: 'test-image' },
+        modelId: 'test-image',
+        profile: DEFAULT_TEST_PROFILE,
+      }),
   })
 }

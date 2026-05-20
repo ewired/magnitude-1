@@ -23,6 +23,7 @@ const LEADER_TRAITS: MagnitudeAdditionalOptions = {
 export interface AgentModelResolverService {
   readonly resolve: (roleId: RoleId) => Effect.Effect<AgentBoundModel, never, AmbientService>
   readonly resolveAutopilot: () => Effect.Effect<AgentBoundModel, Error, HttpClient.HttpClient>
+  readonly resolveImage: () => Effect.Effect<AgentBoundModel, Error, HttpClient.HttpClient>
 }
 
 export class AgentModelResolver extends Context.Tag('AgentModelResolver')<
@@ -65,6 +66,18 @@ export const AgentModelResolverLive = () =>
               model: client.model('util/autopilot', { defaults }),
               modelSource: { type: 'utility', modelId: 'util/autopilot' },
               modelId: 'util/autopilot',
+              profile,
+            }
+          }),
+
+        resolveImage: () =>
+          Effect.gen(function* () {
+            const info = yield* client.catalog.get('util/image')
+            const profile = toModelProfile(info)
+            return {
+              model: client.model('util/image'),
+              modelSource: { type: 'utility', modelId: 'util/image' },
+              modelId: 'util/image',
               profile,
             }
           }),

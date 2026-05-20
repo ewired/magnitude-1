@@ -1,7 +1,7 @@
 import { RGBA, TextAttributes, type KeyEvent } from '@opentui/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Attachment, ImageAttachment, ImageMediaType } from '@magnitudedev/agent'
-import { startImageDescription, cancelImageDescription } from '@magnitudedev/agent'
+
 import { createId } from '@magnitudedev/generate-id'
 
 import { BOX_CHARS } from '../../utils/ui-constants'
@@ -278,7 +278,7 @@ export function ChatController(props: ChatControllerProps) {
     // Start vision preprocessing in the background immediately (only for non-vision models)
     if (!env.supportsVision) {
       const dataUrl = `data:${newAttachment.mediaType};base64,${newAttachment.base64}`
-      startImageDescription(dataUrl)
+      services.startImageDescription(dataUrl)
     }
     setAttachments(prev => [...prev, newAttachment])
     return true
@@ -293,7 +293,7 @@ export function ChatController(props: ChatControllerProps) {
           for (const a of newAttachments) {
             if (a.type === 'image') {
               const dataUrl = `data:${a.mediaType};base64,${a.base64}`
-              startImageDescription(dataUrl)
+              services.startImageDescription(dataUrl)
             }
           }
         }
@@ -307,11 +307,11 @@ export function ChatController(props: ChatControllerProps) {
       const removed = prev[index]
       if (removed?.type === 'image') {
         const dataUrl = `data:${removed.mediaType};base64,${removed.base64}`
-        cancelImageDescription(dataUrl)
+        services.cancelImageDescription(dataUrl)
       }
       return prev.filter((_, i) => i !== index)
     })
-  }, [])
+  }, [services])
 
   const executeSlashCommand = useCallback((commandText: string) => {
     const handled = services.runSlashCommand(commandText)
