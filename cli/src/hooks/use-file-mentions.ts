@@ -199,19 +199,16 @@ async function loadRecentFiles(indexedFiles: string[]): Promise<string[]> {
 }
 
 function parseQueryLineRange(query: string): { filePath: string; lineRange?: { start: number; end: number } } {
-  const lastColon = query.lastIndexOf(':')
-  if (lastColon < 0) return { filePath: query }
+  if (query.endsWith(':')) return { filePath: query.slice(0, -1) }
 
-  const filePath = query.slice(0, lastColon)
-  const lineSpec = query.slice(lastColon + 1)
+  const rangeMatch = query.match(/:([\d]+)(?:-([\d]+))?$/)
+  if (!rangeMatch || rangeMatch.index === 1) return { filePath: query }
 
-  const match = lineSpec.match(/^(\d+)(-(\d+))?$/)
-  if (!match) return { filePath }
+  const filePath = query.slice(0, rangeMatch.index)
+  const start = parseInt(rangeMatch[1], 10)
+  const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : start
 
-  const start = parseInt(match[1], 10)
-  const end = match[3] ? parseInt(match[3], 10) : start
-
-  if (start < 1 || end < 1 || end < start) return { filePath }
+  if (start < 1 || end < 1 || end < start) return { filePath: query }
 
   return { filePath, lineRange: { start, end } }
 }
