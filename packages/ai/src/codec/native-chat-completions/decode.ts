@@ -72,6 +72,7 @@ function toUsage(
     outputTokens: usage.completion_tokens,
     cacheReadTokens: usage.prompt_tokens_details?.cached_tokens ?? 0,
     cacheWriteTokens: 0,
+    cost: usage.cost ?? null,
   }
 }
 

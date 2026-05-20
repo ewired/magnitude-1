@@ -38,6 +38,7 @@ export const buildInterruptedTurnOutcome = (params: {
     outputTokens: null,
     cacheReadTokens: null,
     cacheWriteTokens: null,
+    cost: null,
     providerId: null,
     modelId: null,
   }

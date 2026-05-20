@@ -89,7 +89,7 @@ export type SessionStart =
   | { _tag: 'latest' }
   | { _tag: 'resume'; sessionId: string }
 
-export function App({ sessionStart, debug, autopilot, initialPrompt, onClientReady, onSessionId, disableShellSafeguards, disableCwdSafeguards }: { sessionStart: SessionStart; debug: boolean; autopilot?: boolean; initialPrompt?: string; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void; disableShellSafeguards?: boolean; disableCwdSafeguards?: boolean }) {
+export function App({ sessionStart, debug, autopilot, initialPrompt, onClientReady, onSessionId, disableShellSafeguards, disableCwdSafeguards, atifPath }: { sessionStart: SessionStart; debug: boolean; autopilot?: boolean; initialPrompt?: string; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void; disableShellSafeguards?: boolean; disableCwdSafeguards?: boolean; atifPath?: string }) {
   const [conversationKey, setConversationKey] = useState(0)
   const [sessionSelection, setSessionSelection] = useState<string | null | undefined>(
     sessionStart._tag === 'new' ? null : sessionStart._tag === 'latest' ? undefined : sessionStart.sessionId
@@ -119,9 +119,10 @@ export function App({ sessionStart, debug, autopilot, initialPrompt, onClientRea
       onClientReady={onClientReady}
       onSessionId={onSessionId}
       autopilot={autopilot ?? false}
-      initialPrompt={initialPrompt ?? undefined}
+      initialPrompt={initialPrompt}
       disableShellSafeguards={disableShellSafeguards ?? false}
       disableCwdSafeguards={disableCwdSafeguards ?? false}
+      atifPath={atifPath}
     />
   )
 }
@@ -138,6 +139,7 @@ function AppInner({
   initialPrompt,
   disableShellSafeguards,
   disableCwdSafeguards,
+  atifPath,
 }: {
   debugMode: boolean
   skipAnimation: boolean
@@ -150,6 +152,7 @@ function AppInner({
   initialPrompt?: string
   disableShellSafeguards: boolean
   disableCwdSafeguards: boolean
+  atifPath?: string
 }) {
   const renderer = useRenderer()
   const storage = useStorage()
@@ -341,6 +344,7 @@ function AppInner({
         magnitudeApiKey: auth.key ?? undefined,
         disableShellSafeguards,
         disableCwdSafeguards,
+        atifPath,
       })
     }
 

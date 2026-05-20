@@ -133,6 +133,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
             outcome: { _tag: 'UnexpectedError', message: 'Fork layer not initialized', detail: { _tag: 'CortexDefect' } },
             inputTokens: null, outputTokens: null,
             cacheReadTokens: null, cacheWriteTokens: null,
+            cost: null,
             providerId: 'magnitude', modelId: agentModel.modelId,
           })
           return
@@ -264,6 +265,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
               outcome,
               inputTokens: null, outputTokens: null,
               cacheReadTokens: null, cacheWriteTokens: null,
+              cost: null,
               providerId: 'magnitude', modelId: agentModel.modelId,
             })
             return null
@@ -290,6 +292,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
           outputTokens:     executeResult.usage?.outputTokens ?? null,
           cacheReadTokens:  executeResult.usage?.cacheReadTokens ?? null,
           cacheWriteTokens: executeResult.usage?.cacheWriteTokens ?? null,
+          cost:             executeResult.usage?.cost ?? null,
           providerId: 'magnitude',
           modelId:    agentModel.modelId,
         })
@@ -307,6 +310,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
             outcome: { _tag: 'UnexpectedError', message, detail: { _tag: 'CortexDefect' } },
             inputTokens: null, outputTokens: null,
             cacheReadTokens: null, cacheWriteTokens: null,
+            cost: null,
             providerId: null, modelId: null,
           })
         })),

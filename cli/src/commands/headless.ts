@@ -39,6 +39,7 @@ export interface RunHeadlessOptions {
   sessionStart: SessionStart
   disableShellSafeguards: boolean
   disableCwdSafeguards: boolean
+  atifPath?: string
 }
 
 // ── Runner ─────────────────────────────────────────────────────────────
@@ -82,6 +83,7 @@ export async function runHeadless(options: RunHeadlessOptions): Promise<number> 
     sessionId: activeSessionId, magnitudeApiKey: apiKey,
     disableShellSafeguards: options.disableShellSafeguards,
     disableCwdSafeguards: options.disableCwdSafeguards,
+    atifPath: options.atifPath,
   })
 
   // ── 2. State ────────────────────────────────────────────────────

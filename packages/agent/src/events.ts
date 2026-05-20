@@ -179,6 +179,8 @@ export interface TurnOutcomeEvent {
   readonly cacheReadTokens: number | null
   /** Cache write token count (Anthropic prompt caching). Null when unavailable. */
   readonly cacheWriteTokens: number | null
+  /** Estimated cost of the turn in USD. Null when unavailable. */
+  readonly cost: number | null
   /** Provider ID of the model used for this turn. Null when unavailable. */
   readonly providerId: string | null
   /** Model ID used for this turn. Null when unavailable. */

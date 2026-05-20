@@ -129,6 +129,7 @@ export function translateTurnOutcome(event: TurnOutcomeEvent): HarnessEvent {
           outputTokens: event.outputTokens ?? 0,
           cacheReadTokens: event.cacheReadTokens ?? 0,
           cacheWriteTokens: event.cacheWriteTokens ?? 0,
+          cost: event.cost ?? null,
         }
       : null
 

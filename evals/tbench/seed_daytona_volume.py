@@ -13,7 +13,7 @@ from daytona import AsyncDaytona, CreateSandboxFromImageParams, Image, VolumeMou
 from daytona.common.errors import DaytonaError
 
 DEFAULT_VOLUME_NAME = "magnitude-binaries"
-DEFAULT_BINARY_PATH = "evals/tbench/bin/magnitude"
+DEFAULT_BINARY_PATH = str(Path(__file__).parent / "bin/magnitude")
 MOUNT_PATH = "/mnt/magnitude-volume"
 
 

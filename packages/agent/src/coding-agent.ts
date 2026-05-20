@@ -8,7 +8,7 @@
  * - Supports session persistence and hydration
  */
 
-import { Effect, Layer, Stream } from 'effect'
+import { Effect, Layer, Stream, SubscriptionRef } from 'effect'
 import { Agent } from '@magnitudedev/event-core'
 import { HydrationContext, EventSinkTag } from '@magnitudedev/event-core'
 import type { AppEvent, SessionContext } from './events'
@@ -33,6 +33,8 @@ import { ConversationProjection } from './projections/conversation'
 import { UserPresenceProjection } from './projections/user-presence'
 import { OutboundMessagesProjection } from './projections/outbound-messages'
 import { UserMessageResolutionProjection } from './projections/user-message-resolution'
+import { AtifProjection } from './projections/atif/projection'
+import { serializeAtif } from './projections/atif/serialize'
 
 
 // Workers
@@ -86,6 +88,7 @@ import { loadSkills } from '@magnitudedev/skills'
 import { SkillsAmbient, publishSkills } from './ambient/skills-ambient'
 import { publishToolkit } from './ambient/toolkit-ambient'
 import { leaderToolkit } from './tools/toolkits'
+import { publishAtifConfig, DEFAULT_ATIF_CONFIG } from './ambient/atif-ambient'
 
 // =============================================================================
 // Agent
@@ -113,6 +116,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
     ConversationProjection,
     UserPresenceProjection,
     AutopilotStateProjection,
+    AtifProjection,
   ],
 
   workers: [
@@ -151,6 +155,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
       taskGraph: TaskGraphProjection,
       taskWorker: TaskWorkerProjection,
       autopilotState: AutopilotStateProjection,
+      atif: AtifProjection,
     }
   }
 })
@@ -207,6 +212,11 @@ export interface CreateClientOptions {
    * the trace folder uses this ID instead of a date-based string.
    */
   sessionId?: string
+
+  /**
+   * Write ATIF trajectory to the specified path on session end.
+   */
+  atifPath?: string
 }
 
 /**
@@ -229,7 +239,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
   const magnitudeEndpoint = options.magnitudeEndpoint ?? process.env.MAGNITUDE_ENDPOINT ?? (useLocal ? 'http://localhost:3000/api/v1' : 'https://app.magnitude.dev/api/v1')
 
-  const magnitudeClient = createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey, sessionId: options.sessionId ?? undefined })
+  const magnitudeClient = createMagnitudeClient({ endpoint: magnitudeEndpoint, apiKey, sessionId: options.sessionId })
   const magnitudeClientLayer = Layer.succeed(MagnitudeClient, magnitudeClient)
   const agentModelResolverLayer = Layer.provide(AgentModelResolverLive(), magnitudeClientLayer)
   const imageDescriptionServiceLayer = Layer.provide(
@@ -270,13 +280,21 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
   const layer = tracerLayer ? Layer.merge(baseLayer, tracerLayer) : baseLayer
   const client = await CodingAgent.createClient(layer)
 
-  try {
-    const metadata = await client.runEffect(Effect.gen(function* () {
+  const sessionMetadata = await client.runEffect(
+    Effect.gen(function* () {
       const persistence = yield* ChatPersistence
       return yield* persistence.getSessionMetadata()
-    }))
-    initLogger(metadata.sessionId)
-  } catch {}
+    }).pipe(
+      Effect.catchTag('PersistenceError', (e) => {
+        logger.warn(`Failed to load session metadata: ${e.message}`)
+        return Effect.succeed(null)
+      })
+    )
+  )
+
+  if (sessionMetadata) {
+    initLogger(sessionMetadata.sessionId)
+  }
 
   const flushPendingEvents = () => Effect.gen(function* () {
     const persistence = yield* ChatPersistence
@@ -299,18 +317,13 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
     if (events.length === 0) {
       // New session
-      const baseContext = options.sessionContext ?? (yield* Effect.tryPromise(async () => {
-        try {
-          return await collectSessionContext({
+      const baseContext = options.sessionContext ?? (yield* Effect.tryPromise(() =>
+        collectSessionContext({ cwd: process.cwd(), storage: options.storage })
+      ).pipe(
+        Effect.catchTag('UnknownException', (e) => {
+          logger.error({ err: e }, 'Failed to collect session context')
+          return Effect.succeed({
             cwd: process.cwd(),
-            storage: options.storage,
-          })
-        } catch (err) {
-          logger.error({ err }, 'Failed to collect session context')
-          // Should not happen, but return minimal context so session can still initialize
-          const cwd = process.cwd()
-          return {
-            cwd,
             platform: process.platform === 'darwin' ? 'macos' as const : process.platform === 'win32' ? 'windows' as const : 'linux' as const,
             shell: process.env.SHELL?.split('/').pop() || 'bash',
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -320,9 +333,9 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
             folderStructure: '(failed to collect folder structure)',
             agentsFile: null,
             skills: null,
-          }
-        }
-      }))
+          })
+        })
+      ))
 
       const sessionMetadata = yield* persistence.getSessionMetadata()
       const scratchpadPath = yield* Effect.promise(() =>
@@ -338,6 +351,19 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
         forkId: null,
         context
       }))
+
+      // Publish ATIF config
+      if (options.atifPath) {
+        yield* publishAtifConfig({
+          enabled: true,
+          writeFile: true,
+          filePath: options.atifPath,
+          streamSteps: false,
+          stepsPath: null,
+        })
+      } else {
+        yield* publishAtifConfig(DEFAULT_ATIF_CONFIG)
+      }
 
       // Publish config from catalog
       yield* publishConfigFromCatalog(options.storage)
@@ -362,6 +388,19 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
       )
 
       yield* hydrationContext.setHydrating(true)
+
+      // Publish ATIF config
+      if (options.atifPath) {
+        yield* publishAtifConfig({
+          enabled: true,
+          writeFile: true,
+          filePath: options.atifPath,
+          streamSteps: false,
+          stepsPath: null,
+        })
+      } else {
+        yield* publishAtifConfig(DEFAULT_ATIF_CONFIG)
+      }
 
       // Publish toolkit BEFORE replaying events so that HarnessStateProjection
       // can create tool handles and tool display renders correctly on replay.
@@ -412,6 +451,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
             outputTokens: null,
             cacheReadTokens: null,
             cacheWriteTokens: null,
+            cost: null,
             providerId: null,
             modelId: null,
           }))
@@ -440,6 +480,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
           outputTokens: null,
           cacheReadTokens: null,
           cacheWriteTokens: null,
+          cost: null,
           providerId: null,
           modelId: null,
         }))
@@ -493,11 +534,34 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
 
   const dispose = async () => {
     try {
+      // Write ATIF trajectory before disposing
+      if (options.atifPath) {
+        const forks = await client.runEffect(Effect.gen(function* () {
+          const atifInstance = yield* AtifProjection.Tag
+          const atifState = yield* SubscriptionRef.get(atifInstance.state)
+          return atifState.forks
+        }))
+        const trajectory = serializeAtif(forks, { sessionId: sessionMetadata?.sessionId })
+        const fs = await import('node:fs/promises')
+        const dir = options.atifPath.includes('/')
+          ? options.atifPath.slice(0, options.atifPath.lastIndexOf('/'))
+          : '.'
+        await fs.mkdir(dir, { recursive: true })
+        await fs.writeFile(options.atifPath, JSON.stringify(trajectory, null, 2), 'utf-8')
+        logger.info({ filePath: options.atifPath, steps: trajectory.steps?.length ?? 0 }, 'ATIF trajectory written')
+      }
+    } catch (err) {
+      logger.error({ err }, 'Failed to write ATIF trajectory')
+    }
+
+    try {
       // Best-effort flush of pending events to disk. If the session was mid-turn,
       // hydration recovery will detect non-stable forks on next startup and emit
       // interrupts to bring them to a clean terminal state.
       await client.runEffect(flushPendingEvents())
-    } catch {}
+    } catch (err) {
+      logger.warn({ err }, 'Failed to flush pending events on dispose')
+    }
 
     await originalDispose()
   }
