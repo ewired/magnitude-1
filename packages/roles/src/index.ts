@@ -32,6 +32,9 @@ export {
   createAdvisorRole,
 } from './roles/index'
 
-// Autopilot prompt
+// Autopilot prompts
 import autopilotPromptRaw from './prompts/autopilot.txt' with { type: 'text' }
+import autopilotTaskPromptRaw from './prompts/autopilot-task.txt' with { type: 'text' }
+import { definePrompt } from './prompt'
 export { autopilotPromptRaw }
+export const autopilotTaskPrompt = definePrompt<'TASK'>(autopilotTaskPromptRaw)

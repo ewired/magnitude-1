@@ -22,7 +22,7 @@
  */
 
 import { Effect, Stream, Cause } from 'effect'
-import { Worker } from '@magnitudedev/event-core'
+import { Worker, AmbientServiceTag } from '@magnitudedev/event-core'
 import { createHarness, type HarnessEvent } from '@magnitudedev/harness'
 import { logger } from '@magnitudedev/logger'
 import type { MagnitudeConnectionError } from '@magnitudedev/magnitude-client'
@@ -32,7 +32,8 @@ import { AgentStatusProjection } from '../projections/agent-status'
 import { TurnProjection } from '../projections/turn'
 import { AutopilotStateProjection } from '../projections/autopilot-state'
 import { WindowProjection } from '../window'
-import { autopilotPromptRaw } from '@magnitudedev/roles'
+import { autopilotPromptRaw, autopilotTaskPrompt } from '@magnitudedev/roles'
+import { InitialTaskAmbient } from '../ambient/initial-task-ambient'
 import { autopilotWindowToPrompt } from '../window/render'
 import { AgentModelResolver } from '../model/model-resolver'
 import { autopilotToolkit } from '../tools/autopilot'
@@ -92,7 +93,12 @@ export const Autopilot = Worker.define<AppEvent>()({
       const modelResolver = yield* AgentModelResolver
       const autopilotModel = yield* modelResolver.resolveAutopilot()
 
-      const systemPrompt = autopilotPromptRaw
+      // Select prompt based on whether a task is set
+      const ambientService = yield* AmbientServiceTag
+      const initialTask = ambientService.getValue(InitialTaskAmbient)
+      const systemPrompt = initialTask !== null
+        ? autopilotTaskPrompt.render({ TASK: initialTask })
+        : autopilotPromptRaw
 
       // Build compaction-aware context from WindowProjection
       const windowState = yield* read(WindowProjection, null)

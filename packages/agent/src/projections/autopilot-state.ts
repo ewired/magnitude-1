@@ -1,6 +1,7 @@
 import { Projection, Signal } from '@magnitudedev/event-core'
 import type { AppEvent } from '../events'
 import { UserMessageResolutionProjection } from './user-message-resolution'
+import { InitialTaskAmbient } from '../ambient/initial-task-ambient'
 
 export interface AutopilotState {
   readonly enabled: boolean
@@ -12,6 +13,8 @@ export const AutopilotStateProjection = Projection.define<AppEvent, AutopilotSta
   name: 'AutopilotState',
 
   reads: [UserMessageResolutionProjection] as const,
+
+  ambients: [InitialTaskAmbient] as const,
 
   initial: {
     enabled: false,

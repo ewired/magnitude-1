@@ -13,6 +13,7 @@ import {
   createCodingAgentClient,
   ChatPersistence,
   textParts,
+  publishInitialTask,
   type AppEvent,
   type ForkTurnState,
   type AgentStatusState,
@@ -213,6 +214,9 @@ export async function runHeadless(options: RunHeadlessOptions): Promise<number> 
     })
   }
   if (autopilot) {
+    if (initialPrompt) {
+      await client.runEffect(publishInitialTask(initialPrompt))
+    }
     await send({ type: 'autopilot_toggled', forkId: null, enabled: true })
   }
 
