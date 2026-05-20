@@ -110,7 +110,7 @@ export const readTool = defineHarnessTool({
 export const writeTool = defineHarnessTool({
   definition: {
     name: 'write',
-    description: 'Write content to file. Use this instead of running echo, tee, or heredocs in the shell.',
+    description: 'Write content to file, completely replacing any existing content. Read file in full if already exists before overwriting. Use this instead of running echo, tee, or heredocs in the shell. For partial edits, use the edit tool instead.',
     inputSchema: Schema.Struct({
       path: Schema.String.annotations({
         description: 'Relative path from cwd. Use $M/ prefix for scratchpad path.'
@@ -147,7 +147,7 @@ export const writeTool = defineHarnessTool({
 export const editTool = defineHarnessTool({
   definition: {
     name: 'edit',
-    description: 'Edit a file by replacing exact text. The "old" parameter content must match the file exactly. Read the file first. Use this instead of running sed, perl, or awk in the shell.',
+    description: 'Edit a file by replacing exact text. The "old" parameter content must match the file exactly. Read the file first. Use this instead of running sed, perl, or awk in the shell. If an edit touches >50% of file content, write is more efficient.',
     inputSchema: Schema.Struct({
       path: Schema.String.annotations({
         description: 'Relative path from cwd. Use $M/ prefix for scratchpad path.'
