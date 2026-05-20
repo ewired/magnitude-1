@@ -12,8 +12,6 @@ Open models are less "one size fits all" than closed ones. Different open models
 
 Specialized agents let us match each role to the model that actually performs best for it. We benchmark combinations, tune prompts to each model's quirks, and assign work accordingly. The result is a team that punches above what any single model could do on its own.
 
-We test these constantly. New models drop, the lineup updates.
-
 ## The leader
 
 You only ever talk to the leader. The leader runs the conversation, holds your intent, and delegates work to the specialists when it needs to. You don't pick agents or route tasks. The leader figures out who should do what.
@@ -24,19 +22,19 @@ For simple questions and small fixes, the leader handles them directly. For larg
 
 ## The specialists
 
-Seven specialists the leader delegates to. Each has its own role, model, and tool access.
+Five specialists the leader delegates to. Each has its own role, model, and tool access.
 
 ### Scout
 
 Fast and efficient exploration. Scouts investigate the codebase and gather evidence quickly. Read-only access.
 
-**Model:** MiniMax M2.7
+**Model:** Kimi K2.5
 
 ### Architect
 
 Plans and high-level design thinking. Architects evaluate approaches and produce implementation plans before code gets written.
 
-**Model:** GLM 5.1
+**Model:** Kimi K2.6
 
 ### Engineer
 
@@ -48,22 +46,10 @@ Concrete planning and implementation. Engineers do the actual code changes.
 
 Critical and detail-oriented analysis. Critics independently verify quality and behavior after changes.
 
-**Model:** GLM 5.1
+**Model:** Kimi K2.6
 
 ### Scientist
 
 Empirical debugging and information gathering. Scientists root-cause bugs through hypothesis testing. The focus is diagnosis, not implementing the fix.
 
-**Model:** GLM 5.1
-
-### Artisan
-
-Tasteful and creative work. Artisans handle non-code deliverables like docs, configuration, and content.
-
 **Model:** Kimi K2.6
-
-### Advisor
-
-Smart peer of the leader, always available. Advisors give the leader a second opinion when something is uncertain or high-stakes.
-
-**Model:** GLM 5.1

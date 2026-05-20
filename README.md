@@ -7,15 +7,17 @@
 </p>
 
 <p align="center">
-  <strong>Opinionated coding agent for open models</strong>
+  <strong>The best coding agent for open models</strong>
 </p>
 
-Magnitude is the best way to code with open models. We continuously test and optimize so you don't have to.
+Magnitude is built from the ground up around open models. It matches the performance of Claude Code at 5x lower token prices.
 
-- **Multi-model** - GLM, Kimi, MiniMax, DeepSeek all used for the right job.
-- **Verified providers** - Only the ones serving the models correctly and fast.
-- **Purpose-built** — Agent harness built from scratch around open models.
-- **Sustainable** - Pass-through API pricing with no markup. $5 free credits.
+- **Easy setup** — One API key and you're up and running.
+- **Reliable** — We fix common open model failure modes.
+- **Best models** — We constantly test new model setups.
+- **Web search** — Built-in web search that is fast and reliable.
+- **Private** — Zero data retention on your prompts and code.
+- **Transparent** — API prices with no markup, $5 free credits.
 
 <p align="center">
   <img src="interface.png" alt="Magnitude interface" width="100%" />
@@ -29,35 +31,27 @@ Magnitude is the best way to code with open models. We continuously test and opt
 
 > If you are on Windows, you will need to use `wsl`.
 
-$5 of free credits to start, no card required. Pass-through API pricing with no markup after that.
+$5 of free credits to start, no card required. API pricing with no markup after that.
 
 Want to chat about your use case for open models? [Book a call with our founder](https://calendly.com/tom-magnitude/30min)
 
-## Specialized agents
+## What's under the hood?
+
+- **Constrained decoding.** Custom GBNF grammar that prevents common open model failure modes like overthinking and malformed tool calls.
+- **Robust streaming parser.** Speculative execution with rollback resolves ambiguous decision points that break naive parsers on open model output.
+- **Harness reliability.** Mid-stream schema validation and structured error feedback ensure the model always gets a corrective signal to work off.
+
+### Specialized agents
 
 Magnitude is a curated system of specialized agents, each with its own defined role. These agents are made up of a system prompt, specific context, scoped toolsets, and a dedicated model + reasoning level. Here's the agents we include:
 
 - **Leader.** Talks to the user and delegates work. **Model:** GLM 5.1.
-- **Scout.** Fast and efficient exploration. **Model:** MiniMax M2.7.
-- **Architect.** Plans and high-level design thinking. **Model:** GLM 5.1.
+- **Scout.** Fast and efficient exploration. **Model:** Kimi K2.5.
+- **Architect.** Plans and high-level design thinking. **Model:** Kimi K2.6.
 - **Engineer.** Concrete planning and implementation. **Model:** Kimi K2.6.
-- **Critic.** Critical and detail-oriented analysis. **Model:** GLM 5.1.
-- **Scientist.** Empirical debugging and information gathering. **Model:** GLM 5.1.
-- **Artisan.** Tasteful and creative work. **Model:** Kimi K2.6.
-- **Advisor.** Smart peer of the leader, always available. **Model:** GLM 5.1.
-
-We test these constantly. New models drop, the lineup updates.
-
-## Why we built this
-
-Open models are now good enough for serious coding. But it's the wild west. You need to choose a harness, then a model, then a provider. And hope they all play nicely together. Often they don't, and you get broken tool calls or subpar performance.
-
-Magnitude bundles the harness, models, and provider into one stack that we continuously test and optimize. We benchmark model combinations to find the best setups, tune our harness to each model's quirks, and route only to providers serving them correctly and fast. 
-
-We know this isn't for everyone. Some people want the flexibility. Some people want to hack together their own setups. And we respect that. But we want to offer a path to using open models that just works. One that will stay on the frontier, without you having to do a thing.
+- **Critic.** Critical and detail-oriented analysis. **Model:** Kimi K2.6.
+- **Scientist.** Empirical debugging and information gathering. **Model:** Kimi K2.6.
 
 ## Acknowledgments
 
 Built on top of [Effect](https://effect.website) and [OpenTUI](https://github.com/anomalyco/opentui).
-
-Inspired by other open source coding agents, including [OpenCode](https://github.com/anomalyco/opencode) and [Codex](https://github.com/openai/codex).
