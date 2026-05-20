@@ -2,12 +2,9 @@ import os
 import shlex
 from pathlib import Path
 
-from harbor.agents.installed.base import BaseInstalledAgent, ExecInput
+from harbor.agents.installed.base import BaseInstalledAgent, with_prompt_template
+from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
-
-
-class AgentUnexpectedError(Exception):
-    pass
 
 
 class MagnitudeAgent(BaseInstalledAgent):
@@ -16,104 +13,107 @@ class MagnitudeAgent(BaseInstalledAgent):
     def name() -> str:
         return "magnitude"
 
-    @property
-    def _install_agent_template_path(self) -> Path:
-        return Path(__file__).parent / "install-magnitude.sh.j2"
-
-    async def _try_install_from_volume(self, environment) -> bool:
-        current_path = "/opt/magnitude-volume/magnitude/current"
-        result = await environment.exec(command=f"test -f {current_path}")
-        if result.return_code != 0:
-            return False
-
-        print("Installing magnitude from mounted volume...", flush=True)
-        hash_result = await environment.exec(command=f"cat {current_path} | tr -d '\\n'")
-        if hash_result.return_code != 0 or not hash_result.stdout or not hash_result.stdout.strip():
-            print("Failed to read volume hash pointer", flush=True)
-            return False
-
-        binary_hash = hash_result.stdout.strip()
-        volume_binary = f"/opt/magnitude-volume/magnitude/sha256/{binary_hash}/magnitude"
-
-        copy_result = await environment.exec(
-            command=f"cp {volume_binary} /usr/local/bin/magnitude && chmod +x /usr/local/bin/magnitude"
-        )
-        if copy_result.return_code != 0:
-            print(f"Failed to copy binary from volume: {copy_result.stderr}", flush=True)
-            return False
-
-        return True
-
-    async def setup(self, environment) -> None:
+    async def install(self, environment: BaseEnvironment) -> None:
+        """Install the magnitude binary in the container."""
         installed = await self._try_install_from_volume(environment)
 
         if not installed:
-            print("Volume binary not found, falling back to upload...")
+            print("Volume binary not found, falling back to upload...", flush=True)
             binary_path = Path(__file__).parent / "bin" / "magnitude"
-            if not binary_path.exists():
-                # No local binary — fall back to bun install via install script
-                await super().setup(environment)
-                return
-
-            await environment.upload_file(
-                source_path=binary_path,
-                target_path="/usr/local/bin/magnitude",
-            )
-            await environment.exec(command="chmod +x /usr/local/bin/magnitude")
+            if binary_path.exists():
+                await environment.upload_file(
+                    source_path=binary_path,
+                    target_path="/usr/local/bin/magnitude",
+                )
+                await self.exec_as_root(
+                    environment,
+                    command="chmod +x /usr/local/bin/magnitude",
+                )
+            else:
+                # Last resort: install via bun install script
+                await self.exec_as_root(
+                    environment,
+                    command="if ! command -v bun &> /dev/null; then "
+                            "curl -fsSL https://bun.sh/install | bash && "
+                            "export BUN_INSTALL=$HOME/.bun && "
+                            "export PATH=$BUN_INSTALL/bin:$PATH; fi && "
+                            "bun install -g @magnitudedev/cli",
+                )
 
         # Ensure CA certificates are available for SSL verification
-        await environment.exec(command="apt-get update -qq && apt-get install -y -qq ca-certificates >/dev/null 2>&1 || true")
+        await self.exec_as_root(
+            environment,
+            command="apt-get update -qq && apt-get install -y -qq ca-certificates >/dev/null 2>&1 || true",
+        )
 
-        # Upload OAuth credentials if available (for Claude Pro/Max, ChatGPT Plus/Pro, etc.)
+        # Upload OAuth credentials if available
         auth_path = Path.home() / ".magnitude" / "auth.json"
         if auth_path.exists():
-            await environment.exec(command="mkdir -p /root/.magnitude")
+            await self.exec_as_root(
+                environment,
+                command="mkdir -p /root/.magnitude",
+            )
             await environment.upload_file(
                 source_path=auth_path,
                 target_path="/root/.magnitude/auth.json",
             )
 
-    def create_run_agent_commands(self, instruction: str) -> list[ExecInput]:
+    async def _try_install_from_volume(self, environment: BaseEnvironment) -> bool:
+        """Try to install magnitude from a mounted Daytona volume."""
+        current_path = "/opt/magnitude-volume/magnitude/current"
+
+        try:
+            result = await environment.exec(command=f"test -f {current_path}")
+            if result.return_code != 0:
+                return False
+        except Exception:
+            return False
+
+        print("Installing magnitude from mounted volume...", flush=True)
+        try:
+            hash_result = await environment.exec(command=f"cat {current_path} | tr -d '\\n'")
+            if hash_result.return_code != 0 or not hash_result.stdout or not hash_result.stdout.strip():
+                print("Failed to read volume hash pointer", flush=True)
+                return False
+
+            binary_hash = hash_result.stdout.strip()
+            volume_binary = f"/opt/magnitude-volume/magnitude/sha256/{binary_hash}/magnitude"
+
+            await self.exec_as_root(
+                environment,
+                command=f"cp {volume_binary} /usr/local/bin/magnitude && chmod +x /usr/local/bin/magnitude",
+            )
+            return True
+        except Exception as e:
+            print(f"Failed to copy binary from volume: {e}", flush=True)
+            return False
+
+    @with_prompt_template
+    async def run(
+        self,
+        instruction: str,
+        environment: BaseEnvironment,
+        context: AgentContext,
+    ) -> None:
+        """Run magnitude on the task."""
         escaped = shlex.quote(instruction)
 
-        # Extract provider and model from Harbor's --model flag (format: "provider/model-id")
-        provider = self._parsed_model_provider
-        model = self._parsed_model_name
-
-        if not provider or not model:
-            raise ValueError(
-                "Model must be specified as 'provider/model-id' "
-                "(e.g. -m anthropic/claude-sonnet-4-20250514)"
-            )
-
         # Build the command
-        cmd = "set -o pipefail; " + " ".join([
-            "magnitude", "--oneshot",
+        # Note: exec_as_agent handles set -o pipefail automatically
+        cmd = " ".join([
+            "magnitude",
+            "--headless",
+            "--autopilot",
             "--disable-shell-safeguards",
             "--disable-cwd-safeguards",
-            "--provider", shlex.quote(provider),
-            "--model", shlex.quote(model),
-            "--",
-            escaped,
+            "--prompt", escaped,
         ]) + " 2>&1 | tee /logs/agent/magnitude.txt"
 
-        # Pass through the relevant API key
-        env = {"MAGNITUDE_TELEMETRY": "off"}
-
-        provider_env_keys = {
-            "anthropic": ["ANTHROPIC_API_KEY"],
-            "openai": ["OPENAI_API_KEY"],
-            "openrouter": ["OPENROUTER_API_KEY"],
-            "google": ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
-            "amazon-bedrock": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"],
-            "google-vertex": ["GOOGLE_APPLICATION_CREDENTIALS", "GCLOUD_PROJECT"],
-            "google-vertex-anthropic": ["GOOGLE_APPLICATION_CREDENTIALS", "GCLOUD_PROJECT"],
+        # Only need MAGNITUDE_API_KEY now
+        env = {
+            "MAGNITUDE_TELEMETRY": "off",
+            "MAGNITUDE_API_KEY": os.environ.get("MAGNITUDE_API_KEY", ""),
         }
-
-        for key in provider_env_keys.get(provider, []):
-            val = os.environ.get(key, "")
-            if val:
-                env[key] = val
 
         # Forward BAML/Boundary env vars if present
         for key in ["BOUNDARY_PROJECT_ID", "BOUNDARY_SECRET", "BOUNDARY_API_KEY"]:
@@ -121,23 +121,17 @@ class MagnitudeAgent(BaseInstalledAgent):
             if val:
                 env[key] = val
 
-        return [ExecInput(command=cmd, env=env)]
+        await self.exec_as_agent(
+            environment,
+            command=cmd,
+            env=env,
+        )
 
     def populate_context_post_run(self, context: AgentContext) -> None:
-        # Check if the agent exited with a non-zero return code
-        rc_path = self.logs_dir / "command-0" / "return-code.txt"
-        if rc_path.exists():
-            rc = int(rc_path.read_text().strip())
-            if rc != 0:
-                # Read last few lines of agent output for context
-                log_path = self.logs_dir / "magnitude.txt"
-                tail = ""
-                if log_path.exists():
-                    lines = log_path.read_text().strip().splitlines()
-                    tail = "\n".join(lines[-5:])
-                # Populate context so is_empty() returns False, preventing
-                # harbor from calling this again inside its except handler
-                context.metadata = {"error": f"Magnitude exited with code {rc}\n{tail}"}
-                raise AgentUnexpectedError(
-                    f"Magnitude exited with code {rc}\n{tail}"
-                )
+        """Post-run context population.
+
+        exec_as_agent raises on non-zero exit directly, so error
+        detection is handled by Harbor's execution layer. This method
+        is kept for API compatibility.
+        """
+        pass

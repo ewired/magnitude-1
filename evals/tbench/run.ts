@@ -166,7 +166,7 @@ function commandForRun(
     'harbor',
     'run',
     '-d',
-    'terminal-bench@2.0',
+    'terminal-bench/terminal-bench-2-1',
     '--agent-import-path',
     'evals.tbench.magnitude_agent:MagnitudeAgent',
     '-m',
@@ -178,8 +178,10 @@ function commandForRun(
     args.push('--environment-kwarg', 'volumes=magnitude-binaries')
   }
 
+  const datasetPrefix = 'terminal-bench/'
   for (const task of selectedTasks) {
-    args.push('-t', task)
+    const taskRef = task.startsWith(datasetPrefix) ? task : `${datasetPrefix}${task}`
+    args.push('-i', taskRef)
   }
 
   args.push('-n', String(concurrency))

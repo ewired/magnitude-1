@@ -1,10 +1,10 @@
-# Terminal Bench 2 Evaluation
+# Terminal Bench 2.1 Evaluation
 
-Run Magnitude on [Terminal Bench 2](https://www.tbench.ai/) via the [Harbor](https://github.com/harbor-framework/harbor) framework.
+Run Magnitude on [Terminal Bench 2.1](https://www.tbench.ai/) via the [Harbor](https://github.com/harbor-framework/harbor) framework.
 
 ## Overview
 
-Terminal Bench 2 (TB2) is a benchmark for evaluating AI agents on realistic, end-to-end CLI tasks in sandboxed Docker containers. Each task provides:
+Terminal Bench 2.1 (TB2.1) is a benchmark for evaluating AI agents on realistic, end-to-end CLI tasks in sandboxed Docker containers. It is a revision of TB2.0 that fixes 26 tasks for bugs, timeouts, and reward hacking robustness. Each task provides:
 
 - A Docker environment with pre-loaded files
 - A natural language instruction
@@ -25,7 +25,7 @@ Harbor is the official harness for running TB2. It manages container lifecycle, 
 
 - **Docker** running locally (e.g. OrbStack, Docker Desktop)
 - **Harbor** installed: `pip install harbor` or `uv tool install harbor`
-- **API key** for your chosen provider (e.g. `ANTHROPIC_API_KEY`)
+- **Magnitude API key** — set `MAGNITUDE_API_KEY` (model resolution is handled by the Magnitude API)
 
 ## Quick Start
 
@@ -34,19 +34,65 @@ Harbor is the official harness for running TB2. It manages container lifecycle, 
 ./evals/tbench/build-linux.sh
 
 # 2. Set your API key
-export ANTHROPIC_API_KEY=sk-...
+export MAGNITUDE_API_KEY=...
+```
 
-# 3. Run on a single TB2 task
-harbor run -d terminal-bench@2.0 \
+Then choose your execution environment:
+
+### Local Docker
+
+The agent uploads the binary directly into each container. No extra steps needed.
+
+```bash
+# Interactive wrapper
+bun evals/tbench/cli.ts run
+
+# Or directly:
+harbor run -d terminal-bench/terminal-bench-2-1 \
   --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
-  --model anthropic/claude-sonnet-4-6 \
+  -l 1
+```
+
+### Daytona Cloud
+
+For parallel runs at scale. You must pre-seed a Daytona volume with the binary before running.
+
+```bash
+# 1. Seed the Daytona volume (only needed once per binary build)
+python3 evals/tbench/seed_daytona_volume.py
+# Or via the CLI wrapper:
+bun evals/tbench/cli.ts seed-volume
+
+# 2. Run with the daytona environment
+bun evals/tbench/cli.ts run --env daytona
+
+# Or directly:
+harbor run -d terminal-bench/terminal-bench-2-1 \
+  --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
+  --env daytona \
+  --environment-kwarg volumes=magnitude-binaries \
+  -n 100
+```
+
+The runner automatically passes `--environment-kwarg volumes=magnitude-binaries` when using a cloud environment. The agent's `install()` method checks the volume mount first, then falls back to direct upload.
+
+### Common harbor commands
+
+```bash
+# Run a single task (good for testing)
+harbor run -d terminal-bench/terminal-bench-2-1 \
+  --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
   -l 1
 
-# 4. Run the full benchmark (concurrent)
-harbor run -d terminal-bench@2.0 \
+# Run the full benchmark (4 concurrent)
+harbor run -d terminal-bench/terminal-bench-2-1 \
   --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
-  --model anthropic/claude-sonnet-4-6 \
   -n 4
+
+# Run a specific task (task names are prefixed with terminal-bench/)
+harbor run -d terminal-bench/terminal-bench-2-1 \
+  --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
+  -i "terminal-bench/fix-git"
 ```
 
 ## Building the Linux Binary
@@ -65,40 +111,26 @@ The script will:
 4. Extract the resulting binary to `evals/tbench/bin/magnitude`
 5. Mark the extracted binary executable
 
-If `evals/tbench/bin/magnitude` exists, the adapter uploads it directly into the container (fast). Otherwise, it falls back to installing Magnitude via npm inside the container.
+If `evals/tbench/bin/magnitude` exists, the adapter uploads it directly into the container (fast). Otherwise, it falls back to installing Magnitude via bun inside the container.
 
 ## How It Works
 
 1. **Harbor** spins up a Docker container per task with the task environment pre-loaded
-2. **Setup**: The adapter uploads `evals/tbench/bin/magnitude` into the container at `/usr/local/bin/magnitude`
-3. **Run**: Harbor executes `magnitude --oneshot --provider <id> --model <id> "<instruction>"`
+2. **Install**: The adapter uploads `evals/tbench/bin/magnitude` into the container at `/usr/local/bin/magnitude`
+3. **Run**: Harbor executes `magnitude --headless --autopilot --disable-shell-safeguards --disable-cwd-safeguards --prompt "<instruction>"`
 4. **Magnitude** operates on the container filesystem — reads/edits files, runs shell commands
 5. **Verification**: Harbor runs the task's test scripts against the final container state
 
 ## Configuration
 
-### Provider and model
+### API Key
 
-The `--model` / `-m` flag uses `provider/model-id` format. The adapter extracts the provider and model automatically:
+Set `MAGNITUDE_API_KEY` — Magnitude resolves the model automatically through its API catalog based on your account. No provider-specific keys are needed.
 
 ```bash
-# Anthropic
-export ANTHROPIC_API_KEY=sk-...
-harbor run -d terminal-bench@2.0 \
-  --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
-  -m anthropic/claude-sonnet-4-6
-
-# OpenRouter
-export OPENROUTER_API_KEY=sk-...
-harbor run -d terminal-bench@2.0 \
-  --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
-  -m openrouter/anthropic/claude-sonnet-4
-
-# OpenAI
-export OPENAI_API_KEY=sk-...
-harbor run -d terminal-bench@2.0 \
-  --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
-  -m openai/gpt-5.3-codex
+export MAGNITUDE_API_KEY=...
+harbor run -d terminal-bench/terminal-bench-2-1 \
+  --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent
 ```
 
 ### Useful flags
@@ -107,7 +139,7 @@ harbor run -d terminal-bench@2.0 \
 |------|-------------|
 | `-l <n>` | Limit to n tasks |
 | `-n <n>` | Run n tasks concurrently (default: 4) |
-| `-t <pattern>` | Run specific task(s) by name/glob |
+| `-i <pattern>` | Include specific task(s) by name/glob |
 | `-x <pattern>` | Exclude task(s) by name/glob |
 | `--timeout-multiplier <f>` | Scale task timeouts |
 | `--debug` | Enable debug logging |
@@ -117,7 +149,7 @@ harbor run -d terminal-bench@2.0 \
 Run the oracle agent (no API key needed) to confirm Harbor + TB2 works:
 
 ```bash
-harbor run -d terminal-bench@2.0 -a oracle -l 1
+harbor run -d terminal-bench/terminal-bench-2-1 -a oracle -l 1
 ```
 
 Expected output: 1 trial, reward = 1.0, 0 errors.
