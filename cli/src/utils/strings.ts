@@ -542,13 +542,12 @@ export function parseMentionsFromPrompt(
 
   while ((match = regex.exec(text)) !== null) {
     const rawPathWithRange = match[1]
-    if (!rawPathWithRange || seen.has(rawPathWithRange)) continue
+    if (!rawPathWithRange) continue
 
-    // Parse optional line range suffix: :start-end or :N
     let rawPath = rawPathWithRange
     let lineRange: { start: number; end: number } | undefined
     const rangeMatch = rawPathWithRange.match(/:([\d]+)(?:-([\d]+))?$/)
-    if (rangeMatch) {
+    if (rangeMatch && rangeMatch.index !== 1) {
       const start = parseInt(rangeMatch[1], 10)
       const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : start
       if (!isNaN(start) && !isNaN(end) && start > 0 && end > 0) {
@@ -556,6 +555,9 @@ export function parseMentionsFromPrompt(
         rawPath = rawPathWithRange.slice(0, rangeMatch.index)
       }
     }
+
+    const dedupeKey = lineRange ? `${rawPath}:${lineRange.start}-${lineRange.end}` : rawPath
+    if (seen.has(dedupeKey)) continue
 
     const resolved = resolveCandidatePath(rawPath, cwd)
     if (!resolved) {
@@ -581,7 +583,7 @@ export function parseMentionsFromPrompt(
       // If stat fails, default to 'text'
     }
 
-    seen.add(rawPathWithRange)
+    seen.add(dedupeKey)
     mentions.push({ type: 'mention', path: rawPath, contentType, lineRange })
   }
 
