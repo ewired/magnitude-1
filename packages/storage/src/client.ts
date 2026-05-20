@@ -5,10 +5,6 @@ import {
   AuthStorageLive,
 } from './auth'
 import {
-  CatalogCache,
-  CatalogCacheLive,
-} from './catalog-cache'
-import {
   ConfigStorage,
   ConfigStorageLive,
   type ResolvedContextLimitPolicy,
@@ -29,14 +25,12 @@ import type {
   ContextLimitPolicy,
   MagnitudeConfig,
   MemoryExtractionJobRecord,
-  OAuthAuth,
   StoredLogEntry,
   StoredSessionMeta,
 } from './types'
 
 export type AllStorageServices =
   | AuthStorage
-  | CatalogCache
   | ConfigStorage
   | LogStorage
   | MemoryStorage
@@ -61,7 +55,6 @@ export interface StorageClient<TSlot extends string = string> {
     set(providerId: string, auth: AuthInfo): Promise<void>
     remove(providerId: string): Promise<void>
     getStoredApiKey(providerId: string): Promise<string | undefined>
-    getOAuth(providerId: string): Promise<OAuthAuth | undefined>
   }
 
   sessions: {
@@ -133,7 +126,6 @@ export async function createStorageClient<TSlot extends string = string>(options
   const globalLayer = Layer.mergeAll(
     ConfigStorageLive,
     AuthStorageLive,
-    CatalogCacheLive,
     SessionStorageLive(),
     LogStorageLive,
     TraceStorageLive
@@ -187,11 +179,6 @@ export async function createStorageClient<TSlot extends string = string>(options
       async getStoredApiKey(providerId) {
         const auth = await run(Effect.flatMap(AuthStorage, (s) => s.get(providerId)))
         return auth?.type === 'api' ? auth.key : undefined
-      },
-
-      async getOAuth(providerId) {
-        const auth = await run(Effect.flatMap(AuthStorage, (s) => s.get(providerId)))
-        return auth?.type === 'oauth' ? auth : undefined
       },
     },
 

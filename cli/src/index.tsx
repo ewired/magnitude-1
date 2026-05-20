@@ -116,48 +116,6 @@ async function main() {
       })
     })
 
-  program
-    .command('skills')
-    .description('Manage skills')
-    .addCommand(
-      new Command('reset')
-        .description('Reset global skills to built-in defaults')
-        .action(async () => {
-          const fs = await import('fs')
-          const path = await import('path')
-          const os = await import('os')
-          const readline = await import('readline')
-
-          const globalSkillsDir = path.join(os.homedir(), '.magnitude', 'skills')
-
-          console.log('WARNING: This will overwrite ALL skills in ~/.magnitude/skills/ with the built-in defaults.')
-          console.log('Any custom global skills you have created will be lost.')
-          console.log()
-
-          const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-          })
-
-          const answer = await new Promise<string>((resolve) => {
-            rl.question('Type "yes" to proceed or "no" to cancel: ', (ans) => {
-              rl.close()
-              resolve(ans.trim())
-            })
-          })
-
-          if (answer === 'yes') {
-            fs.rmSync(globalSkillsDir, { recursive: true, force: true })
-            const { initGlobalSkills } = await import('@magnitudedev/skills')
-            await initGlobalSkills()
-            console.log('Global skills reset to built-in defaults.')
-          } else {
-            console.log('Cancelled. No changes were made.')
-            process.exit(0)
-          }
-        })
-    )
-
   program.parse()
 }
 

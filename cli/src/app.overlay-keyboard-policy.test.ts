@@ -5,11 +5,7 @@ type OverlayKind =
   | 'recent-chats'
   | 'fork-detail'
   | 'settings'
-  | 'setup-wizard'
-  | 'auth-method'
-  | 'provider-endpoint'
-  | 'api-key'
-  | 'oauth'
+  | 'usage'
 
 function canToggleRecentChatsWithCtrlR(activeOverlayKind: OverlayKind): boolean {
   return activeOverlayKind === 'none' || activeOverlayKind === 'recent-chats'
@@ -27,11 +23,7 @@ test('Ctrl+R is ignored for non-recent-chats overlays', () => {
   const blockedKinds: OverlayKind[] = [
     'fork-detail',
     'settings',
-    'setup-wizard',
-    'auth-method',
-    'provider-endpoint',
-    'api-key',
-    'oauth',
+    'usage',
   ]
   for (const kind of blockedKinds) {
     expect(canToggleRecentChatsWithCtrlR(kind)).toBe(false)

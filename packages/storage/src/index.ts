@@ -8,7 +8,7 @@ export * from './types'
 
 export * from './config'
 export * from './auth'
-export * from './catalog-cache'
+
 export * from './memory'
 
 export * from './sessions'

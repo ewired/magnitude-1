@@ -29,7 +29,7 @@ describe('webSearchDisplay error rendering', () => {
         query: 'magnitude search',
         sources: [],
         errorDetail:
-          'Current provider does not support web search. To enable web search, set MAGNITUDE_SEARCH_PROVIDER to one of: anthropic, openai, gemini, openrouter, vercel, github-copilot.',
+          'Web search is not available for your current plan. Upgrade to enable web search.',
       } as any,
       isExpanded: false,
       onToggle: () => {},
@@ -37,8 +37,8 @@ describe('webSearchDisplay error rendering', () => {
 
     const text = htmlToText(renderToStaticMarkup(createElement(() => element)))
 
-    expect(text).toContain('· Error (Current provider does not support web search.')
-    expect(text).toContain('To enable web search, set MAGNITU…')
+    expect(text).toContain('· Error (Web search is not available')
+    expect(text).toContain('Upgrade to enable web sear…')
   })
 
   test('shows generic error label when detail is missing', () => {

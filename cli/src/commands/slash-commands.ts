@@ -3,7 +3,7 @@ export interface SlashCommandDefinition {
   label: string
   description: string
   aliases?: string[]
-  source?: 'builtin' | 'skill'
+  source?: 'skill'
   skillPath?: string
 }
 

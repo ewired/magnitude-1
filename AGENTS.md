@@ -18,7 +18,7 @@ bun session projection <id> Window                  # replay events and dump nam
 bun session projection <id> all --at 42            # all projections at point-in-time (after event 42)
 ```
 
-Supported projections: `Window`, `Fork`, `TaskGraph`, `Turn`, `Display`, `Compaction`, `WorkingState`, `SessionContext`, `Proposal`, `AgentRegistry`, `Artifact`, `ChatTitle`, `Replay`, `SkillMode`, `all`
+Supported projections: `Window`, `Fork`, `TaskGraph`, `Turn`, `Display`, `Compaction`, `WorkingState`, `SessionContext`, `Proposal`, `AgentRegistry`, `Artifact`, `ChatTitle`, `Replay`, `all`
 
 Projection output is JSON — pipe to `jq` for querying. Events are 0-indexed.
 
