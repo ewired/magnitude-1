@@ -17,6 +17,7 @@ import type { ForkWindowState } from '../window'
 import type { CompletedTurn } from '../window/types'
 import { SessionContextProjection } from '../projections/session-context'
 import { AgentModelResolver } from '../model/model-resolver'
+import { getAgentByForkId } from '../projections/agent-status'
 import { getAgentDefinition } from '../agents/registry'
 import { getToolkitForRole } from '../tools/toolkits'
 import { buildSystemPrompt } from '../prompts/system-prompt-builder'
@@ -59,7 +60,10 @@ export function runCompactionTurn(
 
     // Resolve model (same as Cortex)
     const modelResolver = yield* AgentModelResolver
-    const agentModel = yield* modelResolver.resolve(roleId)
+    const agentId = forkId
+      ? getAgentByForkId(agentStatus, forkId)?.agentId ?? '000000000000'
+      : '000000000000'
+    const agentModel = yield* modelResolver.resolve(roleId, agentId)
 
     // Get toolkit and fork layer (same as Cortex)
     const toolkit = getToolkitForRole(roleId)

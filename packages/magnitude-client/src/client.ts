@@ -6,7 +6,8 @@ import { CLIENT_PLATFORM, CLIENT_SHELL, HEADER_PLATFORM, HEADER_SHELL, HEADER_SE
 import { isEnvFlagOn } from "./env"
 import type { BalanceResponse, RoleId, UsagePeriod } from "./contract"
 import { createModelCatalog, type ModelCatalog } from "./catalog"
-import { createRoleSpec, createMagnitudeCompatibleSpec, type MagnitudeCallOptions, type MagnitudeStreamError } from "./models"
+import { createRoleSpec, createMagnitudeCompatibleSpec, bindWithMagnitudeOptions, type MagnitudeCallOptions, type MagnitudeStreamError } from "./models"
+import type { MagnitudeAdditionalOptions } from "./contract"
 import type { MagnitudeConnectionError } from "./errors"
 import type { BoundModel, ModelCapabilities as AIModelCapabilities, ImagePlaceholderConfig } from "@magnitudedev/ai"
 
@@ -53,6 +54,7 @@ export interface BalanceQuery {
 export interface MagnitudeClientShape {
   readonly auth: AuthApplicator
   readonly catalog: ModelCatalog
+  readonly sessionId: string | null
   readonly role: (id: RoleId, options?: RoleOptions) => BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>
   readonly model: (id: string, options?: RoleOptions) => BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>
   readonly webSearch: (
@@ -92,15 +94,24 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
   return {
     auth: authWithHeaders,
     catalog,
+    sessionId,
 
     role: (id: RoleId, options?: RoleOptions) => {
       const spec = createRoleSpec(id, endpoint, options?.capabilities)
-      return spec.bind({ auth: authWithHeaders, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
+      const baseOptions: MagnitudeAdditionalOptions | undefined = sessionId
+        ? { session_id: sessionId }
+        : undefined
+      const bound = spec.bind({ auth: authWithHeaders, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
+      return bindWithMagnitudeOptions(bound, baseOptions)
     },
 
     model: (id: string, options?: RoleOptions) => {
       const spec = createMagnitudeCompatibleSpec({ modelId: id, endpoint })
-      return spec.bind({ auth: authWithHeaders, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
+      const baseOptions: MagnitudeAdditionalOptions | undefined = sessionId
+        ? { session_id: sessionId }
+        : undefined
+      const bound = spec.bind({ auth: authWithHeaders, defaults: options?.defaults, imagePlaceholders: options?.imagePlaceholders })
+      return bindWithMagnitudeOptions(bound, baseOptions)
     },
 
     /** Fetch balance + usage summary for the authenticated user */

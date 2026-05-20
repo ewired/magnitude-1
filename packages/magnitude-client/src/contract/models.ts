@@ -72,4 +72,8 @@ export type MagnitudeAdditionalOptions = {
   traits?: string[]
   /** Controls whether message/prose content is required, optional, or forbidden. */
   turn_constraints?: TurnConstraints
+  /** Explicit session identifier for upstream replica affinity (e.g. prompt caching). */
+  session_id?: string
+  /** Agent identifier for grouping requests with the same prompt prefix shape. */
+  agent_id?: string
 }

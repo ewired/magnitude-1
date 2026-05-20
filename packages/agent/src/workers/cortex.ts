@@ -21,7 +21,7 @@ import { mapConnectionErrorToOutcome, mapStreamErrorToOutcome } from '../errors'
 
 import { WindowProjection } from '../window'
 import { SessionContextProjection } from '../projections/session-context'
-import { AgentStatusProjection } from '../projections/agent-status'
+import { AgentStatusProjection, getAgentByForkId } from '../projections/agent-status'
 import { HarnessStateProjection } from '../projections/harness-state'
 import { TurnProjection } from '../projections/turn'
 import { MAX_RETRIES, TERMINAL_RETRY_EXHAUSTED_MESSAGE } from '../util/retry-backoff'
@@ -101,7 +101,10 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // 2. Resolve model
         // ──────────────────────────────────────────────────────────────────────
         const modelResolver = yield* AgentModelResolver
-        const agentModel = yield* modelResolver.resolve(roleId)
+        const agentId = forkId
+          ? getAgentByForkId(agentState, forkId)?.agentId ?? '000000000000'
+          : '000000000000'
+        const agentModel = yield* modelResolver.resolve(roleId, agentId)
 
         // ──────────────────────────────────────────────────────────────────────
         // 3. Observations

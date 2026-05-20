@@ -4,6 +4,7 @@ import {
   type ModelSpec,
   type StreamError,
   type ModelCapabilities as AIModelCapabilities,
+  type BoundModel,
   Option,
 } from "@magnitudedev/ai"
 import { classifyMagnitudeConnectionError, type MagnitudeConnectionError } from "./errors"
@@ -79,4 +80,29 @@ export function createRoleSpec(roleId: RoleId, endpoint: string, capabilities?: 
       defaultClassifyStreamError(failure),
     capabilities,
   })
+}
+
+/**
+ * Wrap a BoundModel so that every call composes `magnitudeAdditionalOptions`
+ * from base + call-site, fully typed through MagnitudeCallOptions.
+ *
+ * This replaces the need for:
+ *   - A compose hook on the wire (which would require casting)
+ *   - Deep-merge logic in the generic ai package
+ */
+export function bindWithMagnitudeOptions(
+  model: BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError>,
+  baseOptions?: MagnitudeAdditionalOptions,
+): BoundModel<MagnitudeCallOptions, MagnitudeConnectionError, MagnitudeStreamError> {
+  return {
+    ...model,
+    stream: (prompt, tools, callOptions?) =>
+      model.stream(prompt, tools, {
+        ...callOptions,
+        magnitudeAdditionalOptions: {
+          ...baseOptions,
+          ...callOptions?.magnitudeAdditionalOptions,
+        },
+      }),
+  }
 }
