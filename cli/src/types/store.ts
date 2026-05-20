@@ -15,6 +15,7 @@ export type InputMentionSegment = {
   contentType: 'text' | 'image' | 'directory'
   start: number
   end: number
+  lineRange?: { start: number; end: number }
 }
 
 export type InputValue = {
