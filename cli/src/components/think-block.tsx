@@ -7,6 +7,7 @@ import { AgentCommunicationCard } from './agent-communication-card'
 import { useTheme } from '../hooks/use-theme'
 import { useLocalWidth } from '../hooks/use-local-width'
 import { violet } from '../utils/theme'
+import { slate } from '../utils/palette'
 
 import { renderToolStep } from '../tool-displays/render'
 
@@ -280,18 +281,157 @@ function truncateToWidth(s: string, maxWidth: number): string {
 // Cluster summary — consolidated line for groupable tools in default mode
 // =============================================================================
 
-function ClusterSummaryRow({ cluster, steps, width }: { cluster: string; steps: Extract<ThinkBlockStep, { type: 'tool' }>[]; width: number }) {
+function ClusterSummaryRow({ cluster, steps, width, mode }: { cluster: string; steps: Extract<ThinkBlockStep, { type: 'tool' }>[]; width: number; mode: 'default' | 'transcript' }) {
   const theme = useTheme()
 
   switch (cluster) {
     case 'read': {
-      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean) as string[]
-      const prefix = `→ Read ${steps.length} file${steps.length > 1 ? 's' : ''}`
+      const anyInProgress = steps.some(s => {
+        const phase = (s.state as any)?.phase
+        return phase === 'streaming' || phase === 'executing'
+      })
+      const anyError = steps.some(s => (s.state as any)?.phase === 'error')
+      const verb = anyInProgress ? 'Reading' : 'Read'
+      const icon = anyError ? '✗ ' : '→ '
+      const iconColor = anyError ? theme.error : theme.info
+
+      // Build display items for each read step — path and range stored separately for color rendering
+      const items: { display: string; path: string; rangeSuffix?: string; isError?: boolean }[] = []
+      for (const s of steps) {
+        const state = s.state as any
+        const path = state?.path
+        if (!path) continue
+        const phase = state?.phase
+
+        if (phase === 'error') {
+          items.push({ display: `✗ ${path}`, path: `✗ ${path}`, isError: true })
+          continue
+        }
+
+        if (phase === 'streaming' || phase === 'executing') {
+          items.push({ display: path, path })
+          continue
+        }
+
+        const offset = state?.offset
+        const limit = state?.limit
+        const lineCount = state?.lineCount ?? 0
+        const isPartial = (offset != null && offset > 1) || limit != null
+        if (isPartial) {
+          const startLine = offset ?? 1
+          const endLine = startLine + lineCount - 1
+          const rangeSuffix = `:${startLine}-${endLine}`
+          items.push({ display: `${path}${rangeSuffix}`, path, rangeSuffix })
+        } else {
+          items.push({ display: path, path })
+        }
+      }
+
+      const fileWord = steps.length === 1 ? 'file' : 'files'
+      const prefix = `${icon}${verb} ${steps.length} ${fileWord}`
       const prefixWidth = stringWidth(prefix)
-      const detailWidth = width - prefixWidth - 2 // 2 for parens
-      const { shown, remaining } = detailWidth > 0 ? fitItems(paths, detailWidth) : { shown: [], remaining: paths.length }
-      const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
-      return <text><span style={{ fg: theme.info }}>{'→ '}</span><span style={{ fg: theme.foreground }}>{`Read ${steps.length} file${steps.length > 1 ? 's' : ''}`}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
+
+      // Helper: render an item with path in slate[400], range suffix in slate[500] (one shade darker)
+      const renderItem = (item: typeof items[number]) => {
+        if (item.isError) {
+          return <span style={{ fg: theme.error }}>{item.display}</span>
+        }
+        if (item.rangeSuffix) {
+          return <><span style={{ fg: slate[400] }}>{item.path}</span><span style={{ fg: slate[500] }}>{item.rangeSuffix}</span></>
+        }
+        return <span style={{ fg: slate[400] }}>{item.path}</span>
+      }
+
+      // Default mode: truncate with fitItems
+      if (mode === 'default') {
+        const displayStrings = items.map(i => i.display)
+        const detailWidth = width - prefixWidth - 2 // 2 for parens
+        const { shown, remaining } = detailWidth > 0 ? fitItems(displayStrings, detailWidth) : { shown: [], remaining: displayStrings.length }
+        // Map shown strings back to their items for color rendering
+        const shownItems = items.slice(0, shown.length)
+        return (
+          <text>
+            <span style={{ fg: iconColor }}>{icon}</span>
+            <span style={{ fg: theme.foreground }}>{`${verb} ${steps.length} ${fileWord}`}</span>
+            {shownItems.length > 0 && <span style={{ fg: slate[400] }}>{' ('}</span>}
+            {shownItems.map((item, i) => (
+              <span key={i}>
+                {i > 0 && <span style={{ fg: slate[400] }}>{', '}</span>}
+                {renderItem(item)}
+              </span>
+            ))}
+            {remaining > 0 && <span style={{ fg: slate[400] }}>{`${shown.length > 0 ? ', ' : ''}+${remaining} more`}</span>}
+            {shownItems.length > 0 && <span style={{ fg: slate[400] }}>{')'}</span>}
+          </text>
+        )
+      }
+
+      // Transcript mode: show all items, wrap with indent alignment
+      const indentWidth = prefixWidth + 2 // " (" before first item
+      const lineItems: (typeof items[number])[][] = []
+      let currentItems: (typeof items[number])[] = []
+      let currentLineWidth = 0
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        const sepWidth = currentLineWidth > 0 ? 2 : 0 // ", "
+        const itemWidth = stringWidth(item.display)
+        const isLast = i === items.length - 1
+        const capacity = isLast ? width - indentWidth - 1 : width - indentWidth
+        if (currentLineWidth + sepWidth + itemWidth <= capacity) {
+          currentItems.push(item)
+          currentLineWidth += sepWidth + itemWidth
+        } else {
+          if (currentItems.length > 0) lineItems.push(currentItems)
+          currentItems = [item]
+          currentLineWidth = itemWidth
+        }
+      }
+      if (currentItems.length > 0) lineItems.push(currentItems)
+
+      if (lineItems.length === 0) {
+        return <text><span style={{ fg: iconColor }}>{icon}</span><span style={{ fg: theme.foreground }}>{`${verb} ${steps.length} ${fileWord}`}</span></text>
+      }
+
+      const indent = ' '.repeat(indentWidth)
+      return (
+        <box style={{ flexDirection: 'column' }}>
+          <text>
+            <span style={{ fg: iconColor }}>{icon}</span>
+            <span style={{ fg: theme.foreground }}>{`${verb} ${steps.length} ${fileWord}`}</span>
+            <span style={{ fg: slate[400] }}>{' ('}</span>
+            {lineItems[0].map((item, j) => (
+              <span key={j}>
+                {j > 0 && <span style={{ fg: slate[400] }}>{', '}</span>}
+                {renderItem(item)}
+              </span>
+            ))}
+            {lineItems.length === 1 && <span style={{ fg: slate[400] }}>{')'}</span>}
+          </text>
+          {lineItems.slice(1, -1).map((line, i) => (
+            <text key={i}>
+              <span>{indent}</span>
+              {line.map((item, j) => (
+                <span key={j}>
+                  {j > 0 && <span style={{ fg: slate[400] }}>{', '}</span>}
+                  {renderItem(item)}
+                </span>
+              ))}
+            </text>
+          ))}
+          {lineItems.length > 1 && (
+            <text>
+              <span>{indent}</span>
+              {lineItems[lineItems.length - 1].map((item, j) => (
+                <span key={j}>
+                  {j > 0 && <span style={{ fg: slate[400] }}>{', '}</span>}
+                  {renderItem(item)}
+                </span>
+              ))}
+              <span style={{ fg: slate[400] }}>{')'}</span>
+            </text>
+          )}
+        </box>
+      )
     }
     case 'search': {
       const totalMatches = steps.reduce((sum, s) => sum + ((s.state as any)?.matchCount ?? 0), 0)
@@ -372,11 +512,14 @@ const StepGroupView = memo(function StepGroupView({
 }) {
   const theme = useTheme()
 
-  // In default mode, consolidate groupable tool clusters into summary lines
-  if (mode === 'default' && group.cluster && group.cluster !== '__subagent_lifecycle__') {
+  // Consolidate groupable tool clusters into summary lines
+  // Read clusters use ClusterSummaryRow in both default and transcript modes
+  // Other clusters only use ClusterSummaryRow in default mode
+  const shouldConsolidate = group.cluster && group.cluster !== '__subagent_lifecycle__' && (mode === 'default' || group.cluster === 'read')
+  if (shouldConsolidate) {
     const toolSteps = group.steps.filter((s): s is Extract<ThinkBlockStep, { type: 'tool' }> => s.type === 'tool')
     if (toolSteps.length > 0) {
-      return <ClusterSummaryRow key={group.steps[0].id} cluster={group.cluster!} steps={toolSteps} width={width} />
+      return <ClusterSummaryRow key={group.steps[0].id} cluster={group.cluster!} steps={toolSteps} width={width} mode={mode} />
     }
     return null
   }

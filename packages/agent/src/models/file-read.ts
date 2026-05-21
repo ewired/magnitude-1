@@ -4,12 +4,16 @@ import { readTool } from '../tools/fs'
 export interface FileReadState extends BaseState {
   path?: string
   lineCount?: number
+  offset?: number
+  limit?: number
   errorDetail?: string
 }
 
 const initial: Omit<FileReadState, 'phase'> = {
   path: undefined,
   lineCount: undefined,
+  offset: undefined,
+  limit: undefined,
   errorDetail: undefined,
 }
 
@@ -26,7 +30,13 @@ export const fileReadModel = defineStateModel(readTool)<FileReadState>({
       case 'ToolInputReady':
         return state
       case 'ToolExecutionStarted':
-        return { ...state, phase: 'executing', path: event.input.path ?? state.path }
+        return {
+          ...state,
+          phase: 'executing',
+          path: event.input.path ?? state.path,
+          offset: event.input.offset ?? undefined,
+          limit: event.input.limit ?? undefined,
+        }
       case 'ToolExecutionEnded': {
         switch (event.result._tag) {
           case 'Success':

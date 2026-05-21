@@ -4,7 +4,6 @@ import type { CommonToolProps, ToolDisplay } from './types'
 import { shellDisplay } from './displays/shell'
 import { diffDisplay } from './displays/diff'
 import { contentDisplay } from './displays/content'
-import { fileReadDisplay } from './displays/file-read'
 import { fileSearchDisplay } from './displays/file-search'
 import { fileTreeDisplay } from './displays/file-tree'
 import { webSearchDisplay } from './displays/web-search'
@@ -27,7 +26,6 @@ function eraseStateType<T extends BaseState>(display: ToolDisplay<T>): ToolDispl
 
 const displaysByToolKey: Partial<Record<string, ToolDisplay<BaseState>>> = {
   shell: eraseStateType(shellDisplay),
-  fileRead: eraseStateType(fileReadDisplay),
   fileWrite: eraseStateType(contentDisplay),
   fileEdit: eraseStateType(diffDisplay),
   fileTree: eraseStateType(fileTreeDisplay),
