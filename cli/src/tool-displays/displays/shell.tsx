@@ -41,10 +41,11 @@ export const shellDisplay = createToolDisplay<ShellState>({
     const nonEmptyLines = allLines.filter(l => l.length > 0);
     const previewLimit = mode === 'transcript' ? Infinity : PREVIEW_LINE_CAP;
     const showPreview = mode === 'default' && nonEmptyLines.length > previewLimit * 2 + 1;
+    const truncatedCount = nonEmptyLines.length - previewLimit * 2;
     const displayedLines = showPreview
       ? [
           ...nonEmptyLines.slice(0, previewLimit),
-          '…',
+          `… ${truncatedCount} lines collapsed`,
           ...nonEmptyLines.slice(-previewLimit),
         ]
       : nonEmptyLines;
@@ -58,6 +59,16 @@ export const shellDisplay = createToolDisplay<ShellState>({
             {shortenCommandPreview(command, MAX_COMMAND_DISPLAY_LEN)}
           </span>
           {isStreaming && <span style={{ fg: theme.muted }}>{'▍'}</span>}
+          {isExecuting && (
+            <>
+              <span style={{ fg: theme.muted }}>{' · '}</span>
+              <ShimmerText
+                text="Running…"
+                interval={SHIMMER_INTERVAL_MS}
+                primaryColor={theme.secondary}
+              />
+            </>
+          )}
           {isCompleted && (
             <span style={{ fg: isFailed ? theme.error : theme.success }}>
               {' '}{isFailed ? `✗ Exit ${state.exitCode}` : '✓'}
@@ -68,36 +79,19 @@ export const shellDisplay = createToolDisplay<ShellState>({
           {isInterrupted && <span style={{ fg: theme.muted }}>{' · Interrupted'}</span>}
         </text>
 
-        {/* Executing: Running… shimmer + live output */}
-        {isExecuting && (
-          <text style={{ marginTop: 1 }}>
-            <span style={{ fg: theme.muted }}>{'  '}</span>
-            <ShimmerText
-              text="Running…"
-              interval={SHIMMER_INTERVAL_MS}
-              primaryColor={theme.secondary}
-            />
-          </text>
-        )}
-
         {/* Output block */}
         {(isExecuting || isCompleted) && (outputText || errorText) && (
-          <box style={{ flexDirection: 'column', marginTop: 1, paddingLeft: 2 }}>
+          <box style={{ flexDirection: 'column', paddingLeft: 2 }}>
             {displayedLines.map((line, i) => {
               // Determine if this line is from stderr (errorText) or stdout
               const errorLineCount = errorText ? errorText.split('\n').length : 0;
-              const isErrorLine = errorText && i < errorLineCount && line !== '…';
+              const isErrorLine = errorText && i < errorLineCount && !line.startsWith('…');
               return (
                 <text key={i} style={{ fg: isErrorLine ? theme.error : theme.muted }}>
                   {line}
                 </text>
               );
             })}
-            {showPreview && (
-              <text style={{ fg: theme.muted }}>
-                {`— ${nonEmptyLines.length} lines total`}
-              </text>
-            )}
           </box>
         )}
 

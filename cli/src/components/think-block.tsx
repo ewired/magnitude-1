@@ -387,7 +387,11 @@ export const ThinkBlock = memo(function ThinkBlock({
           const prevGroup = gi > 0 ? visibleGroups[gi - 1] : null
           const prevHadThinking = prevGroup != null && prevGroup.steps.some(s => s.type === 'thinking')
           const currentHasTool = group.steps.some(s => s.type === 'tool' || s.type === 'subagent_started')
-          const hasMarginTop = prevHadThinking && currentHasTool
+          // Add spacing after shell groups (shell to shell, or shell to non-shell)
+          const isShellGroup = group.steps.some(s => s.type === 'tool' && s.toolKey === 'shell')
+          const prevIsShellGroup = prevGroup != null && prevGroup.steps.some(s => s.type === 'tool' && s.toolKey === 'shell')
+          const hasShellSpacing = (isShellGroup || prevIsShellGroup) && prevGroup != null
+          const hasMarginTop = (prevHadThinking && currentHasTool) || hasShellSpacing
 
           return (
             <ClusterContainer key={gi} cluster={group.cluster} hasMarginTop={hasMarginTop}>
