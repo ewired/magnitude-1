@@ -22,6 +22,7 @@ import { useTheme } from './hooks/use-theme'
 import { SelectedFileProvider } from './hooks/use-file-viewer'
 
 import { BOX_CHARS } from './utils/ui-constants'
+import { parseMentionsFromPrompt } from './utils/strings'
 import { formatTokensCompact } from './utils/format-tokens'
 import { hasConversationActivity } from './utils/start-state'
 
@@ -88,7 +89,7 @@ export type SessionStart =
   | { _tag: 'latest' }
   | { _tag: 'resume'; sessionId: string }
 
-export function App({ sessionStart, debug, autopilot, initialPrompt, onClientReady, onSessionId, disableShellSafeguards, disableCwdSafeguards }: { sessionStart: SessionStart; debug: boolean; autopilot?: boolean; initialPrompt?: string; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void; disableShellSafeguards?: boolean; disableCwdSafeguards?: boolean }) {
+export function App({ sessionStart, debug, autopilot, initialPrompt, onClientReady, onSessionId, disableShellSafeguards, disableCwdSafeguards, atifPath }: { sessionStart: SessionStart; debug: boolean; autopilot?: boolean; initialPrompt?: string; onClientReady?: (client: AgentClient | null) => void; onSessionId?: (id: string) => void; disableShellSafeguards?: boolean; disableCwdSafeguards?: boolean; atifPath?: string }) {
   const [conversationKey, setConversationKey] = useState(0)
   const [sessionSelection, setSessionSelection] = useState<string | null | undefined>(
     sessionStart._tag === 'new' ? null : sessionStart._tag === 'latest' ? undefined : sessionStart.sessionId
@@ -118,9 +119,10 @@ export function App({ sessionStart, debug, autopilot, initialPrompt, onClientRea
       onClientReady={onClientReady}
       onSessionId={onSessionId}
       autopilot={autopilot ?? false}
-      initialPrompt={initialPrompt ?? undefined}
+      initialPrompt={initialPrompt}
       disableShellSafeguards={disableShellSafeguards ?? false}
       disableCwdSafeguards={disableCwdSafeguards ?? false}
+      atifPath={atifPath}
     />
   )
 }
@@ -137,6 +139,7 @@ function AppInner({
   initialPrompt,
   disableShellSafeguards,
   disableCwdSafeguards,
+  atifPath,
 }: {
   debugMode: boolean
   skipAnimation: boolean
@@ -149,6 +152,7 @@ function AppInner({
   initialPrompt?: string
   disableShellSafeguards: boolean
   disableCwdSafeguards: boolean
+  atifPath?: string
 }) {
   const renderer = useRenderer()
   const storage = useStorage()
@@ -341,6 +345,7 @@ function AppInner({
         magnitudeApiKey: auth.key ?? undefined,
         disableShellSafeguards,
         disableCwdSafeguards,
+        atifPath,
       })
     }
 
@@ -459,6 +464,7 @@ function AppInner({
   useEffect(() => {
     if (!initialPrompt || initialPromptSentRef.current || !auth.loaded || !auth.key) return
     initialPromptSentRef.current = true
+    const attachments = parseMentionsFromPrompt(initialPrompt, process.cwd())
     // Publish initial task so autopilot uses task-driving prompt
     ensureClientReady().then(({ client }) => client.runEffect(publishInitialTask(initialPrompt)))
     clientSend({
@@ -467,7 +473,7 @@ function AppInner({
       timestamp: Date.now(),
       forkId: null,
       content: textParts(initialPrompt),
-      attachments: [],
+      attachments,
       mode: 'text',
       synthetic: false,
       taskMode: false,

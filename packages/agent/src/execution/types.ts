@@ -66,7 +66,7 @@ export function fromResponseUsage(usage: ResponseUsage): AgentCallUsage {
     outputTokens: usage.outputTokens,
     cacheReadTokens: usage.cacheReadTokens,
     cacheWriteTokens: null,
-    totalCost: null,
+    totalCost: usage.cost ?? null,
   }
 }
 
@@ -88,6 +88,7 @@ export interface ExecuteResult {
     readonly outputTokens: number | null
     readonly cacheReadTokens: number | null
     readonly cacheWriteTokens: number | null
+    readonly cost: number | null
   } | null
 }
 

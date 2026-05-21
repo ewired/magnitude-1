@@ -231,6 +231,15 @@ export type { SerializedEvent } from './serialization'
 // Types are still exported for CLI debug panel
 export type { DebugSnapshot, ProjectionSnapshot, ContextUsage } from './projections/debug-introspection'
 
+export { AtifProjection } from './projections/atif/projection'
+export type {
+  AtifTrajectory,
+  AtifStep,
+  AtifForkState,
+  AtifProjectionState,
+} from './projections/atif'
+export { serializeAtif } from './projections/atif/serialize'
+
 // Ambient config
 export * from './ambient'
 

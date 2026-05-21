@@ -168,6 +168,7 @@ describe("decode — mid-stream error envelope", () => {
         outputTokens: 5,
         cacheReadTokens: 0,
         cacheWriteTokens: 0,
+        cost: null,
       })
     }
   })

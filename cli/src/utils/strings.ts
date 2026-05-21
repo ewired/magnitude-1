@@ -1,5 +1,9 @@
 import stringWidth from 'string-width'
+import { existsSync, statSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { InputMentionSegment, InputPasteSegment, InputValue } from '../types/store'
+import { IMAGE_EXTENSIONS } from '../hooks/use-file-mentions'
+
 
 // Re-export InputValue type for backwards compatibility
 export type { InputValue } from '../types/store'
@@ -229,14 +233,18 @@ export function applyTextEditWithSegments(
 
 export function insertMentionSegment(
   input: InputValue,
-  mention: { path: string; contentType: 'text' | 'image' | 'directory' },
+  mention: { path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } },
   id: string,
   replaceStart: number,
   replaceEnd: number,
 ): InputValue {
   const safeStart = Math.max(0, Math.min(replaceStart, input.text.length))
   const safeEnd = Math.max(safeStart, Math.min(replaceEnd, input.text.length))
-  const placeholder = `@${mention.path}`
+  const lineRangeSuffix =
+    mention.lineRange && mention.contentType !== 'directory'
+      ? `:${mention.lineRange.start}-${mention.lineRange.end}`
+      : ''
+  const placeholder = `@${mention.path}${lineRangeSuffix}`
   const before = input.text.slice(0, safeStart)
   const after = input.text.slice(safeEnd)
   const removed = safeEnd - safeStart
@@ -273,6 +281,7 @@ export function insertMentionSegment(
         id,
         path: mention.path,
         contentType: mention.contentType,
+        lineRange: mention.lineRange,
         start: safeStart,
         end: safeStart + inserted,
       },
@@ -378,13 +387,14 @@ export function reconstituteInputTextWithMentions(
   input: InputValue,
 ): {
   text: string
-  mentions: Array<{ path: string; contentType: 'text' | 'image' | 'directory' }>
+  mentions: Array<{ path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } }>
 } {
   const text = reconstituteInputText(input)
   const seen = new Set<string>()
   const mentions: Array<{
     path: string
     contentType: 'text' | 'image' | 'directory'
+    lineRange?: { start: number; end: number }
   }> = []
 
   for (const segment of input.mentionSegments) {
@@ -395,6 +405,7 @@ export function reconstituteInputTextWithMentions(
     mentions.push({
       path: segment.path,
       contentType: segment.contentType,
+      lineRange: segment.lineRange,
     })
   }
 
@@ -471,6 +482,112 @@ export function formatFullTimestamp(ts: number): string {
   const minutes = date.getMinutes().toString().padStart(2, '0')
   const hours = date.getHours().toString().padStart(2, '0')
   return `${hours}:${minutes}:${seconds}`
+}
+
+// ---------------------------------------------------------------------------
+// Line range utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Expand a single-line spec by ±10 lines, clamped to [1, totalLines].
+ * If totalLines is unknown (undefined), clamps only to minimum of 1.
+ *
+ * Examples:
+ *   expandLineRange({ start: 42, end: 42 }, 200)  → { start: 32, end: 52 }
+ *   expandLineRange({ start: 5, end: 5 }, 100)    → { start: 1, end: 15 }
+ *   expandLineRange({ start: 1, end: 1 }, 50)     → { start: 1, end: 11 }
+ *   expandLineRange({ start: 100, end: 100 }, 50) → { start: 41, end: 50 }
+ *   expandLineRange({ start: 10, end: 20 }, 100)  → { start: 10, end: 20 }  // no change
+ */
+export function expandLineRange(
+  lineRange: { start: number; end: number },
+  totalLines?: number,
+): { start: number; end: number } {
+  // Only expand single-line specs (start === end)
+  if (lineRange.start !== lineRange.end) {
+    return lineRange;
+  }
+
+  const line = lineRange.start;
+  const start = Math.max(1, line - 10);
+  const end = totalLines !== undefined ? Math.min(totalLines, line + 10) : line + 10;
+
+  return { start, end };
+}
+
+// ---------------------------------------------------------------------------
+// @mention parsing for CLI prompts
+// ---------------------------------------------------------------------------
+
+function resolveCandidatePath(rawPath: string, cwd: string): string | null {
+  if (existsSync(rawPath)) return rawPath
+  const relativePath = resolve(cwd, rawPath)
+  if (existsSync(relativePath)) return relativePath
+  return null
+}
+
+export function parseMentionsFromPrompt(
+  text: string,
+  cwd: string,
+): Array<{ type: 'mention'; path: string; contentType: 'text' | 'image' | 'directory'; lineRange?: { start: number; end: number } }> {
+  const mentions: Array<{
+    type: 'mention'
+    path: string
+    contentType: 'text' | 'image' | 'directory'
+    lineRange?: { start: number; end: number }
+  }> = []
+  const seen = new Set<string>()
+  const regex = /(?:^|\s)@([^\s@]*)/g
+  let match
+
+  while ((match = regex.exec(text)) !== null) {
+    const rawPathWithRange = match[1]
+    if (!rawPathWithRange) continue
+
+    let rawPath = rawPathWithRange
+    let lineRange: { start: number; end: number } | undefined
+    const rangeMatch = rawPathWithRange.match(/:([\d]+)(?:-([\d]+))?$/)
+    if (rangeMatch && rangeMatch.index !== 1) {
+      const start = parseInt(rangeMatch[1], 10)
+      const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : start
+      if (!isNaN(start) && !isNaN(end) && start > 0 && end > 0) {
+        lineRange = expandLineRange({ start, end })
+        rawPath = rawPathWithRange.slice(0, rangeMatch.index)
+      }
+    }
+
+    const dedupeKey = lineRange ? `${rawPath}:${lineRange.start}-${lineRange.end}` : rawPath
+    if (seen.has(dedupeKey)) continue
+
+    const resolved = resolveCandidatePath(rawPath, cwd)
+    if (!resolved) {
+      console.warn(`[mentions] Path not found: @${rawPathWithRange}`)
+      continue
+    }
+
+    let contentType: 'text' | 'image' | 'directory' = 'text'
+    try {
+      const stat = statSync(resolved)
+      if (stat.isDirectory()) {
+        contentType = 'directory'
+      } else {
+        const extIdx = rawPath.lastIndexOf('.')
+        if (extIdx >= 0) {
+          const extension = rawPath.slice(extIdx).toLowerCase()
+          if (IMAGE_EXTENSIONS.has(extension)) {
+            contentType = 'image'
+          }
+        }
+      }
+    } catch {
+      // If stat fails, default to 'text'
+    }
+
+    seen.add(dedupeKey)
+    mentions.push({ type: 'mention', path: rawPath, contentType, lineRange })
+  }
+
+  return mentions
 }
 
 

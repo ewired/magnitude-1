@@ -284,6 +284,7 @@ export function createHarnessAdapter(config: HarnessAdapterConfig): HarnessAdapt
               outputTokens: event.usage.outputTokens ?? null,
               cacheReadTokens: event.usage.cacheReadTokens ?? null,
               cacheWriteTokens: event.usage.cacheWriteTokens ?? null,
+              cost: event.usage.cost ?? null,
             }
           }
 

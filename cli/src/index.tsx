@@ -25,6 +25,7 @@ async function main() {
     .option('--headless', 'Run in headless mode (no TUI, output to stdout)')
     .option('--disable-shell-safeguards', 'Disable shell command classification safeguards')
     .option('--disable-cwd-safeguards', 'Disable working directory boundary safeguards')
+    .option('--atif <path>', 'Write ATIF trajectory to the specified path')
 
     .action(async (opts) => {
 
@@ -45,6 +46,7 @@ async function main() {
           sessionStart,
           disableShellSafeguards: opts.disableShellSafeguards ?? false,
           disableCwdSafeguards: opts.disableCwdSafeguards ?? false,
+          atifPath: opts.atif,
         })
         process.exit(exitCode)
       }
@@ -85,9 +87,10 @@ async function main() {
             sessionStart={sessionStart}
             debug={opts.debug ?? false}
             autopilot={opts.autopilot ?? false}
-            initialPrompt={opts.prompt ?? undefined}
+            initialPrompt={opts.prompt}
             disableShellSafeguards={opts.disableShellSafeguards ?? false}
             disableCwdSafeguards={opts.disableCwdSafeguards ?? false}
+            atifPath={opts.atif}
             onClientReady={(client) => {
               clientRef = client
             }}

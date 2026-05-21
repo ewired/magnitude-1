@@ -8,6 +8,7 @@ export type FileMentionMenuItem = {
   kind: 'file' | 'directory'
   contentType: 'text' | 'image' | 'directory'
   warning?: boolean
+  lineRange?: { start: number; end: number }
 }
 
 interface FileMentionMenuProps {
@@ -82,6 +83,11 @@ export const FileMentionMenu = memo(function FileMentionMenu({
                 {item.kind === 'directory' && (
                   <text style={{ fg: theme.muted }} attributes={TextAttributes.DIM}>
                     {' '}{'[dir]'}
+                  </text>
+                )}
+                {item.lineRange && item.kind !== 'directory' && (
+                  <text style={{ fg: theme.muted }} attributes={TextAttributes.DIM}>
+                    {`:${item.lineRange.start}-${item.lineRange.end}`}
                   </text>
                 )}
                 {item.warning && (

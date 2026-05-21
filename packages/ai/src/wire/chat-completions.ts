@@ -147,6 +147,7 @@ const ChatChunkUsage = Schema.Struct({
       }),
     ),
   ),
+  cost: Schema.optional(Schema.Number),
 })
 
 export class ChatCompletionsStreamChunk extends Schema.Class<ChatCompletionsStreamChunk>(
