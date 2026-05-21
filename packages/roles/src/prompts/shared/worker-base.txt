@@ -42,6 +42,7 @@ The scratchpad is shared across all agents in this session — use it to share f
 $M/
   results/ - truncated tool results go here automatically
   reports/ - put informational reports here
-  plans/ - put plans in here
+  designs/ - high level designs
+  plans/ - concrete implementation plans
   thoughts/ - space for ideation, iteration, problem solving
   ...other directories as appropriate

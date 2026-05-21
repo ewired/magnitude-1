@@ -128,7 +128,8 @@ The scratchpad should be used to maintain documents and share with workers effic
 $M/
   results/ - truncated tool results go here automatically
   reports/ - put informational reports here
-  plans/ - put plans in here
+  designs/ - high level designs
+  plans/ - concrete implementation plans
   thoughts/ - space for ideation, iteration, problem solving. this can be used as a space for deep, persistent chain of thought.
   ...other directories as appropriate
 
