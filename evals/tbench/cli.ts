@@ -94,23 +94,15 @@ async function pullImagesMain() {
 }
 
 async function seedVolumeMain(options: {
-  name?: string
-  binary?: string
   force?: boolean
 }) {
-  const args = ['evals/tbench/seed_daytona_volume.py']
+  const args = ['evals/tbench/seed_modal_volume.py']
 
-  if (options.name) {
-    args.push('--name', options.name)
-  }
-  if (options.binary) {
-    args.push('--binary', options.binary)
-  }
   if (options.force) {
     args.push('--force')
   }
 
-  const child = spawn(['python3', ...args], {
+  const child = spawn(['modal', 'run', ...args], {
     stdout: 'inherit',
     stderr: 'inherit',
     stdin: 'inherit',
@@ -128,7 +120,7 @@ program
   .description('Start the interactive TB2 runner')
   .option('-c, --concurrency <number>', 'Concurrency to pass to harbor via -n', '1')
   .option('-t, --trials <number>', 'Trials to pass to harbor via -k', '1')
-  .option('--env <provider>', 'Execution environment/provider (default: daytona, use "local" for local Docker)', 'daytona')
+  .option('--env <provider>', 'Execution environment/provider (default: modal, use "local" for local Docker)', 'modal')
   .option('-r, --resume <jobDir>', 'Resume a previous job, retrying errored trials (except timeouts)')
   .action(async options => {
     const concurrency = parsePositiveInt(options.concurrency, 1)
@@ -177,9 +169,7 @@ program
 
 program
   .command('seed-volume')
-  .description('Seed a Daytona volume with the magnitude binary')
-  .option('--name <name>', 'Daytona volume name')
-  .option('--binary <path>', 'Path to the magnitude binary')
+  .description('Seed a Modal volume with the magnitude binary')
   .option('--force', 'Overwrite an existing binary for the computed hash', false)
   .action(async options => {
     await seedVolumeMain({

@@ -175,7 +175,7 @@ function commandForRun(
 
   if (environment && environment !== 'local') {
     args.push('--env', environment)
-    args.push('--environment-kwarg', 'volumes=magnitude-binaries')
+    args.push('--environment-kwarg', 'volumes={"/magnitude-binaries":"magnitude-binaries"}')
   }
 
   const datasetPrefix = 'terminal-bench/'
@@ -195,11 +195,8 @@ function renderCommand(args: string[]) {
 }
 
 const CLOUD_ENV_VAR_NAMES = new Set([
-  'BOUNDARY_API_KEY', // For BAML observability
-  'ANTHROPIC_API_KEY',
-  'OPENAI_API_KEY',
-  'OPENROUTER_API_KEY',
-  'DAYTONA_API_KEY',
+  'MODAL_TOKEN_ID',
+  'MODAL_TOKEN_SECRET',
   'HOME',
   'PATH',
   'LANG',

@@ -5,7 +5,7 @@ Run Magnitude on [Terminal Bench 2.1](https://www.tbench.ai/) via [Harbor](https
 ## Prerequisites
 
 - **Docker** (OrbStack, Docker Desktop, etc.)
-- **Harbor**: `uv tool install harbor`
+- **Harbor**: `uv tool install 'harbor[modal]'`
 - **Magnitude API key**: `export MAGNITUDE_API_KEY=...`
 
 ## Build the Linux binary
@@ -39,25 +39,43 @@ harbor run -d terminal-bench/terminal-bench-2-1 \
   -i "terminal-bench/fix-git"
 ```
 
-### Daytona Cloud
+### Modal Cloud
 
-Pre-seed the binary into a Daytona volume first:
+Requires `uv tool install 'harbor[modal]'` and Modal credentials (`MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET`).
+
+Pre-seed the binary into a Modal volume:
 
 ```bash
-python3 evals/tbench/seed_daytona_volume.py
+modal run evals/tbench/seed_modal_volume.py
 ```
 
-Then run with cloud environment:
+Then run. **Both `--env modal` and `--environment-kwarg` are required** — without them the volume won't be mounted and the agent will fall back to uploading the binary on every trial:
 
 ```bash
+# Single task
 harbor run -d terminal-bench/terminal-bench-2-1 \
   --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
-  --env daytona \
-  --environment-kwarg volumes=magnitude-binaries \
+  --env modal \
+  --environment-kwarg 'volumes={"/magnitude-binaries":"magnitude-binaries"}' \
+  -i "terminal-bench/fix-git"
+
+# Full benchmark (100 concurrent)
+harbor run -d terminal-bench/terminal-bench-2-1 \
+  --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
+  --env modal \
+  --environment-kwarg 'volumes={"/magnitude-binaries":"magnitude-binaries"}' \
   -n 100
 ```
 
+> **Tip:** The interactive runner (`bun evals/tbench/run.ts`) adds these flags automatically when you select a cloud environment.
+
 ## View results
+
+Visualize jobs in browser:
+```
+harbor view jobs
+```
+Opens `http://127.0.0.1:8080`.
 
 Harbor stores runs under `./jobs/`:
 
@@ -72,11 +90,3 @@ jobs/
     job.log
     result.json
 ```
-
-Visualize in browser:
-
-```bash
-harbor view jobs/2026-05-19__23-55-14 --jobs
-```
-
-Opens `http://127.0.0.1:8080`.
