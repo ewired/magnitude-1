@@ -15,11 +15,6 @@ import { spawnWorkerDisplay } from './displays/spawn-worker'
 import { reassignWorkerDisplay } from './displays/reassign-worker'
 
 /**
- * Erases the specific state type from a ToolDisplay, allowing it to accept BaseState.
- * This is safe because the dispatch function (renderToolStep/summarizeToolStep) guarantees
- * that the correct display is matched to the correct state shape via toolKey.
- */
-/**
  * Wraps a typed ToolDisplay to accept BaseState.
  * Safe because the toolKey-based dispatch guarantees the correct state shape.
  */

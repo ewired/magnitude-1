@@ -121,7 +121,7 @@ export const InlineForkActivity = memo(function InlineForkActivity({
     <box
       style={{
         alignSelf: 'flex-start',
-        marginBottom: 1,
+        
         borderStyle: 'single',
         border: ['left'],
         borderColor: lineColor,

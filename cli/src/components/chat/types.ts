@@ -24,6 +24,7 @@ export type ChatControllerEnv = {
   supportsVision: boolean
   autopilotEnabled: boolean
   autopilotGenerating: boolean
+  displayMode: 'default' | 'transcript'
 }
 
 export type ChatControllerServices = {

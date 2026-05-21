@@ -84,6 +84,7 @@ function makeProps(overrides: Partial<ChatControllerProps> = {}): ChatController
       supportsVision: true,
       autopilotEnabled: false,
       autopilotGenerating: false,
+      displayMode: 'default' as const,
     },
     services: {
       submitUserMessageToFork: mock(() => {}),

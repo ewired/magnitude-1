@@ -7,7 +7,7 @@ import { useFilePanel } from '../hooks/use-file-panel'
 import { Button } from './button'
 import { MessageView } from './message-view'
 import { ContextUsageBar } from './context-usage-bar'
-import { useCollapsedBlocks } from '../hooks/use-collapsed-blocks'
+
 import { FileViewerPanel } from './file-viewer-panel'
 import { SelectedFileProvider } from '../hooks/use-file-viewer'
 
@@ -77,8 +77,6 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
       onClose()
     }
   }, [onClose]))
-
-  const { isCollapsed, toggleCollapse } = useCollapsedBlocks()
 
   useEffect(() => {
     const unsubscribe = subscribeForkDisplay(forkId, (state) => {
@@ -212,8 +210,6 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
                     key={msg.id}
                     message={msg}
                     isStreaming={isStreamingMsg}
-                    isCollapsed={msg.type === 'think_block' ? isCollapsed(msg.id) : undefined}
-                    onToggleCollapse={msg.type === 'think_block' ? () => toggleCollapse(msg.id) : undefined}
                     onForkExpand={onForkExpand}
                     onFileClick={openFile}
                     onErrorAction={onErrorAction}

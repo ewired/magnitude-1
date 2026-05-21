@@ -10,7 +10,7 @@ import { violet } from '../../utils/theme';
 const SHIMMER_INTERVAL_MS = 160;
 
 export const spawnWorkerDisplay = createToolDisplay<SpawnWorkerState>({
-  render: ({ state }) => {
+  render: ({ state, mode }) => {
     const theme = useTheme();
     const message = state.message ?? '';
     const isStreaming = state.phase === 'streaming' || state.phase === 'executing';
@@ -19,6 +19,47 @@ export const spawnWorkerDisplay = createToolDisplay<SpawnWorkerState>({
 
     const { displayedContent, showCursor } = useStreamingReveal(message, isStreaming);
 
+    // Default mode: only show lifecycle stubs, no prompt content
+    if (mode === 'default') {
+      if (isStreaming || isError) {
+        const wordCount = displayedContent.trim() ? displayedContent.trim().split(/\s+/).length : 0;
+        return (
+          <text>
+            <span style={{ fg: violet[300] }}>{'▶ '}</span>
+            <span style={{ fg: theme.muted }}>{'Starting worker '}</span>
+            <span style={{ fg: theme.foreground }}>{state.agentId}</span>
+            {state.role && (
+              <span style={{ fg: theme.muted }}>{' · '}{state.role}</span>
+            )}
+            {isStreaming && (
+              <>
+                <ShimmerText text="…" interval={SHIMMER_INTERVAL_MS} primaryColor={theme.muted} />
+                <span style={{ fg: theme.muted }}>{' · '}{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
+              </>
+            )}
+            {isError && <span style={{ fg: theme.error }}>{' · Error'}</span>}
+          </text>
+        );
+      }
+
+      if (isCompleted) {
+        return (
+          <text>
+            <span style={{ fg: violet[300] }}>{'▶ '}</span>
+            <span style={{ fg: theme.muted }}>{'Worker '}</span>
+            <span style={{ fg: theme.foreground }}>{state.agentId}</span>
+            <span style={{ fg: theme.muted }}>{' started'}</span>
+            {state.role && (
+              <span style={{ fg: theme.muted }}>{' · '}{state.role}</span>
+            )}
+          </text>
+        );
+      }
+
+      return null;
+    }
+
+    // Transcript mode: show full streaming prompt as it currently works
     // Completed state: worker has started, show the same visual as WorkerStartedRow
     if (isCompleted) {
       return (
@@ -85,12 +126,12 @@ export const spawnWorkerDisplay = createToolDisplay<SpawnWorkerState>({
   summary: (state) => {
     const id = state.agentId ? ` ${state.agentId}` : '';
     if (state.phase === 'completed') {
-      return `Start worker${id}${state.title ? ` — ${state.title}` : ''}`;
+      return `Worker${id} started${state.role ? ` · ${state.role}` : ''}`;
     }
-    if (state.phase === 'streaming' || state.phase === 'executing') return `Start worker${id} with prompt...`;
-    if (state.phase === 'error') return `Start worker${id} with prompt · Error`;
-    if (state.phase === 'rejected') return `Start worker${id} with prompt · Rejected`;
-    if (state.phase === 'interrupted') return `Start worker${id} with prompt · Interrupted`;
-    return `Start worker${id} with prompt`;
+    if (state.phase === 'streaming' || state.phase === 'executing') return `Starting worker${id}${state.role ? ` · ${state.role}` : ''}...`;
+    if (state.phase === 'error') return `Starting worker${id} · Error`;
+    if (state.phase === 'rejected') return `Starting worker${id} · Rejected`;
+    if (state.phase === 'interrupted') return `Starting worker${id} · Interrupted`;
+    return `Starting worker${id}`;
   },
 });

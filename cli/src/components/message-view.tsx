@@ -14,11 +14,6 @@ interface MessageViewProps {
   message: DisplayMessage
   isStreaming: boolean
   isInterrupted?: boolean
-  isCollapsed?: boolean
-  onToggleCollapse?: () => void
-  hideThinkBlockHeader?: boolean
-  onThinkBlockHeaderRef?: (ref: any) => void
-  pendingApproval?: boolean
   onApprove?: () => void
   onReject?: () => void
   onWorkApprove?: () => void
@@ -27,17 +22,13 @@ interface MessageViewProps {
   onFileClick?: (path: string, section?: string) => void
   onForkExpand?: (forkId: string) => void
   onErrorAction?: (actionId: ActionId) => void
+  mode?: 'default' | 'transcript'
 }
 
 export const MessageView = memo(function MessageView({
   message,
   isStreaming,
   isInterrupted,
-  isCollapsed,
-  onToggleCollapse,
-  hideThinkBlockHeader,
-  onThinkBlockHeaderRef,
-  pendingApproval,
   onApprove,
   onReject,
   onWorkApprove,
@@ -46,6 +37,7 @@ export const MessageView = memo(function MessageView({
   onFileClick,
   onForkExpand,
   onErrorAction,
+  mode = 'default',
 }: MessageViewProps) {
   const theme = useTheme()
   // User messages have their own border structure providing left offset
@@ -73,12 +65,7 @@ export const MessageView = memo(function MessageView({
         return (
           <ThinkBlock
             block={message}
-            isCollapsed={isCollapsed ?? false}
-            onToggle={onToggleCollapse ?? (() => {})}
-            timerStartTime={message.status === 'active' ? message.timestamp : null}
-            hideHeader={hideThinkBlockHeader}
-            onHeaderRef={onThinkBlockHeaderRef}
-            pendingApproval={pendingApproval}
+            mode={mode}
             onFileClick={onFileClick}
             isInterrupted={isInterrupted}
           />
@@ -94,7 +81,7 @@ export const MessageView = memo(function MessageView({
           interruptText = '[Interrupted] · What would you like to do instead?'
         }
         return (
-          <box style={{ marginBottom: 1 }}>
+          <box>
             <text style={{ fg: theme.warning }}>{interruptText}</text>
           </box>
         )
@@ -116,7 +103,7 @@ export const MessageView = memo(function MessageView({
 
       case 'agent_communication':
         return (
-          <box style={{ marginBottom: 1 }}>
+          <box>
             <AgentCommunicationCard message={message} onFileClick={onFileClick} />
           </box>
         )
@@ -124,6 +111,8 @@ export const MessageView = memo(function MessageView({
     }
   })()
 
+  // Every message gets consistent top margin for spacing (handled at list level)
+  // No per-component bottom margins needed
   if (isUserType) {
     return content
   }

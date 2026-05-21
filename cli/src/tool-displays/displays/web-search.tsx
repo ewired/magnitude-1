@@ -1,7 +1,6 @@
 import { TextAttributes } from '@opentui/core';
 import { type WebSearchState } from '@magnitudedev/agent/src/models';
 import { createToolDisplay } from '../types';
-import { Button } from '../../components/button';
 import { ShimmerText } from '../../components/shimmer-text';
 import { useTheme } from '../../hooks/use-theme';
 
@@ -13,7 +12,7 @@ function truncate(s: string, max: number): string {
 }
 
 export const webSearchDisplay = createToolDisplay<WebSearchState>({
-  render: ({ state, isExpanded, onToggle }) => {
+  render: ({ state }) => {
     const theme = useTheme();
     const isRunning = state.phase === 'streaming' || state.phase === 'executing';
     const isError = state.phase === 'error';
@@ -21,14 +20,12 @@ export const webSearchDisplay = createToolDisplay<WebSearchState>({
 
     if (isRunning) {
       return (
-        <Button onClick={onToggle}>
-          <text style={{ wrapMode: 'word' }}>
-            <span style={{ fg: theme.info }}>[⌕] </span>
-            <span style={{ fg: theme.foreground }}>{'Search web for '}</span>
-            <span style={{ fg: theme.muted }}>{`"${state.query ? truncate(state.query, 50) : '...'}"`}</span>
-            <ShimmerText text=" ..." interval={WEB_SEARCH_SHIMMER_MS} primaryColor={theme.info} />
-          </text>
-        </Button>
+        <text style={{ wrapMode: 'word' }}>
+          <span style={{ fg: theme.info }}>[⌕] </span>
+          <span style={{ fg: theme.foreground }}>{'Search web for '}</span>
+          <span style={{ fg: theme.muted }}>{`"${state.query ? truncate(state.query, 50) : '...'}"`}</span>
+          <ShimmerText text=" ..." interval={WEB_SEARCH_SHIMMER_MS} primaryColor={theme.info} />
+        </text>
       );
     }
 
@@ -48,25 +45,20 @@ export const webSearchDisplay = createToolDisplay<WebSearchState>({
     if (sources.length > 0) {
       return (
         <box style={{ flexDirection: 'column' }}>
-          <Button onClick={onToggle}>
-            <text style={{ wrapMode: 'word' }}>
-              <span style={{ fg: theme.info }}>[⌕] </span>
-              <span style={{ fg: theme.foreground }}>{'Search web for '}</span>
-              <span style={{ fg: theme.muted }}>{`"${truncate(state.query ?? '', 50)}"`}</span>
-              <span style={{ fg: theme.info }}>{` · ${sources.length} ${sources.length === 1 ? 'source' : 'sources'}`}</span>
-              <span style={{ fg: theme.secondary }} attributes={TextAttributes.DIM}>{isExpanded ? ' (collapse)' : ' (expand)'}</span>
-            </text>
-          </Button>
-          {isExpanded && (
-            <box style={{ flexDirection: 'column', paddingLeft: 2 }}>
-              {sources.map((src, i) => (
-                <text key={i}>
-                  <span style={{ fg: theme.foreground }}>{'- '}{src.title}</span>
-                  <span style={{ fg: theme.muted }} attributes={TextAttributes.DIM}>{`: ${truncate(src.url, 60)}`}</span>
-                </text>
-              ))}
-            </box>
-          )}
+          <text style={{ wrapMode: 'word' }}>
+            <span style={{ fg: theme.info }}>[⌕] </span>
+            <span style={{ fg: theme.foreground }}>{'Search web for '}</span>
+            <span style={{ fg: theme.muted }}>{`"${truncate(state.query ?? '', 50)}"`}</span>
+            <span style={{ fg: theme.info }}>{` · ${sources.length} ${sources.length === 1 ? 'source' : 'sources'}`}</span>
+          </text>
+          <box style={{ flexDirection: 'column', paddingLeft: 2 }}>
+            {sources.map((src, i) => (
+              <text key={i}>
+                <span style={{ fg: theme.foreground }}>{'- '}{src.title}</span>
+                <span style={{ fg: theme.muted }} attributes={TextAttributes.DIM}>{`: ${truncate(src.url, 60)}`}</span>
+              </text>
+            ))}
+          </box>
         </box>
       );
     }

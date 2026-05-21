@@ -12,12 +12,7 @@ mock.module('../hooks/use-theme', () => ({
   }),
 }))
 
-mock.module('../hooks/use-collapsed-blocks', () => ({
-  useCollapsedBlocks: () => ({
-    isCollapsed: () => false,
-    toggleCollapse: () => {},
-  }),
-}))
+// useCollapsedBlocks was deleted — no mock needed
 
 mock.module('./button', () => ({
   Button: ({ children }: { children?: any }) => <>{children}</>,

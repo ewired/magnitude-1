@@ -31,8 +31,8 @@ describe('webSearchDisplay error rendering', () => {
         errorDetail:
           'Web search is not available for your current plan. Upgrade to enable web search.',
       } as any,
-      isExpanded: false,
-      onToggle: () => {},
+      mode: 'default',
+      onFileClick: () => {},
     }) as any
 
     const text = htmlToText(renderToStaticMarkup(createElement(() => element)))
@@ -49,8 +49,8 @@ describe('webSearchDisplay error rendering', () => {
         query: 'magnitude search',
         sources: [],
       } as any,
-      isExpanded: false,
-      onToggle: () => {},
+      mode: 'default',
+      onFileClick: () => {},
     }) as any
 
     const text = htmlToText(renderToStaticMarkup(createElement(() => element)))

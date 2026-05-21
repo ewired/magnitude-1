@@ -63,6 +63,7 @@ const SpanRenderer = memo(function SpanRenderer({
   const hitZones: Array<
     | { kind: 'artifact'; charStart: number; charEnd: number; name: string; section?: string }
     | { kind: 'file'; charStart: number; charEnd: number; path: string; section?: string }
+    | { kind: 'url'; charStart: number; charEnd: number; url: string }
   > = []
   let charOffset = 0
   const elements: React.ReactNode[] = []
@@ -92,12 +93,19 @@ const SpanRenderer = memo(function SpanRenderer({
     }
 
     if (span.url) {
+      const zoneIdx = hitZones.length
+      hitZones.push({
+        kind: 'url',
+        charStart: charOffset,
+        charEnd: charOffset + span.text.length,
+        url: span.url,
+      })
+
+      const isHovered = hoveredZone === zoneIdx
       elements.push(
-        <a key={i} href={span.url}>
-          <span fg={span.fg ?? theme.link} bg={span.bg} attributes={(attrs ?? 0) | TextAttributes.UNDERLINE}>
-            {span.text}
-          </span>
-        </a>,
+        <span key={i} fg={isHovered ? theme.link : (span.fg ?? theme.link)} bg={span.bg} attributes={(attrs ?? 0) | TextAttributes.UNDERLINE}>
+          {span.text}
+        </span>,
       )
       charOffset += span.text.length
       continue
@@ -179,8 +187,14 @@ const SpanRenderer = memo(function SpanRenderer({
         { mountedRef },
       )
       const zone = hitZones[hit]
-      if (zone.kind === 'file') onOpenFile?.(zone.path, zone.section)
-      else onOpenArtifact?.(zone.name, zone.section)
+      if (zone.kind === 'file') {
+        onOpenFile?.(zone.path, zone.section)
+      } else if (zone.kind === 'url') {
+        const isMac = process.platform === 'darwin'
+        Bun.spawn([isMac ? 'open' : 'xdg-open', zone.url])
+      } else {
+        onOpenArtifact?.(zone.name, zone.section)
+      }
     }
     pressStartedRef.current = null
   })
@@ -216,7 +230,6 @@ const SpanRenderer = memo(function SpanRenderer({
         textRef.current = el
       }}
       style={{ fg: foreground, wrapMode: 'word' }}
-      selectable={false}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseMove={handleMouseMove}

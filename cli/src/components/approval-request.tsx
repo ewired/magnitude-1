@@ -34,7 +34,7 @@ export const ApprovalRequest = memo(function ApprovalRequest({ message, onApprov
   if (message.status === 'rejected') {
     return (
       <box style={{
-        marginBottom: 1,
+        
         paddingLeft: 1,
         paddingRight: 1,
         flexDirection: 'column',
@@ -63,7 +63,7 @@ export const ApprovalRequest = memo(function ApprovalRequest({ message, onApprov
   return (
     <box style={{
       flexDirection: 'column',
-      marginBottom: 1,
+      
       borderStyle: 'single',
       borderColor: theme.border,
       customBorderChars: BOX_CHARS,

@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 
 export interface CommonToolProps {
-  isExpanded: boolean
-  onToggle(): void
+  mode: 'default' | 'transcript'
   onFileClick(path: string, section?: string): void
 }
 

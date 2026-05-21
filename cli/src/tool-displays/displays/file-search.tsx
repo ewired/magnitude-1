@@ -1,7 +1,6 @@
 import { TextAttributes } from '@opentui/core';
 import { createToolDisplay } from '../types';
 import { type FileSearchState } from '@magnitudedev/agent/src/models';
-import { Button } from '../../components/button';
 import { ShimmerText } from '../../components/shimmer-text';
 import { useTheme } from '../../hooks/use-theme';
 
@@ -34,7 +33,7 @@ function truncateLine(text: string, max: number): string {
 }
 
 export const fileSearchDisplay = createToolDisplay<FileSearchState>({
-  render: ({ state, isExpanded, onToggle }) => {
+  render: ({ state }) => {
     const theme = useTheme();
     const inputSummary = summarizeInputs(state);
     const isRunning = state.phase === 'streaming' || state.phase === 'executing';
@@ -43,42 +42,35 @@ export const fileSearchDisplay = createToolDisplay<FileSearchState>({
 
     return (
       <box style={{ flexDirection: 'column' }}>
-        <Button onClick={onToggle}>
-          <text style={{ wrapMode: 'word' }}>
-            <span style={{ fg: isError ? theme.error : theme.info }}>{isError ? '✗ ' : '/ '}</span>
-            {isRunning ? (
-              <>
-                <span style={{ fg: theme.foreground }}>{'Search '}</span>
-                <span style={{ fg: theme.muted }}>{inputSummary || '...'}</span>
-                <ShimmerText text="..." interval={SHIMMER_INTERVAL_MS} primaryColor={theme.secondary} />
-              </>
-            ) : isError ? (
-              <>
-                <span style={{ fg: theme.foreground }}>{'Search '}</span>
-                <span style={{ fg: theme.muted }}>{inputSummary}</span>
-                <span style={{ fg: theme.error }}>{' · Error'}</span>
-                <span style={{ fg: theme.muted }}>{` (${state.errorDetail || ''})`}</span>
-              </>
-            ) : (
-              <>
-                <span style={{ fg: theme.foreground }}>{'Search '}</span>
-                <span style={{ fg: theme.muted }}>{inputSummary}</span>
-                {state.matchCount > 0 ? (
-                  <>
-                    <span style={{ fg: theme.info }}>{` · ${state.matchCount} ${state.matchCount === 1 ? 'match' : 'matches'} in ${uniqueFiles} ${uniqueFiles === 1 ? 'file' : 'files'}`}</span>
-                    <span style={{ fg: theme.secondary }} attributes={TextAttributes.DIM}>
-                      {isExpanded ? ' (collapse)' : ' (expand)'}
-                    </span>
-                  </>
-                ) : (
-                  <span style={{ fg: theme.muted }}>{' · no matches'}</span>
-                )}
-              </>
-            )}
-          </text>
-        </Button>
+        <text style={{ wrapMode: 'word' }}>
+          <span style={{ fg: isError ? theme.error : theme.info }}>{isError ? '✗ ' : '/ '}</span>
+          {isRunning ? (
+            <>
+              <span style={{ fg: theme.foreground }}>{'Search '}</span>
+              <span style={{ fg: theme.muted }}>{inputSummary || '...'}</span>
+              <ShimmerText text="..." interval={SHIMMER_INTERVAL_MS} primaryColor={theme.secondary} />
+            </>
+          ) : isError ? (
+            <>
+              <span style={{ fg: theme.foreground }}>{'Search '}</span>
+              <span style={{ fg: theme.muted }}>{inputSummary}</span>
+              <span style={{ fg: theme.error }}>{' · Error'}</span>
+              <span style={{ fg: theme.muted }}>{` (${state.errorDetail || ''})`}</span>
+            </>
+          ) : (
+            <>
+              <span style={{ fg: theme.foreground }}>{'Search '}</span>
+              <span style={{ fg: theme.muted }}>{inputSummary}</span>
+              {state.matchCount > 0 ? (
+                <span style={{ fg: theme.info }}>{` · ${state.matchCount} ${state.matchCount === 1 ? 'match' : 'matches'} in ${uniqueFiles} ${uniqueFiles === 1 ? 'file' : 'files'}`}</span>
+              ) : (
+                <span style={{ fg: theme.muted }}>{' · no matches'}</span>
+              )}
+            </>
+          )}
+        </text>
 
-        {isExpanded && state.matchCount > 0 && (
+        {state.matchCount > 0 && (
           <box style={{ flexDirection: 'column', paddingLeft: 2 }}>
             {state.matches.map((match, i) => {
               const parsed = parseMatch(match.match);

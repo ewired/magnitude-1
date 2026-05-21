@@ -52,6 +52,19 @@ import {
   moveMessageToEndBeforeQueue,
   toPreview,
 } from './helpers/messages'
+import type { ToolKey } from '../tools/toolkits'
+
+function getToolCluster(toolKey: ToolKey): string | undefined {
+  switch (toolKey) {
+    case 'fileRead': return 'read'
+    case 'fileSearch': return 'search'
+    case 'webSearch': return 'web_search'
+    case 'webFetch': return 'web_fetch'
+    case 'fileTree': return 'tree'
+    case 'fileView': return 'view'
+    default: return undefined
+  }
+}
 
 import {
   findThinkBlock,
@@ -347,6 +360,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
               id: event.toolCallId,
               type: 'tool',
               toolKey: event.toolKey,
+              cluster: getToolCluster(event.toolKey),
               state: getVisualState(toolStateFork, event.toolCallId),
               filter: null,
               resultFilePath: null,

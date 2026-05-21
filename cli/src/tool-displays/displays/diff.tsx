@@ -9,16 +9,14 @@ import { useStreamingReveal } from '../../hooks/use-streaming-reveal';
 import { useTheme } from '../../hooks/use-theme';
 import { useSelectedFile } from '../../hooks/use-file-viewer';
 
-
 const SHIMMER_INTERVAL_MS = 160;
 
 export const diffDisplay = createToolDisplay<DiffState>({
-  render: ({ state, isExpanded, onToggle, onFileClick }) => {
+  render: ({ state, onFileClick }) => {
     const theme = useTheme();
     const path = state.path;
     const newText = state.newText ?? '';
     const [isHovered, setIsHovered] = useState(false);
-    const [isExpandHovered, setIsExpandHovered] = useState(false);
     const selectedFile = useSelectedFile();
     const isViewerShowingSameFile = !!path && selectedFile?.path === path;
 
@@ -58,24 +56,15 @@ export const diffDisplay = createToolDisplay<DiffState>({
               </text>
             </Button>
             {state.diffs.length > 0 && (
-              <Button
-                onClick={onToggle}
-                onMouseOver={() => setIsExpandHovered(true)}
-                onMouseOut={() => setIsExpandHovered(false)}
-              >
-                <text>
-                  <span style={{ fg: theme.syntax.string }} attributes={isExpandHovered ? undefined : TextAttributes.DIM}>{` +${totals.added}`}</span>
-                  <span style={{ fg: isExpandHovered ? theme.foreground : theme.secondary }} attributes={TextAttributes.DIM}>{'/'}</span>
-                  <span style={{ fg: theme.error }} attributes={isExpandHovered ? undefined : TextAttributes.DIM}>{`-${totals.removed}`}</span>
-                  <span style={{ fg: isExpandHovered ? theme.foreground : theme.secondary }} attributes={TextAttributes.DIM}>
-                    {isExpanded ? ' (collapse)' : ' (expand)'}
-                  </span>
-                </text>
-              </Button>
+              <text>
+                <span style={{ fg: theme.syntax.string }} attributes={TextAttributes.DIM}>{` +${totals.added}`}</span>
+                <span style={{ fg: theme.secondary }} attributes={TextAttributes.DIM}>{'/'}</span>
+                <span style={{ fg: theme.error }} attributes={TextAttributes.DIM}>{`-${totals.removed}`}</span>
+              </text>
             )}
           </box>
 
-          {isExpanded && state.diffs.length > 0 && (
+          {state.diffs.length > 0 && (
             <box style={{ flexDirection: 'column', paddingLeft: 2 }}>
               {state.diffs.map((diff, index) => (
                 <DiffHunk
@@ -84,6 +73,7 @@ export const diffDisplay = createToolDisplay<DiffState>({
                   removedLines={[...diff.removedLines]}
                   addedLines={[...diff.addedLines]}
                   contextAfter={[...diff.contextAfter]}
+                  startLine={diff.startLine}
                 />
               ))}
             </box>
@@ -123,6 +113,7 @@ export const diffDisplay = createToolDisplay<DiffState>({
                 addedLines={isStreamingNew ? revealedNewText.split('\n') : streamingDiff.addedLines}
                 contextAfter={streamingDiff.contextAfter}
                 streamingCursor={isStreamingNew}
+                startLine={streamingDiff.startLine}
               />
             )}
           </box>

@@ -564,6 +564,9 @@ export function ChatController(props: ChatControllerProps) {
           subscribeForkCompaction={subscribeForkCompaction}
           subscribeForkWindow={subscribeForkWindow}
         />
+        <box style={{ height: 1, borderStyle: 'single', border: ['left'], borderColor: env.bashMode ? orange[400] : env.modeColor, customBorderChars: { topLeft: '', bottomLeft: '', topRight: '', bottomRight: '', horizontal: ' ', vertical: '╻', topT: '', bottomT: '', leftT: '', rightT: '', cross: '' } }}>
+          <box style={{ height: 1, borderStyle: 'single', border: ['top'], borderColor: env.theme.inputBg, customBorderChars: { topLeft: '', bottomLeft: '', topRight: '', bottomRight: '', horizontal: '▄', vertical: ' ', topT: '', bottomT: '', leftT: '', rightT: '', cross: '' } }} />
+        </box>
         <box style={{ borderStyle: 'single', border: ['left'], borderColor: env.bashMode ? orange[400] : env.modeColor, customBorderChars: { ...BOX_CHARS, vertical: '┃' } }}>
           <box style={{ backgroundColor: env.theme.inputBg, paddingTop: 1, paddingLeft: 1, paddingRight: 2, flexDirection: 'column', flexGrow: 1 }}>
             {!env.bashMode && fileMentions.isOpen && (
@@ -650,6 +653,12 @@ export function ChatController(props: ChatControllerProps) {
           ) : env.bashMode ? (
             <text style={{ fg: env.theme.muted }}><span attributes={TextAttributes.BOLD}>Esc</span> to exit Bash mode</text>
           ) : null)}
+          {env.displayMode === 'transcript' && (
+            <>
+              <text style={{ fg: env.theme.info }}>Transcript Mode</text>
+              <text style={{ fg: env.theme.muted }}>{' · '}</text>
+            </>
+          )}
           <ContextUsageBar
             tokenUsage={env.tokenUsage}
             hardCap={env.contextHardCap}

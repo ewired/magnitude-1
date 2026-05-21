@@ -1,37 +1,24 @@
-import { memo, useEffect, useRef, useState, useCallback } from 'react'
-import type { Ref } from 'react'
-import { TextAttributes, type BoxRenderable } from '@opentui/core'
+import { memo, useEffect, useRef, useState } from 'react'
+import { TextAttributes } from '@opentui/core'
 import type { ThinkBlockMessage, ThinkBlockStep, DisplayMessage, ToolKey } from '@magnitudedev/agent'
 import { Button } from './button'
 import { AgentCommunicationCard } from './agent-communication-card'
 import { useTheme } from '../hooks/use-theme'
 import { violet } from '../utils/theme'
-import { ShimmerText } from './shimmer-text'
-import { MiniWave } from './mini-wave'
-import { renderToolStep } from '../tool-displays/render'
-import { selectLatestLiveActivityFromThinkSteps } from '../utils/live-activity'
-import { formatSubagentIdWithEmoji } from '../utils/subagent-role-emoji'
 
-const SHIMMER_INTERVAL_MS = 160
+import { renderToolStep } from '../tool-displays/render'
+
+
+
+
 
 type AgentCommunicationMessage = Extract<DisplayMessage, { type: 'agent_communication' }>
 
 interface ThinkBlockProps {
   block: ThinkBlockMessage
-  isCollapsed: boolean
-  onToggle: () => void
-  timerStartTime?: number | null
-  hideHeader?: boolean
-  onHeaderRef?: Ref<BoxRenderable>
-  pendingApproval?: boolean
+  mode: 'default' | 'transcript'
   onFileClick?: (path: string, section?: string) => void
   isInterrupted?: boolean
-}
-
-const formatElapsedTime = (seconds: number): string => {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
 }
 
 const formatDuration = (seconds: number): string => {
@@ -47,43 +34,9 @@ const WorkerStartedRow = ({ step }: { step: Extract<ThinkBlockStep, { type: 'sub
     <text>
       <span style={{ fg: violet[300] }}>▶ </span>
       <span style={{ fg: theme.muted }}>Worker </span>
-      <span style={{ fg: theme.muted }}>started</span>
-      <span style={{ fg: theme.muted }}>: </span>
-      <span style={{ fg: theme.foreground }}>{formatSubagentIdWithEmoji(step.subagentId, step.subagentType)}</span>
-      {step.resumed && <span style={{ fg: theme.muted }}> (resumed)</span>}
-      <span style={{ fg: theme.muted }}> — {step.title}</span>
-    </text>
-  )
-}
-
-const WorkerFinishedRow = ({ step }: { step: Extract<ThinkBlockStep, { type: 'subagent_finished' }> }) => {
-  const theme = useTheme()
-  const duration = formatDuration(Math.floor(step.cumulativeTotalTimeMs / 1000))
-  const tools = step.cumulativeTotalToolsUsed
-  return (
-    <text>
-      <span style={{ fg: theme.success }}>✓ </span>
-      <span style={{ fg: theme.muted }}>Worker </span>
-      <span style={{ fg: theme.muted }}>finished</span>
-      <span style={{ fg: theme.muted }}>: </span>
-      <span style={{ fg: theme.foreground }}>{formatSubagentIdWithEmoji(step.subagentId, step.subagentType)}</span>
-      {step.resumed && <span style={{ fg: theme.muted }}> (resumed)</span>}
-      <span style={{ fg: theme.muted }}> · {step.resumed ? '↺ ' : ''}{duration} · </span>
-      <span style={{ fg: theme.primary }}>{tools}</span>
-      <span style={{ fg: theme.muted }}> {tools === 1 ? 'tool' : 'tools'}</span>
-    </text>
-  )
-}
-
-const WorkerKilledRow = ({ step }: { step: Extract<ThinkBlockStep, { type: 'subagent_killed' | 'subagent_user_killed' }> }) => {
-  const theme = useTheme()
-  const message = step.type === 'subagent_user_killed' ? 'Worker killed by user: ' : 'Worker killed: '
-  return (
-    <text>
-      <span style={{ fg: theme.error }}>■ </span>
-      <span style={{ fg: theme.muted }}>{message}</span>
-      <span style={{ fg: theme.foreground }}>{formatSubagentIdWithEmoji(step.subagentId, step.subagentType)}</span>
-      <span style={{ fg: theme.muted }}> - {step.title}</span>
+      <span style={{ fg: theme.foreground }}>{step.subagentId}</span>
+      <span style={{ fg: theme.muted }}> started</span>
+      <span style={{ fg: theme.muted }}> · {step.subagentType}</span>
     </text>
   )
 }
@@ -95,56 +48,6 @@ const StatusIndicatorRow = ({ step }: { step: Extract<ThinkBlockStep, { type: 's
       <span style={{ fg: theme.muted }}>{step.message}</span>
     </text>
   )
-}
-
-function buildSummary(steps: readonly { type: string; toolKey?: ToolKey; state?: { phase?: string } }[]): string {
-  let webSearches = 0
-  let commands = 0
-  let reads = 0
-  let writes = 0
-  let searches = 0
-  let edits = 0
-
-  let workerStarted = 0
-  let workerFinished = 0
-  let workerKilled = 0
-  for (const step of steps) {
-    if (step.type === 'subagent_started') {
-      workerStarted++
-      continue
-    }
-    if (step.type === 'tool' && step.toolKey === 'spawnWorker' && step.state?.phase === 'completed') {
-      workerStarted++
-      continue
-    }
-    if (step.type === 'subagent_finished') {
-      workerFinished++
-      continue
-    }
-    if (step.type === 'subagent_killed' || step.type === 'subagent_user_killed') {
-      workerKilled++
-      continue
-    }
-    if (step.type !== 'tool') continue
-    if (step.toolKey === 'webSearch' || step.toolKey === 'webFetch') webSearches++
-    else if (step.toolKey === 'shell') commands++
-    else if (step.toolKey === 'fileRead') reads++
-    else if (step.toolKey === 'fileWrite') writes++
-    else if (step.toolKey === 'fileSearch') searches++
-    else if (step.toolKey === 'fileEdit') edits++
-  }
-  const parts: string[] = []
-  if (webSearches > 0) parts.push(`${webSearches} ${webSearches === 1 ? 'web search' : 'web searches'}`)
-  if (commands > 0) parts.push(`${commands} ${commands === 1 ? 'command' : 'commands'}`)
-  if (reads > 0) parts.push(`${reads} ${reads === 1 ? 'read' : 'reads'}`)
-  if (writes > 0) parts.push(writes + ' ' + (writes === 1 ? 'write' : 'writes'))
-  if (edits > 0) parts.push(edits + ' ' + (edits === 1 ? 'edit' : 'edits'))
-  if (searches > 0) parts.push(`${searches} ${searches === 1 ? 'search' : 'searches'}`)
-
-  if (workerStarted > 0) parts.push(`${workerStarted} ${workerStarted === 1 ? 'worker started' : 'workers started'}`)
-  if (workerFinished > 0) parts.push(`${workerFinished} ${workerFinished === 1 ? 'worker finished' : 'workers finished'}`)
-  if (workerKilled > 0) parts.push(`${workerKilled} ${workerKilled === 1 ? 'worker killed' : 'workers killed'}`)
-  return parts.length > 0 ? ` (${parts.join(', ')})` : ''
 }
 
 // =============================================================================
@@ -185,20 +88,17 @@ function groupByCluster(steps: readonly ThinkBlockStep[]): StepGroup[] {
 
 const ToolStepView = memo(function ToolStepView({
   step,
-  isExpanded,
-  onToggle,
+  mode,
   onFileClick,
 }: {
   step: Extract<ThinkBlockStep, { type: 'tool' }>
-  isExpanded: boolean
-  onToggle: () => void
+  mode: 'default' | 'transcript'
   onFileClick?: (name: string, section?: string) => void
 }) {
   const theme = useTheme()
   if (step.state) {
     return <>{renderToolStep(step.toolKey, step.state, {
-      isExpanded,
-      onToggle,
+      mode,
       onFileClick: onFileClick ?? (() => {}),
     })}</>
   }
@@ -278,11 +178,11 @@ const ThinkingStep = memo(function ThinkingStep({ content, label, isActive, isIn
 
 function ClusterContainer({
   cluster,
-  isFirstGroup,
+  hasMarginTop,
   children,
 }: {
   cluster: string | null
-  isFirstGroup: boolean
+  hasMarginTop: boolean
   children: React.ReactNode
 }) {
   const theme = useTheme()
@@ -291,7 +191,7 @@ function ClusterContainer({
     <box
       style={{
         flexDirection: 'column',
-        marginTop: isFirstGroup ? 0 : 1,
+        marginTop: hasMarginTop ? 1 : 0,
         ...(cluster === 'shell'
           ? {
               backgroundColor: theme.terminalBg,
@@ -306,21 +206,61 @@ function ClusterContainer({
 }
 
 // =============================================================================
+// Cluster summary — consolidated line for groupable tools in default mode
+// =============================================================================
+
+function ClusterSummaryRow({ cluster, steps }: { cluster: string; steps: Extract<ThinkBlockStep, { type: 'tool' }>[] }) {
+  const theme = useTheme()
+
+  switch (cluster) {
+    case 'read': {
+      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean)
+      const displayPaths = paths.slice(0, 3).join(', ')
+      const suffix = paths.length > 3 ? ` +${paths.length - 3} more` : ''
+      return <text><span style={{ fg: theme.info }}>{'→ '}</span><span style={{ fg: theme.foreground }}>{`Read ${steps.length} file${steps.length > 1 ? 's' : ''}`}</span>{displayPaths && <span style={{ fg: theme.muted }}>{` (${displayPaths}${suffix})`}</span>}</text>
+    }
+    case 'search': {
+      const totalMatches = steps.reduce((sum, s) => sum + ((s.state as any)?.matchCount ?? 0), 0)
+      const uniqueFiles = new Set(steps.flatMap(s => ((s.state as any)?.matches ?? []) as any[]).map((m: any) => m?.file)).size
+      const pattern = (steps[0].state as any)?.pattern ?? (steps[0].state as any)?.query
+      return <text><span style={{ fg: theme.info }}>{'/ '}</span><span style={{ fg: theme.foreground }}>{`${totalMatches} match${totalMatches !== 1 ? 'es' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`}</span>{pattern && <span style={{ fg: theme.muted }}>{` (pattern: "${String(pattern).slice(0, 40)}")`}</span>}</text>
+    }
+    case 'web_search': {
+      const totalSources = steps.reduce((sum, s) => sum + ((s.state as any)?.sources?.length ?? 0), 0)
+      const query = (steps[0].state as any)?.query ?? ''
+      return <text><span style={{ fg: theme.info }}>{'[⌕] '}</span><span style={{ fg: theme.foreground }}>{`Web searched ${totalSources} source${totalSources !== 1 ? 's' : ''}`}</span>{query && <span style={{ fg: theme.muted }}>{` ("${String(query).slice(0, 40)}")`}</span>}</text>
+    }
+    case 'web_fetch': {
+      const urls = steps.map(s => (s.state as any)?.url).filter(Boolean)
+      return <text><span style={{ fg: theme.info }}>{'[↓] '}</span><span style={{ fg: theme.foreground }}>{`Fetched ${urls.length} URL${urls.length > 1 ? 's' : ''}`}</span>{urls.length === 1 && <span style={{ fg: theme.muted }}>{` (${String(urls[0]).slice(0, 50)})`}</span>}</text>
+    }
+    case 'tree': {
+      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean)
+      return <text><span style={{ fg: theme.info }}>{'◫ '}</span><span style={{ fg: theme.foreground }}>{`Listed files`}</span>{paths.length > 0 && <span style={{ fg: theme.muted }}>{` (${paths.join(', ')})`}</span>}</text>
+    }
+    case 'view': {
+      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean)
+      return <text><span style={{ fg: theme.info }}>{'⚲ '}</span><span style={{ fg: theme.foreground }}>{`Viewed ${steps.length} file${steps.length > 1 ? 's' : ''}`}</span>{paths.length > 0 && <span style={{ fg: theme.muted }}>{` (${paths.join(', ')})`}</span>}</text>
+    }
+    default:
+      return null
+  }
+}
+
+// =============================================================================
 // Group rendering — cluster renderer or per-step fallback
 // =============================================================================
 
 const StepGroupView = memo(function StepGroupView({
   group,
-  expandedSteps,
-  toggleStep,
+  mode,
   onFileClick,
   isActive,
   isInterrupted,
   lastThinkingStepId,
 }: {
   group: StepGroup
-  expandedSteps: Set<string>
-  toggleStep: (id: string) => void
+  mode: 'default' | 'transcript'
   onFileClick?: (path: string, section?: string) => void
   isActive?: boolean
   isInterrupted?: boolean
@@ -328,10 +268,21 @@ const StepGroupView = memo(function StepGroupView({
 }) {
   const theme = useTheme()
 
+  // In default mode, consolidate groupable tool clusters into summary lines
+  if (mode === 'default' && group.cluster && group.cluster !== '__subagent_lifecycle__') {
+    const toolSteps = group.steps.filter((s): s is Extract<ThinkBlockStep, { type: 'tool' }> => s.type === 'tool')
+    if (toolSteps.length > 0) {
+      return <ClusterSummaryRow key={group.steps[0].id} cluster={group.cluster!} steps={toolSteps} />
+    }
+    return null
+  }
+
   return (
     <>
       {group.steps.map((step) => {
         if (step.type === 'thinking') {
+          // Hide thinking in default mode
+          if (mode === 'default') return null
           const isLastThinkingStep = step.id === lastThinkingStepId
           return (
             <box key={step.id}>
@@ -345,14 +296,16 @@ const StepGroupView = memo(function StepGroupView({
         }
 
         if (step.type === 'subagent_finished') {
-          return <WorkerFinishedRow key={step.id} step={step} />
+          return null
         }
 
         if (step.type === 'subagent_killed' || step.type === 'subagent_user_killed') {
-          return <WorkerKilledRow key={step.id} step={step} />
+          return null
         }
 
         if (step.type === 'communication') {
+          // Never show from_agent comms; only show to_agent in transcript mode
+          if (step.direction === 'from_agent' || mode === 'default') return null
           const message: AgentCommunicationMessage = {
             id: step.id,
             type: 'agent_communication',
@@ -379,8 +332,7 @@ const StepGroupView = memo(function StepGroupView({
           <ToolStepView
             key={step.id}
             step={step}
-            isExpanded={expandedSteps.has(step.id)}
-            onToggle={() => toggleStep(step.id)}
+            mode={mode}
             onFileClick={onFileClick}
           />
         )
@@ -393,74 +345,6 @@ const StepGroupView = memo(function StepGroupView({
 // Sticky Working Header
 // =============================================================================
 
-interface StickyWorkingHeaderProps {
-  timerStartTime: number | null
-  onToggle: () => void
-  pendingApproval?: boolean
-}
-
-export const StickyWorkingHeader = memo(function StickyWorkingHeader({
-  timerStartTime,
-  onToggle,
-  pendingApproval,
-}: StickyWorkingHeaderProps) {
-  const theme = useTheme()
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const [isHovered, setIsHovered] = useState(false)
-
-  useEffect(() => {
-    if (!timerStartTime) {
-      setElapsedSeconds(0)
-      return
-    }
-
-    const updateElapsed = () => {
-      const now = Date.now()
-      const elapsed = Math.floor((now - timerStartTime) / 1000)
-      setElapsedSeconds(elapsed)
-    }
-
-    updateElapsed()
-
-    // Freeze timer during pending approval
-    if (pendingApproval) return
-
-    const interval = setInterval(updateElapsed, 1000)
-
-    return () => clearInterval(interval)
-  }, [timerStartTime, pendingApproval])
-
-  const textColor = isHovered ? theme.primary : theme.muted
-  const shimmerColor = isHovered ? theme.primary : theme.secondary
-
-  return (
-    <Button
-      onClick={onToggle}
-      style={{ flexDirection: 'row' }}
-      onMouseOver={() => setIsHovered(true)}
-      onMouseOut={() => setIsHovered(false)}
-    >
-      <text style={{ fg: textColor }}>
-        <span>{'\u25be '}</span>
-        {pendingApproval ? (
-          <span>Waiting for approval...</span>
-        ) : (
-          <>
-            <ShimmerText
-              text="Working "
-              interval={SHIMMER_INTERVAL_MS}
-              primaryColor={shimmerColor}
-            />
-            <MiniWave color={shimmerColor} />
-          </>
-        )}
-        {elapsedSeconds > 0 && (
-          <span style={{ fg: theme.secondary }}> {formatElapsedTime(elapsedSeconds)}</span>
-        )}
-      </text>
-    </Button>
-  )
-})
 
 // =============================================================================
 // ThinkBlock
@@ -468,127 +352,57 @@ export const StickyWorkingHeader = memo(function StickyWorkingHeader({
 
 export const ThinkBlock = memo(function ThinkBlock({
   block,
-  isCollapsed,
-  onToggle,
-  timerStartTime,
-  hideHeader,
-  onHeaderRef,
-  pendingApproval,
+  mode,
   onFileClick,
   isInterrupted
 }: ThinkBlockProps) {
   const theme = useTheme()
   const isActive = block.status === 'active'
-  const isEmpty = block.steps.length === 0
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(() => new Set())
-  const [isHeaderHovered, setIsHeaderHovered] = useState(false)
-
-  const toggleStep = useCallback((id: string) => {
-    setExpandedSteps(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
-
-  const preview = selectLatestLiveActivityFromThinkSteps(block.steps) ?? 'Thinking...'
-
-  // Summary for completed blocks
-  const summary = buildSummary(block.steps)
-  const completedDuration = block.completedAt ? Math.floor((block.completedAt - block.timestamp) / 1000) : 0
 
   // Group steps by visual cluster
   const groups = groupByCluster(block.steps)
   const lastStepId = block.steps.length > 0 ? block.steps[block.steps.length - 1].id : undefined
 
-  // Timer logic
-  useEffect(() => {
-    if (!timerStartTime || !isActive) {
-      setElapsedSeconds(0)
-      return
-    }
+  // In default mode, filter out groups with no visible content
+  // (thinking, comms, status indicators render as null but still occupy container space)
+  const visibleGroups = mode === 'default'
+    ? groups.filter(group => group.steps.some(step => {
+        if (step.type === 'thinking' || step.type === 'communication' || step.type === 'status_indicator' || step.type === 'subagent_finished' || step.type === 'subagent_killed' || step.type === 'subagent_user_killed') return false
+        return true // tools, subagent_started are visible
+      }))
+    : groups
 
-    const updateElapsed = () => {
-      const now = Date.now()
-      const elapsed = Math.floor((now - timerStartTime) / 1000)
-      setElapsedSeconds(elapsed)
-    }
-
-    updateElapsed()
-
-    // Freeze timer during pending approval
-    if (pendingApproval) return
-
-    const interval = setInterval(updateElapsed, 1000)
-
-    return () => clearInterval(interval)
-  }, [timerStartTime, isActive, pendingApproval])
+  // In default mode, hide the entire ThinkBlock if there are no visible groups
+  if (mode === 'default' && visibleGroups.length === 0) return null
 
   return (
-    <box ref={onHeaderRef} style={{ marginBottom: 1, flexDirection: 'column' }}>
-      {/* Header - clickable to toggle (hidden when rendered externally as sticky) */}
-      {!hideHeader && (
-        <Button
-          onClick={() => { setExpandedSteps(new Set()); onToggle() }}
-          style={{ flexDirection: 'row', alignSelf: 'flex-start' }}
-          onMouseOver={() => setIsHeaderHovered(true)}
-          onMouseOut={() => setIsHeaderHovered(false)}
-        >
-          <text style={{ fg: isHeaderHovered ? theme.primary : theme.muted }}>
-            <span>{isCollapsed ? '\u25b8' : '\u25be'} </span>
-            {isActive ? (
-              <>
-                {pendingApproval ? (
-                  <span>Waiting for approval...</span>
-                ) : (
-                  <>
-                    <ShimmerText
-                      text="Working "
-                      interval={SHIMMER_INTERVAL_MS}
-                      primaryColor={isHeaderHovered ? theme.primary : theme.secondary}
-                    />
-                    <MiniWave color={isHeaderHovered ? theme.primary : theme.secondary} />
-                  </>
-                )}
-                {elapsedSeconds > 0 && (
-                  <span style={{ fg: theme.secondary }}> {formatElapsedTime(elapsedSeconds)}</span>
-                )}
-              </>
-            ) : (
-              <>
-                <span attributes={TextAttributes.BOLD}>
-                  Completed{completedDuration > 0 ? ` in ${formatDuration(completedDuration)}` : ''}{summary}
-                </span>
-                <span style={{ fg: isHeaderHovered ? theme.primary : theme.muted }}> · {isCollapsed ? 'Show' : 'Hide'}</span>
-              </>
-            )}
-            {isCollapsed && isActive && !isEmpty && (
-              <span style={{ fg: theme.secondary }}> — {preview}</span>
-            )}
-          </text>
-        </Button>
-      )}
+    <box style={{ marginBottom: 1, flexDirection: 'column' }}>
+      {/* No header — WorkingTimer at the bottom handles all timing/summary */}
 
-      {/* Expanded content — cluster-grouped, registry-driven rendering */}
-      {!isCollapsed && (
-        <box style={{ paddingLeft: 2, flexDirection: 'column' }}>
-          {groups.map((group, gi) => (
-            <ClusterContainer key={gi} cluster={group.cluster} isFirstGroup={gi === 0}>
+      {/* Content — cluster-grouped, registry-driven rendering */}
+      <box style={{ flexDirection: 'column' }}>
+        {visibleGroups.map((group, gi) => {
+          // Add marginTop when a tool group follows a thinking group (or any previous group with thinking)
+          // Consecutive tool groups don't need space between them
+          const prevGroup = gi > 0 ? visibleGroups[gi - 1] : null
+          const prevHadThinking = prevGroup != null && prevGroup.steps.some(s => s.type === 'thinking')
+          const currentHasTool = group.steps.some(s => s.type === 'tool' || s.type === 'subagent_started')
+          const hasMarginTop = prevHadThinking && currentHasTool
+
+          return (
+            <ClusterContainer key={gi} cluster={group.cluster} hasMarginTop={hasMarginTop}>
               <StepGroupView
                 group={group}
-                expandedSteps={expandedSteps}
-                toggleStep={toggleStep}
+                mode={mode}
                 onFileClick={onFileClick}
                 isActive={isActive}
                 isInterrupted={isInterrupted}
                 lastThinkingStepId={lastStepId}
               />
             </ClusterContainer>
-          ))}
-        </box>
-      )}
+          )
+        })}
+      </box>
     </box>
   )
 })

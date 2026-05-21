@@ -10,6 +10,20 @@ export type DiffHunkProps = {
   contextAfter?: readonly string[]
   streamingCursor?: boolean
   maxHeight?: number
+  startLine?: number
+}
+
+function padLineNum(n?: number): string {
+  return n !== undefined ? String(n).padStart(3, ' ') : '   '
+}
+
+type DiffRow = {
+  oldNum?: number
+  newNum?: number
+  prefix: string
+  text: string
+  fg: string
+  dim?: boolean
 }
 
 export function DiffHunk({
@@ -19,8 +33,68 @@ export function DiffHunk({
   contextAfter = [],
   streamingCursor = false,
   maxHeight = 12,
+  startLine = 1,
 }: DiffHunkProps) {
   const theme = useTheme()
+
+  const contextRadius = contextBefore.length
+  const oldLineStart = startLine - contextRadius
+  const newLineStart = oldLineStart
+
+  let oldLineNum = oldLineStart
+  let newLineNum = newLineStart
+
+  const rows: DiffRow[] = []
+
+  for (const line of contextBefore) {
+    rows.push({
+      oldNum: oldLineNum,
+      newNum: newLineNum,
+      prefix: ' ',
+      text: line,
+      fg: theme.muted,
+      dim: true,
+    })
+    oldLineNum++
+    newLineNum++
+  }
+
+  for (const line of removedLines) {
+    rows.push({
+      oldNum: oldLineNum,
+      newNum: undefined,
+      prefix: '-',
+      text: line,
+      fg: theme.error,
+    })
+    oldLineNum++
+  }
+
+  for (let i = 0; i < addedLines.length; i++) {
+    const line = addedLines[i]
+    const isLast = i === addedLines.length - 1
+    rows.push({
+      oldNum: undefined,
+      newNum: newLineNum,
+      prefix: '+',
+      text: line + (streamingCursor && isLast ? '▍' : ''),
+      fg: theme.syntax.string,
+    })
+    newLineNum++
+  }
+
+  for (const line of contextAfter) {
+    rows.push({
+      oldNum: oldLineNum,
+      newNum: newLineNum,
+      prefix: ' ',
+      text: line,
+      fg: theme.muted,
+      dim: true,
+    })
+    oldLineNum++
+    newLineNum++
+  }
 
   return (
     <box
@@ -46,27 +120,13 @@ export function DiffHunk({
         }}
       >
         <box style={{ flexDirection: 'column' }}>
-          {contextBefore.map((line, index) => (
-            <text key={`context-before-${index}`} style={{ fg: theme.muted }} attributes={TextAttributes.DIM}>
-              {line}
-            </text>
-          ))}
-
-          {removedLines.map((line, index) => (
-            <text key={`removed-${index}`} style={{ fg: theme.error }}>
-              {`- ${line}`}
-            </text>
-          ))}
-
-          {addedLines.map((line, index) => (
-            <text key={`added-${index}`} style={{ fg: theme.syntax.string }}>
-              {`+ ${line}${streamingCursor && index === addedLines.length - 1 ? '▍' : ''}`}
-            </text>
-          ))}
-
-          {contextAfter.map((line, index) => (
-            <text key={`context-after-${index}`} style={{ fg: theme.muted }} attributes={TextAttributes.DIM}>
-              {line}
+          {rows.map((row, index) => (
+            <text
+              key={`row-${index}`}
+              style={{ fg: row.fg }}
+              attributes={row.dim ? TextAttributes.DIM : undefined}
+            >
+              <span>{`${padLineNum(row.oldNum)} │ ${padLineNum(row.newNum)} │ ${row.prefix} ${row.text}`}</span>
             </text>
           ))}
         </box>

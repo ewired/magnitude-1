@@ -16,8 +16,6 @@ mock.module('../hooks/use-theme', () => ({
 
 const { ThinkBlock } = await import('./think-block')
 
-const noop = () => {}
-
 const htmlToText = (html: string): string => html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
 
 function render(node: React.ReactNode) {
@@ -53,13 +51,12 @@ test('ThinkBlock renders worker started/finished/killed rows with structured fie
           },
         ],
       }}
-      isCollapsed={false}
-      onToggle={noop}
+      mode="default"
     />
   )
 
   const text = htmlToText(html)
-  expect(text).toContain('▶ Worker started: ⚒ [builder] agent-7 — Investigate flaky test')
+  expect(text).toContain('▶ Worker started: ⚒ [builder] agent-7 · Investigate flaky test')
   expect(text).toContain('✓ Worker finished: ⚒ [builder] agent-7 · 2m 5s · 3 tools')
 })
 
@@ -92,13 +89,12 @@ test('ThinkBlock includes resumed marker for worker lifecycle rows', () => {
           },
         ],
       }}
-      isCollapsed={false}
-      onToggle={noop}
+      mode="default"
     />
   )
 
   const text = htmlToText(html)
-  expect(text).toContain('▶ Worker started: [researcher] agent-3 (resumed) — Trace root cause')
+  expect(text).toContain('▶ Worker started: [researcher] agent-3 (resumed) · Trace root cause')
   expect(text).toContain('✓ Worker finished: [researcher] agent-3 (resumed) · ↺ 1m · 1 tool')
 })
 
@@ -130,13 +126,12 @@ test('ThinkBlock completed summary includes singular worker lifecycle counts', (
           },
         ],
       }}
-      isCollapsed
-      onToggle={noop}
+      mode="default"
     />
   )
 
   const text = htmlToText(html)
-  expect(text).toContain('Completed in 8s (1 worker started, 1 worker finished) · Show')
+  expect(text).toContain('Completed in 8s (1 worker started, 1 worker finished)')
 })
 
 test('ThinkBlock completed summary includes plural worker lifecycle counts', () => {
@@ -183,13 +178,12 @@ test('ThinkBlock completed summary includes plural worker lifecycle counts', () 
           },
         ],
       }}
-      isCollapsed
-      onToggle={noop}
+      mode="default"
     />
   )
 
   const text = htmlToText(html)
-  expect(text).toContain('Completed in 8s (2 workers started, 2 workers finished) · Show')
+  expect(text).toContain('Completed in 8s (2 workers started, 2 workers finished)')
 })
 
 test('ThinkBlock summary includes killed worker counts from both kill sources', () => {
@@ -198,7 +192,7 @@ test('ThinkBlock summary includes killed worker counts from both kill sources', 
     <ThinkBlock
       block={{
         id: 't5',
-        type: 'think',
+        type: 'think_block',
         timestamp: now,
         status: 'completed',
         completedAt: now + 8000,
@@ -232,13 +226,12 @@ test('ThinkBlock summary includes killed worker counts from both kill sources', 
           },
         ],
       }}
-      isCollapsed={true}
-      onToggle={() => {}}
+      mode="default"
     />,
   )
 
   const text = htmlToText(markup)
-  expect(text).toContain('Completed in 8s (1 worker started, 2 workers killed) · Show')
+  expect(text).toContain('Completed in 8s (1 worker started, 2 workers killed)')
 })
 
 test('ThinkBlock renders user-killed worker row with dedicated text', () => {
@@ -247,7 +240,7 @@ test('ThinkBlock renders user-killed worker row with dedicated text', () => {
     <ThinkBlock
       block={{
         id: 't-user-killed',
-        type: 'think',
+        type: 'think_block',
         timestamp: now,
         status: 'completed',
         completedAt: now + 1000,
@@ -263,8 +256,7 @@ test('ThinkBlock renders user-killed worker row with dedicated text', () => {
           },
         ],
       }}
-      isCollapsed={false}
-      onToggle={() => {}}
+      mode="default"
     />,
   )
 
@@ -316,8 +308,7 @@ test('ThinkBlock applies spacing around consecutive worker lifecycle rows, not b
           },
         ],
       }}
-      isCollapsed={false}
-      onToggle={noop}
+      mode="default"
     />
   )
 

@@ -199,6 +199,7 @@ function makeProps(): ChatControllerProps {
       supportsVision: false,
       autopilotEnabled: false,
       autopilotGenerating: false,
+      displayMode: 'default' as const,
     },
     services: {
       submitUserMessageToFork: noop,

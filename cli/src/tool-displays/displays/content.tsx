@@ -92,7 +92,14 @@ export const contentDisplay = createToolDisplay<ContentState>({
                     <StreamingMarkdownContent content={displayedContent} showCursor={showCursor} />
                   ) : (
                     <box style={{ flexDirection: 'column' }}>
-                      {codeLines.map((line, idx) => renderCodeLines(line, idx, theme.foreground))}
+                      {codeLines.map((line, idx) => (
+                        <text key={idx} style={{ fg: theme.foreground }}>
+                          <span style={{ fg: theme.muted }}>{String(idx + 1).padStart(4, ' ') + ' │ '}</span>
+                          {line.map((span, i) => (
+                            <span key={i} style={{ fg: span.fg ?? theme.foreground }}>{span.text}</span>
+                          ))}
+                        </text>
+                      ))}
                     </box>
                   )}
                 </scrollbox>

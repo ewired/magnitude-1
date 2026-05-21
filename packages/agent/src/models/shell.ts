@@ -8,6 +8,8 @@ export interface ShellState extends BaseState {
   stdout?: string
   stderr?: string
   errorMessage?: string
+  partialStdout: string
+  partialStderr: string
 }
 
 const initial: Omit<ShellState, 'phase'> = {
@@ -17,6 +19,8 @@ const initial: Omit<ShellState, 'phase'> = {
   stdout: undefined,
   stderr: undefined,
   errorMessage: undefined,
+  partialStdout: '',
+  partialStderr: '',
 }
 
 export const shellModel = defineStateModel(shellTool)<ShellState>({
@@ -44,6 +48,8 @@ export const shellModel = defineStateModel(shellTool)<ShellState>({
               stdout: event.result.output.stdout,
               stderr: event.result.output.stderr,
               errorMessage: undefined,
+              partialStdout: event.result.output.stdout,
+              partialStderr: event.result.output.stderr,
             }
           case 'Error':
             return { ...state, phase: 'error', errorMessage: event.result.error.message }
@@ -57,7 +63,17 @@ export const shellModel = defineStateModel(shellTool)<ShellState>({
       }
       case 'ToolInputRejected':
         return { ...state, phase: 'error', errorMessage: event.issue.message }
-      case 'ToolEmission':
+      case 'ToolEmission': {
+        const v = event.value as { type: string; stdout?: string; stderr?: string }
+        if (v.type === 'shell_output') {
+          return {
+            ...state,
+            partialStdout: state.partialStdout + (v.stdout ?? ''),
+            partialStderr: state.partialStderr + (v.stderr ?? ''),
+          }
+        }
+        return state
+      }
       case 'ToolInputFieldComplete':
       default:
         return state

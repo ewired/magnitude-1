@@ -44,7 +44,12 @@ export const shellTool = defineHarnessTool({
     outputSchema: ShellOutput,
   },
   errorSchema: ShellErrorSchema,
-  execute: ({ command, timeout }, _ctx) =>
+  emissionSchema: Schema.Struct({
+    type: Schema.Literal('shell_output'),
+    stdout: Schema.String,
+    stderr: Schema.String,
+  }),
+  execute: ({ command, timeout }, ctx) =>
     Effect.gen(function* () {
       const { cwd, scratchpadPath } = yield* WorkingDirectoryTag
       let activeChild: ReturnType<typeof spawn> | null = null
@@ -93,11 +98,15 @@ export const shellTool = defineHarnessTool({
               }
 
               child.stdout?.on('data', (chunk: Buffer | string) => {
-                stdout += typeof chunk === 'string' ? chunk : chunk.toString('utf8')
+                const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8')
+                stdout += text
+                Effect.runFork(ctx.emit({ type: 'shell_output', stdout: text, stderr: '' }))
               })
 
               child.stderr?.on('data', (chunk: Buffer | string) => {
-                stderr += typeof chunk === 'string' ? chunk : chunk.toString('utf8')
+                const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8')
+                stderr += text
+                Effect.runFork(ctx.emit({ type: 'shell_output', stdout: '', stderr: text }))
               })
 
               child.once('spawn', () => {

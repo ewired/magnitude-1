@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Effect, Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId, type ThinkBlockMessage } from '@magnitudedev/agent'
 import { matchKeyToChord } from './utils/chord'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
@@ -10,13 +10,13 @@ import { JsonChatPersistence, loadSessionMeta } from './persistence'
 
 import { MessageView } from './components/message-view'
 import { ErrorBoundary } from './components/error-boundary'
-import { StickyWorkingHeader } from './components/think-block'
+
+import { WorkingTimer } from './components/working-timer'
 import { PendingCommunicationsPanel } from './components/pending-communications-panel'
 import { LoadPreviousButton } from './components/chat-controls'
 
 
 import { usePaginatedTimeline } from './hooks/use-paginated-timeline'
-import { useCollapsedBlocks } from './hooks/use-collapsed-blocks'
 
 import { useTheme } from './hooks/use-theme'
 import { SelectedFileProvider } from './hooks/use-file-viewer'
@@ -185,6 +185,7 @@ function AppInner({
   const [debugEvents, setDebugEvents] = useState<AppEvent[]>([])
   const [debugLogs, setDebugLogs] = useState<LogEntry[]>([])
   const [composerHasContent, setComposerHasContent] = useState(false)
+  const [displayMode, setDisplayMode] = useState<'default' | 'transcript'>('default')
   const [restoredQueuedInputText, setRestoredQueuedInputText] = useState<string | null>(null)
   const [tokenEstimate, setTokenEstimate] = useState(0)
   const [isCompacting, setIsCompacting] = useState(false)
@@ -765,19 +766,7 @@ function AppInner({
     systemMessages
   )
 
-  const { isCollapsed, toggleCollapse, collapseBlock } = useCollapsedBlocks()
-
-  // Auto-collapse think blocks when they complete
-  const autoCollapsedRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    const messages = display?.messages ?? []
-    for (const msg of messages) {
-      if (msg.type === 'think_block' && msg.status === 'completed' && !autoCollapsedRef.current.has(msg.id)) {
-        autoCollapsedRef.current.add(msg.id)
-        collapseBlock(msg.id)
-      }
-    }
-  }, [display?.messages, collapseBlock])
+  // Display mode — no expand/collapse, everything inline
 
   const theme = useTheme()
   const { showCopiedToast: clipboardToast } = useSelectionAutoCopy()
@@ -1064,6 +1053,7 @@ function AppInner({
         const isCtrlC = key.ctrl && key.name === 'c' && !key.meta && !key.option
         const isCtrlX = key.ctrl && key.name === 'x' && !key.meta && !key.option
         const isCtrlR = key.ctrl && key.name === 'r' && !key.meta && !key.option
+        const isCtrlT = key.ctrl && key.name === 't' && !key.meta && !key.option
 
         if (isCtrlC) {
           if (composerHasContent) return
@@ -1084,6 +1074,11 @@ function AppInner({
           key.preventDefault()
           hasAnimatedRef.current = true
           setShowRecentChatsOverlay(prev => !prev)
+        }
+
+        if (isCtrlT) {
+          key.preventDefault()
+          setDisplayMode(prev => prev === 'default' ? 'transcript' : 'default')
         }
       },
       [composerHasContent, debugMode, activeDisplay, display, canToggleRecentChatsWithCtrlR],
@@ -1146,12 +1141,24 @@ function AppInner({
     return null
   }, [display?.messages])
 
+  // Find most recently completed think block for the persistent summary footer
+  const lastCompletedThinkBlock = useMemo(() => {
+    const messages = display?.messages ?? []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i]
+      if (msg.type === 'think_block' && msg.status === 'completed') {
+        return msg
+      }
+    }
+    return null
+  }, [display?.messages])
+
   // Scroll-tracking for sticky header
   const scrollboxRef = useRef<any>(null)
-  const thinkBlockRef = useRef<any>(null)
+
   const lastStreamingMessageIdRef = useRef<string | null>(null)
   const interruptedMessageIdRef = useRef<string | null>(null)
-  const [headerScrolledOff, setHeaderScrolledOff] = useState(false)
+
 
   const snapChatToBottom = useCallback(() => {
     const scrollbox = scrollboxRef.current
@@ -1189,48 +1196,6 @@ function AppInner({
       clearTimeout(t2)
     }
   }, [selectedForkContentVersion, selectedForkId, snapChatToBottom])
-
-  const showStickyHeader = activeThinkBlock != null && !isCollapsed(activeThinkBlock.id) && headerScrolledOff
-
-  // Poll scroll position to detect when think block header scrolls off-screen
-  useEffect(() => {
-    if (!activeThinkBlock || isCollapsed(activeThinkBlock.id)) {
-      setHeaderScrolledOff(false)
-      return
-    }
-
-    const checkScroll = () => {
-      const scrollbox = scrollboxRef.current
-      const thinkBlockEl = thinkBlockRef.current
-      if (!scrollbox || !thinkBlockEl) {
-        setHeaderScrolledOff(false)
-        return
-      }
-
-      // Compute absolute Y of think block within scrollbox content
-      // by walking up the parent chain summing yoga computed tops
-      let offsetY = 0
-      let node: any = thinkBlockEl
-      const contentNode = scrollbox.content
-      while (node && node !== contentNode) {
-        const yogaNode = node.yogaNode || node.getLayoutNode?.()
-        if (yogaNode) {
-          offsetY += yogaNode.getComputedTop()
-        }
-        node = node.parent
-      }
-
-      const scrollTop = scrollbox.scrollTop
-      // Trigger 1 row before header fully scrolls off for seamless transition
-      const isOff = scrollTop > offsetY - 1
-      setHeaderScrolledOff(isOff)
-    }
-
-    const interval = setInterval(checkScroll, 50)
-    checkScroll()
-
-    return () => clearInterval(interval)
-  }, [activeThinkBlock, isCollapsed])
 
   const handleSubmitViaClientBoundary = useCallback((payload: {
     forkId: string | null
@@ -1390,11 +1355,7 @@ function AppInner({
                     message={msg}
                     isStreaming={isStreamingMsg}
                     isInterrupted={isInterrupted}
-                    isCollapsed={msg.type === 'think_block' ? isCollapsed(msg.id) : undefined}
-                    onToggleCollapse={msg.type === 'think_block' ? () => toggleCollapse(msg.id) : undefined}
-                    hideThinkBlockHeader={msg.type === 'think_block' && msg.status === 'active' && !isCollapsed(msg.id) && headerScrolledOff}
-                    onThinkBlockHeaderRef={msg.type === 'think_block' && msg.status === 'active' ? (ref: any) => { thinkBlockRef.current = ref } : undefined}
-                    pendingApproval={pendingApproval != null}
+                    mode={displayMode}
                     onApprove={handleApprove}
                     onReject={handleReject}
 
@@ -1456,15 +1417,6 @@ function AppInner({
         style={{ flexDirection: 'column', flexGrow: 1, minWidth: 0, position: 'relative', height: '100%', paddingBottom: 0, marginBottom: 0 }}
       >
         <box style={{ flexGrow: 1, minHeight: 0, flexDirection: 'column' }}>
-          {showStickyHeader && activeThinkBlock && (
-            <box style={{ flexShrink: 0, paddingLeft: 2 }}>
-              <StickyWorkingHeader
-                timerStartTime={activeThinkBlock.timestamp}
-                onToggle={() => toggleCollapse(activeThinkBlock.id)}
-                pendingApproval={pendingApproval != null}
-              />
-            </box>
-          )}
           {chatScrollbox}
           {autopilotCountdown.isRunning && autopilotCountdown.content && autopilotCountdown.startTime && (
             <AutopilotPreviewMessage
@@ -1472,6 +1424,11 @@ function AppInner({
               startTime={autopilotCountdown.startTime}
             />
           )}
+          <WorkingTimer
+            startTime={activeThinkBlock?.timestamp ?? turnStartTimeRef.current}
+            visible={display?.status === 'streaming' || display?.activeThinkBlockId !== null}
+            completedThinkBlock={lastCompletedThinkBlock}
+          />
           <ChatController
             isBlockingOverlayActive={isBlockingOverlayActive}
             env={{
@@ -1495,6 +1452,7 @@ function AppInner({
               supportsVision: activeModelSupportsVision,
               autopilotEnabled,
               autopilotGenerating,
+              displayMode,
             }}
             services={{
               submitUserMessageToFork: ({ forkId, message, attachments }) => handleSubmitViaClientBoundary({ forkId, message, attachments }),

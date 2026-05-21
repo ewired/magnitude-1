@@ -39,7 +39,7 @@ describe('inline diff display streaming', () => {
       streamingTarget: 'new',
       baseContent: null,
       diffs: [],
-    })).toBe('Editing a.ts')
+    })).toBe('Edit a.ts')
   })
 
   test('summary reflects completed state', () => {
@@ -53,7 +53,7 @@ describe('inline diff display streaming', () => {
       streamingTarget: null,
       baseContent: null,
       diffs: [],
-    })).toBe('Edited a.ts')
+    })).toBe('Edit a.ts')
   })
 
   test('renders surrounding context from state.diffs while streaming inline edit', () => {
@@ -75,18 +75,18 @@ describe('inline diff display streaming', () => {
                 removedLines: ['  const before = 1'],
                 addedLines: ['  const after = 2'],
                 contextAfter: ['  return after', '}'],
+                startLine: 3,
               },
             ],
           },
-          isExpanded: false,
-          onToggle: () => {},
+          mode: 'default',
           onFileClick: () => {},
         }) as any,
       )
     }
 
     const text = htmlToText(renderToStaticMarkup(createElement(Harness)))
-    expect(text).toContain('Editing')
+    expect(text).toContain('Edit')
     expect(text).toContain('function demo() {')
     expect(text).toContain('// keep this')
     expect(text).toContain('const before = 1')
@@ -112,11 +112,11 @@ describe('inline diff display streaming', () => {
               removedLines: ['  const before = 1'],
               addedLines: ['  const after = 2'],
               contextAfter: ['}'],
+              startLine: 3,
             },
           ],
         } as any,
-        isExpanded: false,
-        onToggle: () => {},
+        mode: 'default',
         onFileClick: () => {},
       }) as any
     }
@@ -127,7 +127,7 @@ describe('inline diff display streaming', () => {
 
     const text = htmlToText(renderToStaticMarkup(createElement(Harness)))
 
-    expect(text).toContain('Editing')
+    expect(text).toContain('Edit')
     expect(text).toContain('src/a.ts')
     expect(text).not.toContain('const before = 1')
     expect(text).not.toContain('const after = 2')
