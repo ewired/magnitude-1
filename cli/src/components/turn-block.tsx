@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { TextAttributes } from '@opentui/core'
 import stringWidth from 'string-width'
-import type { ThinkBlockMessage, ThinkBlockStep, DisplayMessage, ToolKey } from '@magnitudedev/agent'
+import type { TurnBlockMessage, TurnBlockStep, DisplayMessage, ToolKey } from '@magnitudedev/agent'
 import { Button } from './button'
 import { AgentCommunicationCard } from './agent-communication-card'
 import { useTheme } from '../hooks/use-theme'
@@ -17,8 +17,8 @@ import { renderToolStep } from '../tool-displays/render'
 
 type AgentCommunicationMessage = Extract<DisplayMessage, { type: 'agent_communication' }>
 
-interface ThinkBlockProps {
-  block: ThinkBlockMessage
+interface TurnBlockProps {
+  block: TurnBlockMessage
   mode: 'default' | 'transcript'
   onFileClick?: (path: string, section?: string) => void
   isInterrupted?: boolean
@@ -31,20 +31,20 @@ const formatDuration = (seconds: number): string => {
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
-const WorkerStartedRow = ({ step }: { step: Extract<ThinkBlockStep, { type: 'subagent_started' }> }) => {
+const WorkerResumedRow = ({ step }: { step: Extract<TurnBlockStep, { type: 'worker_resumed' }> }) => {
   const theme = useTheme()
   return (
     <text>
       <span style={{ fg: violet[300] }}>▶ </span>
       <span style={{ fg: theme.muted }}>Worker </span>
-      <span style={{ fg: theme.foreground }}>{step.subagentId}</span>
-      <span style={{ fg: theme.muted }}> started</span>
-      <span style={{ fg: theme.muted }}> · {step.subagentType}</span>
+      <span style={{ fg: theme.foreground }}>{step.workerId}</span>
+      <span style={{ fg: theme.muted }}> resumed</span>
+      <span style={{ fg: theme.muted }}> · {step.workerRole}</span>
     </text>
   )
 }
 
-const StatusIndicatorRow = ({ step }: { step: Extract<ThinkBlockStep, { type: 'status_indicator' }> }) => {
+const StatusIndicatorRow = ({ step }: { step: Extract<TurnBlockStep, { type: 'status_indicator' }> }) => {
   const theme = useTheme()
   return (
     <text attributes={TextAttributes.DIM}>
@@ -60,7 +60,7 @@ const StatusIndicatorRow = ({ step }: { step: Extract<ThinkBlockStep, { type: 's
 interface StepGroup {
   /** Cluster key from the visual definition, or null for thinking/unregistered tools */
   cluster: string | null
-  steps: ThinkBlockStep[]
+  steps: TurnBlockStep[]
 }
 
 /**
@@ -68,12 +68,12 @@ interface StepGroup {
  * Consecutive tool steps with the same non-null cluster share a group.
  * Thinking steps and tools without a cluster get their own singleton group.
  */
-function groupByCluster(steps: readonly ThinkBlockStep[]): StepGroup[] {
+function groupByCluster(steps: readonly TurnBlockStep[]): StepGroup[] {
   const groups: StepGroup[] = []
   for (const step of steps) {
     const cluster = step.type === 'tool' ? (step.cluster ?? null) : null
-    const syntheticCluster = step.type === 'subagent_started' || step.type === 'subagent_finished' || step.type === 'subagent_killed' || step.type === 'subagent_user_killed'
-      ? '__subagent_lifecycle__'
+    const syntheticCluster = step.type === 'worker_resumed' || step.type === 'worker_finished' || step.type === 'worker_killed' || step.type === 'worker_user_killed'
+      ? '__worker_lifecycle__'
       : cluster
     const last = groups[groups.length - 1]
     if (last && syntheticCluster !== null && last.cluster === syntheticCluster) {
@@ -94,7 +94,7 @@ const ToolStepView = memo(function ToolStepView({
   mode,
   onFileClick,
 }: {
-  step: Extract<ThinkBlockStep, { type: 'tool' }>
+  step: Extract<TurnBlockStep, { type: 'tool' }>
   mode: 'default' | 'transcript'
   onFileClick?: (name: string, section?: string) => void
 }) {
@@ -281,7 +281,7 @@ function truncateToWidth(s: string, maxWidth: number): string {
 // Cluster summary — consolidated line for groupable tools in default mode
 // =============================================================================
 
-function ClusterSummaryRow({ cluster, steps, width, mode }: { cluster: string; steps: Extract<ThinkBlockStep, { type: 'tool' }>[]; width: number; mode: 'default' | 'transcript' }) {
+function ClusterSummaryRow({ cluster, steps, width, mode }: { cluster: string; steps: Extract<TurnBlockStep, { type: 'tool' }>[]; width: number; mode: 'default' | 'transcript' }) {
   const theme = useTheme()
 
   switch (cluster) {
@@ -515,9 +515,9 @@ const StepGroupView = memo(function StepGroupView({
   // Consolidate groupable tool clusters into summary lines
   // Read clusters use ClusterSummaryRow in both default and transcript modes
   // Other clusters only use ClusterSummaryRow in default mode
-  const shouldConsolidate = group.cluster && group.cluster !== '__subagent_lifecycle__' && (mode === 'default' || group.cluster === 'read')
+  const shouldConsolidate = group.cluster && group.cluster !== '__worker_lifecycle__' && (mode === 'default' || group.cluster === 'read')
   if (shouldConsolidate) {
-    const toolSteps = group.steps.filter((s): s is Extract<ThinkBlockStep, { type: 'tool' }> => s.type === 'tool')
+    const toolSteps = group.steps.filter((s): s is Extract<TurnBlockStep, { type: 'tool' }> => s.type === 'tool')
     if (toolSteps.length > 0) {
       return <ClusterSummaryRow key={group.steps[0].id} cluster={group.cluster!} steps={toolSteps} width={width} mode={mode} />
     }
@@ -538,15 +538,15 @@ const StepGroupView = memo(function StepGroupView({
           )
         }
 
-        if (step.type === 'subagent_started') {
-          return <WorkerStartedRow key={step.id} step={step} />
+        if (step.type === 'worker_resumed') {
+          return <WorkerResumedRow key={step.id} step={step} />
         }
 
-        if (step.type === 'subagent_finished') {
+        if (step.type === 'worker_finished') {
           return null
         }
 
-        if (step.type === 'subagent_killed' || step.type === 'subagent_user_killed') {
+        if (step.type === 'worker_killed' || step.type === 'worker_user_killed') {
           return null
         }
 
@@ -594,15 +594,15 @@ const StepGroupView = memo(function StepGroupView({
 
 
 // =============================================================================
-// ThinkBlock
+// TurnBlock
 // =============================================================================
 
-export const ThinkBlock = memo(function ThinkBlock({
+export const TurnBlock = memo(function TurnBlock({
   block,
   mode,
   onFileClick,
   isInterrupted
-}: ThinkBlockProps) {
+}: TurnBlockProps) {
   const theme = useTheme()
   const isActive = block.status === 'active'
   const localWidth = useLocalWidth()
@@ -615,19 +615,19 @@ export const ThinkBlock = memo(function ThinkBlock({
   // (thinking, comms, status indicators render as null but still occupy container space)
   const visibleGroups = mode === 'default'
     ? groups.filter(group => group.steps.some(step => {
-        if (step.type === 'thinking' || step.type === 'communication' || step.type === 'status_indicator' || step.type === 'subagent_finished' || step.type === 'subagent_killed' || step.type === 'subagent_user_killed') return false
-        return true // tools, subagent_started are visible
+        if (step.type === 'thinking' || step.type === 'communication' || step.type === 'status_indicator' || step.type === 'worker_finished' || step.type === 'worker_killed' || step.type === 'worker_user_killed') return false
+        return true // tools, worker_resumed are visible
       }))
     : groups
 
-  // In default mode, hide the entire ThinkBlock if there are no visible groups
+  // In default mode, hide the entire TurnBlock if there are no visible groups
   if (mode === 'default' && visibleGroups.length === 0) return null
 
   // Use measured width, fall back to 80 if not yet measured
   const contentWidth = localWidth.width ?? 80
 
   return (
-    <box ref={localWidth.ref} onSizeChange={localWidth.onSizeChange} style={{ marginBottom: 1, flexDirection: 'column' }}>
+    <box ref={localWidth.ref} onSizeChange={localWidth.onSizeChange} style={{ marginBottom: mode === 'default' ? 0 : 1, flexDirection: 'column' }}>
       {/* No header — WorkingTimer at the bottom handles all timing/summary */}
 
       {/* Content — cluster-grouped, registry-driven rendering */}
@@ -637,13 +637,13 @@ export const ThinkBlock = memo(function ThinkBlock({
           // Consecutive tool groups don't need space between them
           const prevGroup = gi > 0 ? visibleGroups[gi - 1] : null
           const prevHadThinking = prevGroup != null && prevGroup.steps.some(s => s.type === 'thinking')
-          const currentHasTool = group.steps.some(s => s.type === 'tool' || s.type === 'subagent_started')
+          const currentHasTool = group.steps.some(s => s.type === 'tool' || s.type === 'worker_resumed')
           // Add spacing between block-level tool groups (shell, edit, write)
           const BLOCK_TOOLS = new Set(['shell', 'fileEdit', 'fileWrite'])
           const isBlockGroup = group.steps.some(s => s.type === 'tool' && BLOCK_TOOLS.has(s.toolKey))
           const prevIsBlockGroup = prevGroup != null && prevGroup.steps.some(s => s.type === 'tool' && BLOCK_TOOLS.has(s.toolKey))
           const hasBlockSpacing = (isBlockGroup || prevIsBlockGroup) && prevGroup != null
-          const prevHadTool = prevGroup != null && prevGroup.steps.some(s => s.type === 'tool' || s.type === 'subagent_started')
+          const prevHadTool = prevGroup != null && prevGroup.steps.some(s => s.type === 'tool' || s.type === 'worker_resumed')
           const currentHasThinking = group.steps.some(s => s.type === 'thinking')
           const hasMarginTop = (prevHadThinking && currentHasTool) || hasBlockSpacing || (prevHadTool && currentHasThinking)
 

@@ -1,12 +1,13 @@
 import { memo, useEffect, useState } from 'react'
-import type { ThinkBlockMessage, InterruptedMessage } from '@magnitudedev/agent'
+import type { InterruptedMessage, ChainStats } from '@magnitudedev/agent'
 import { useTheme } from '../hooks/use-theme'
 import { red } from '../utils/theme'
 
 interface WorkingTimerProps {
-  startTime: number | null
-  visible: boolean
-  completedThinkBlock: ThinkBlockMessage | null
+  chainStartTime: number | null
+  chainStatus: 'active' | 'completed' | null
+  chainEndTime: number | null
+  chainStats: ChainStats | null
   interruptedMessage?: InterruptedMessage | null
 }
 
@@ -24,107 +25,61 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
 }
 
-function computeSummary(block: ThinkBlockMessage): {
-  durationSeconds: number
-  workerCount: number
-  editCount: number
-  writeCount: number
-  shellCount: number
-  readCount: number
-  searchCount: number
-} {
-  let workerCount = 0
-  let editCount = 0
-  let writeCount = 0
-  let shellCount = 0
-  let readCount = 0
-  let searchCount = 0
-
-  for (const step of block.steps) {
-    switch (step.type) {
-      case 'subagent_started':
-        workerCount++
-        break
-      case 'tool':
-        switch (step.toolKey) {
-          case 'fileEdit':
-            editCount++
-            break
-          case 'fileWrite':
-            writeCount++
-            break
-          case 'shell':
-            shellCount++
-            break
-          case 'fileRead':
-            readCount++
-            break
-          case 'fileSearch':
-          case 'webSearch':
-            searchCount++
-            break
-        }
-        break
-    }
-  }
-
-  const durationSeconds = block.completedAt
-    ? Math.floor((block.completedAt - block.timestamp) / 1000)
-    : 0
-
-  return { durationSeconds, workerCount, editCount, writeCount, shellCount, readCount, searchCount }
-}
-
-function buildSummaryLine(summary: ReturnType<typeof computeSummary>): string {
+function buildSummaryLine(stats: ChainStats, durationSeconds: number): string {
   const parts: string[] = []
 
-  parts.push(`Worked for ${formatDuration(summary.durationSeconds)}`)
+  parts.push(`Worked for ${formatDuration(durationSeconds)}`)
 
-  if (summary.workerCount > 0) {
-    parts.push(`${summary.workerCount} worker${summary.workerCount === 1 ? '' : 's'} ran`)
+  if (stats.workersStarted > 0) {
+    parts.push(`${stats.workersStarted} worker${stats.workersStarted === 1 ? '' : 's'} started`)
   }
 
-  if (summary.editCount > 0) {
-    parts.push(`${summary.editCount} edit${summary.editCount === 1 ? '' : 's'}`)
+  if (stats.editCount > 0) {
+    parts.push(`${stats.editCount} edit${stats.editCount === 1 ? '' : 's'}`)
   }
 
-  if (summary.writeCount > 0) {
-    parts.push(`${summary.writeCount} write${summary.writeCount === 1 ? '' : 's'}`)
+  if (stats.writeCount > 0) {
+    parts.push(`${stats.writeCount} write${stats.writeCount === 1 ? '' : 's'}`)
   }
 
-  if (summary.shellCount > 0) {
-    parts.push(`${summary.shellCount} command${summary.shellCount === 1 ? '' : 's'}`)
+  if (stats.shellCount > 0) {
+    parts.push(`${stats.shellCount} command${stats.shellCount === 1 ? '' : 's'}`)
   }
 
-  if (summary.readCount > 0) {
-    parts.push(`${summary.readCount} read${summary.readCount === 1 ? '' : 's'}`)
+  if (stats.readCount > 0) {
+    parts.push(`${stats.readCount} read${stats.readCount === 1 ? '' : 's'}`)
   }
 
-  if (summary.searchCount > 0) {
-    parts.push(`${summary.searchCount} search${summary.searchCount === 1 ? '' : 'es'}`)
+  if (stats.searchCount > 0) {
+    parts.push(`${stats.searchCount} search${stats.searchCount === 1 ? '' : 'es'}`)
+  }
+
+  if (stats.webSearchCount > 0) {
+    parts.push(`${stats.webSearchCount} web search${stats.webSearchCount === 1 ? '' : 'es'}`)
   }
 
   return parts.join(' \u00b7 ')
 }
 
 export const WorkingTimer = memo(function WorkingTimer({
-  startTime,
-  visible,
-  completedThinkBlock,
+  chainStartTime,
+  chainStatus,
+  chainEndTime,
+  chainStats,
   interruptedMessage,
 }: WorkingTimerProps) {
   const theme = useTheme()
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   useEffect(() => {
-    if (!visible || !startTime) {
+    if (chainStatus !== 'active' || !chainStartTime) {
       setElapsedSeconds(0)
       return
     }
 
     const updateElapsed = () => {
       const now = Date.now()
-      const elapsed = Math.floor((now - startTime) / 1000)
+      const elapsed = Math.floor((now - chainStartTime) / 1000)
       setElapsedSeconds(elapsed)
     }
 
@@ -133,10 +88,10 @@ export const WorkingTimer = memo(function WorkingTimer({
     const interval = setInterval(updateElapsed, 1000)
 
     return () => clearInterval(interval)
-  }, [visible, startTime])
+  }, [chainStatus, chainStartTime])
 
-  // Working state: show running timer
-  if (visible && startTime) {
+  // Active: show running timer
+  if (chainStatus === 'active' && chainStartTime) {
     return (
       <box style={{ flexShrink: 0, paddingLeft: 2, paddingTop: 0, paddingBottom: 0 }}>
         <text style={{ fg: theme.muted }}>
@@ -163,13 +118,13 @@ export const WorkingTimer = memo(function WorkingTimer({
     )
   }
 
-  // Completed state: show persistent summary from the last completed think block
-  if (completedThinkBlock) {
-    const summary = computeSummary(completedThinkBlock)
+  // Completed: show persistent summary from chain stats
+  if (chainStatus === 'completed' && chainStartTime && chainEndTime && chainStats) {
+    const durationSeconds = Math.floor((chainEndTime - chainStartTime) / 1000)
     return (
       <box style={{ flexShrink: 0, paddingLeft: 2, paddingTop: 0, paddingBottom: 0 }}>
         <text style={{ fg: theme.muted }}>
-          {buildSummaryLine(summary)}
+          {buildSummaryLine(chainStats, durationSeconds)}
         </text>
       </box>
     )

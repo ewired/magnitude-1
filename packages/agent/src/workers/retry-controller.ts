@@ -16,7 +16,7 @@
  * Cancellation:
  *   The worker is forked, so its sleep is automatically interrupted on user
  *   interrupt (via Worker.defineForked's built-in interrupt coordinator) and
- *   on agent_killed / subagent_user_killed / subagent_idle_closed via
+ *   on agent_killed / worker_user_killed / worker_idle_closed via
  *   forkLifecycle.completeOn.
  *
  * The cap (MAX_RETRIES) is enforced in Cortex by transforming the outcome
@@ -35,7 +35,7 @@ export const RetryController = Worker.defineForked<AppEvent>()({
 
   forkLifecycle: {
     activateOn: 'agent_created',
-    completeOn: ['agent_killed', 'subagent_user_killed', 'subagent_idle_closed'],
+    completeOn: ['agent_killed', 'worker_user_killed', 'worker_idle_closed'],
   },
 
   eventHandlers: {

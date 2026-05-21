@@ -2,7 +2,7 @@
  * Display projection — tool lifecycle event handling.
  *
  * Verifies that tool_event events correctly create and update ToolSteps
- * in the display projection's ThinkBlock.
+ * in the display projection's TurnBlock.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -80,9 +80,9 @@ describe('Display projection — tool lifecycle events', () => {
       } as AppEvent,
     ])
 
-    const thinkBlock = state.messages.find(m => m.type === 'think_block')
+    const thinkBlock = state.messages.find(m => m.type === 'turn_block')
     expect(thinkBlock).toBeDefined()
-    if (!thinkBlock || thinkBlock.type !== 'think_block') return
+    if (!thinkBlock || thinkBlock.type !== 'turn_block') return
 
     const toolStep = thinkBlock.steps.find(s => s.id === toolCallId && s.type === 'tool') as ToolStep | undefined
     expect(toolStep).toBeDefined()
@@ -119,9 +119,9 @@ describe('Display projection — tool lifecycle events', () => {
       } as AppEvent,
     ])
 
-    const thinkBlock = state.messages.find(m => m.type === 'think_block')
-    if (!thinkBlock || thinkBlock.type !== 'think_block') {
-      throw new Error('Expected think block')
+    const thinkBlock = state.messages.find(m => m.type === 'turn_block')
+    if (!thinkBlock || thinkBlock.type !== 'turn_block') {
+      throw new Error('Expected turn block')
     }
 
     const toolStep = thinkBlock.steps.find(s => s.id === toolCallId && s.type === 'tool') as ToolStep | undefined
@@ -142,8 +142,8 @@ describe('Display projection — tool lifecycle events', () => {
       } as AppEvent,
     ])
 
-    const thinkBlock = state.messages.find(m => m.type === 'think_block')
-    if (!thinkBlock || thinkBlock.type !== 'think_block') throw new Error('Expected think block')
+    const thinkBlock = state.messages.find(m => m.type === 'turn_block')
+    if (!thinkBlock || thinkBlock.type !== 'turn_block') throw new Error('Expected turn block')
 
     const step1 = thinkBlock.steps.find(s => s.id === 'tc-1' && s.type === 'tool') as ToolStep | undefined
     const step2 = thinkBlock.steps.find(s => s.id === 'tc-2' && s.type === 'tool') as ToolStep | undefined

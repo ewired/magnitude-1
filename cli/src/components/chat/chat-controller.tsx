@@ -607,7 +607,7 @@ export function ChatController(props: ChatControllerProps) {
                     onKeyIntercept={handleKeyIntercept}
                     focused={env.composerCanFocus && !env.pendingApproval}
                     highlightColor={env.bashMode ? orange[400] : undefined}
-                    placeholder={env.pendingApproval ? 'Approve or reject the pending action...' : env.bashMode ? 'Enter a command...' : env.isSubagentView ? `Chat directly with worker ${selectedWorkerAgentId}...` : env.status === 'streaming' ? 'Type to queue a message...' : 'Chat with the agent...'}
+                    placeholder={env.pendingApproval ? 'Approve or reject the pending action...' : env.bashMode ? 'Enter a command...' : env.isWorkerView ? `Chat directly with worker ${selectedWorkerAgentId}...` : env.status === 'streaming' ? 'Type to queue a message...' : 'Chat with the agent...'}
                     maxHeight={10}
                     minHeight={1}
                     bulkInsertEpoch={bulkInsertEpoch}
@@ -683,7 +683,7 @@ export function ChatController(props: ChatControllerProps) {
                 </Button>
                 <Button
                   onClick={() => {
-                    services.requestActiveSubagentKill({ forkId: pendingKillTab.forkId, agentId: pendingKillTab.agentId })
+                    services.requestActiveWorkerKill({ forkId: pendingKillTab.forkId, agentId: pendingKillTab.agentId })
                     setPendingKillForkId(null)
                   }}
                   onMouseOver={() => setIsKillConfirmHovered(true)}

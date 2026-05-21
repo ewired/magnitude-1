@@ -21,7 +21,7 @@ export interface SubagentActivityState {
 
 }
 
-export const SubagentActivityProjection = Projection.define<AppEvent, SubagentActivityState>()({
+export const WorkerActivityProjection = Projection.define<AppEvent, SubagentActivityState>()({
   name: 'SubagentActivity',
 
   reads: [AgentStatusProjection] as const,
@@ -142,7 +142,7 @@ export const SubagentActivityProjection = Projection.define<AppEvent, SubagentAc
       }
     },
 
-    subagent_idle_closed: ({ event, state }) => {
+    worker_idle_closed: ({ event, state }) => {
       const pendingProse = new Map(state.pendingProse)
       pendingProse.delete(event.forkId)
 

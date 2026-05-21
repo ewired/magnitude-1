@@ -359,6 +359,6 @@ export const AgentRoutingProjection = Projection.define<AppEvent, AgentRoutingSt
 
     subagent_user_killed: ({ event, state }) => removeAgentRoutingState(state, event),
 
-    subagent_idle_closed: ({ event, state }) => removeAgentRoutingState(state, event),
+    worker_idle_closed: ({ event, state }) => removeAgentRoutingState(state, event),
   },
 }))

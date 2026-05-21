@@ -9,7 +9,7 @@ import {
 import type { AppEvent } from '../../events'
 import { AgentStatusProjection } from '../agent-status'
 import { WindowProjection, type ForkWindowState } from '../../window'
-import { SubagentActivityProjection } from '../subagent-activity'
+import { WorkerActivityProjection } from '../worker-activity'
 import { UserPresenceProjection } from '../user-presence'
 import { OutboundMessagesProjection } from '../outbound-messages'
 import { UserMessageResolutionProjection } from '../user-message-resolution'
@@ -28,7 +28,7 @@ const makeRuntimeLayer = () => {
     Layer.provide(FrameworkErrorReporterLive, FrameworkErrorPubSubLive),
     projectionBusLayer,
     Layer.provide(AgentStatusProjection.Layer, projectionBusLayer),
-    Layer.provide(SubagentActivityProjection.Layer, projectionBusLayer),
+    Layer.provide(WorkerActivityProjection.Layer, projectionBusLayer),
     Layer.provide(UserPresenceProjection.Layer, projectionBusLayer),
     Layer.provide(OutboundMessagesProjection.Layer, projectionBusLayer),
     Layer.provide(UserMessageResolutionProjection.Layer, projectionBusLayer),
@@ -86,7 +86,7 @@ describe('WindowProjection queue ordering regressions', () => {
         message: null,
       } as any,
       {
-        type: 'subagent_user_killed',
+        type: 'worker_user_killed',
         timestamp: ts(2),
         forkId: 'fork-sub',
         parentForkId: null,
@@ -113,7 +113,7 @@ describe('WindowProjection queue ordering regressions', () => {
 
     expect(rootFork.queuedTimeline).toEqual([])
     const ctx = getLastContext(rootFork)
-    expect(ctx.timeline.map(e => e.kind)).toEqual(['lifecycle_hook', 'subagent_user_killed', 'user_message'])
+    expect(ctx.timeline.map(e => e.kind)).toEqual(['lifecycle_hook', 'worker_user_killed', 'user_message'])
     const user = ctx.timeline.find(e => e.kind === 'user_message')
     expect(user).toBeTruthy()
     expect((user as any).text).toBe('/debug issue')
@@ -183,7 +183,7 @@ describe('WindowProjection queue ordering regressions', () => {
         message: null,
       } as any,
       {
-        type: 'subagent_user_killed',
+        type: 'worker_user_killed',
         timestamp: ts(2),
         forkId: 'fork-sub',
         parentForkId: null,
@@ -219,7 +219,7 @@ describe('WindowProjection queue ordering regressions', () => {
 
     expect(rootFork.queuedTimeline).toEqual([])
     const ctx = getLastContext(rootFork)
-    expect(ctx.timeline.map(e => e.kind)).toEqual(['lifecycle_hook', 'subagent_user_killed', 'user_message'])
+    expect(ctx.timeline.map(e => e.kind)).toEqual(['lifecycle_hook', 'worker_user_killed', 'user_message'])
     const user = ctx.timeline.find(e => e.kind === 'user_message')
     expect(user).toBeTruthy()
     expect((user as any).text).toBe('hello root')

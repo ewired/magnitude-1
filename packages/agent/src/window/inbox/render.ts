@@ -128,7 +128,7 @@ function renderTimelineTextLines(
       const status = agentsMap.get(entry.agentId)?.status ?? 'idle'
       return [`<agent id="${entry.agentId}" role="${entry.role}" status="${status}">\n${lines}\n</agent>`]
     }
-    case 'subagent_user_killed':
+    case 'worker_user_killed':
       return [`<subagent-user-killed agent="${entry.agentId}" type="${entry.agentType}"/>`]
     case 'user_presence':
       return [`<user-presence${entry.confirmed ? ' confirmed="true"' : ''}>${entry.text}</user-presence>`]

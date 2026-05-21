@@ -1,4 +1,6 @@
 export { DisplayProjection } from './projection'
+export { computeChainStats, EMPTY_CHAIN_STATS } from './helpers/chain-stats'
+export type { ChainStats } from './helpers/chain-stats'
 export type {
   UserMessageDisplay,
   QueuedUserMessageDisplay,
@@ -7,12 +9,12 @@ export type {
   ToolStep,
   CommunicationStep,
   StatusIndicatorStep,
-  SubagentStartedStep,
-  SubagentFinishedStep,
-  SubagentKilledStep,
-  SubagentUserKilledStep,
-  ThinkBlockMessage,
-  ThinkBlockStep,
+  WorkerResumedStep,
+  WorkerFinishedStep,
+  WorkerKilledStep,
+  WorkerUserKilledStep,
+  TurnBlockMessage,
+  TurnBlockStep,
   InterruptedMessage,
   ErrorDisplayMessage,
   ForkResultMessage,

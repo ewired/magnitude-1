@@ -3,7 +3,7 @@ import type { DisplayMessage, ActionId } from '@magnitudedev/agent'
 import { UserMessage } from './user-message'
 import { QueuedUserMessage } from './queued-user-message'
 import { AssistantMessage } from './assistant-message'
-import { ThinkBlock } from './think-block'
+import { TurnBlock } from './turn-block'
 import { InlineForkActivity } from './inline-fork-activity'
 import { ApprovalRequest } from './approval-request'
 import { AgentCommunicationCard } from './agent-communication-card'
@@ -64,9 +64,9 @@ export const MessageView = memo(function MessageView({
           />
         )
 
-      case 'think_block':
+      case 'turn_block':
         return (
-          <ThinkBlock
+          <TurnBlock
             block={message}
             mode={mode}
             onFileClick={onFileClick}

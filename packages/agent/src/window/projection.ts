@@ -10,7 +10,7 @@ import type { AppEvent, StrategyId, ImageAttachment, ObservationPart } from '../
 import { present } from '../errors'
 import { getAgentByForkId, AgentStatusProjection } from '../projections/agent-status'
 import { getForkInfo } from '../agents/registry'
-import { SubagentActivityProjection } from '../projections/subagent-activity'
+import { WorkerActivityProjection } from '../projections/worker-activity'
 import { OutboundMessagesProjection } from '../projections/outbound-messages'
 import { HarnessStateProjection } from '../projections/harness-state'
 import { buildSessionContextContent } from '../prompts/session-context'
@@ -386,7 +386,7 @@ function emitIfChanged(
 
 export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowState>()({
   name: 'Window',
-  reads: [AgentStatusProjection, SubagentActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection, TaskWorkerProjection, HarnessStateProjection] as const,
+  reads: [AgentStatusProjection, WorkerActivityProjection, UserPresenceProjection, OutboundMessagesProjection, UserMessageResolutionProjection, TaskGraphProjection, TaskWorkerProjection, HarnessStateProjection] as const,
   ambients: [SkillsAmbient, ConfigAmbient] as const,
   signals: {
     tokenEstimateChanged: Signal.create<{ forkId: string | null; tokenEstimate: number }>('Window/tokenEstimateChanged'),
@@ -790,7 +790,7 @@ export const WindowProjection = Projection.defineForked<AppEvent, ForkWindowStat
       }
     }),
 
-    on(SubagentActivityProjection.signals.unseenActivityAvailable, ({ value, state, read }) => {
+    on(WorkerActivityProjection.signals.unseenActivityAvailable, ({ value, state, read }) => {
       const parentState = state.forks.get(value.parentForkId)
       if (!parentState) return state
 

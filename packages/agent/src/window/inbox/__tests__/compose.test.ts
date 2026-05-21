@@ -30,7 +30,7 @@ describe('inbox compose', () => {
       role: 'engineer',
       atoms,
     }).kind).toBe('agent_block')
-    expect(toTimelineSubagentUserKilled({ timestamp: TS, agentId: 'a1', agentType: 'builder' }).kind).toBe('subagent_user_killed')
+    expect(toTimelineSubagentUserKilled({ timestamp: TS, agentId: 'a1', agentType: 'builder' }).kind).toBe('worker_user_killed')
     expect(toTimelineUserPresence({ timestamp: TS, text: 'present', confirmed: true }).kind).toBe('user_presence')
     expect(
       toTimelineLifecycleHook({

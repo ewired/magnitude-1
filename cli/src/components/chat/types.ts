@@ -20,7 +20,7 @@ export type ChatControllerEnv = {
   attachmentsMaxWidth: number
   composerCanFocus: boolean
   widgetNavActive: boolean
-  isSubagentView: boolean
+  isWorkerView: boolean
   supportsVision: boolean
   autopilotEnabled: boolean
   autopilotGenerating: boolean
@@ -46,8 +46,8 @@ export type ChatControllerServices = {
   handleWidgetKeyEvent: (key: KeyEvent) => boolean
   enterBashMode: () => void
   exitBashMode: () => void
-  requestIdleSubagentClose: (payload: { forkId: string; agentId: string }) => void
-  requestActiveSubagentKill: (payload: { forkId: string; agentId: string }) => void
+  requestIdleWorkerClose: (payload: { forkId: string; agentId: string }) => void
+  requestActiveWorkerKill: (payload: { forkId: string; agentId: string }) => void
   showToast: (message: string) => void
   toggleAutopilot: () => void
   startImageDescription: (dataUrl: string) => void

@@ -60,7 +60,7 @@ export const spawnWorkerDisplay = createToolDisplay<SpawnWorkerState>({
     }
 
     // Transcript mode: show full streaming prompt as it currently works
-    // Completed state: worker has started, show the same visual as WorkerStartedRow
+    // Completed state: worker has started
     if (isCompleted) {
       return (
         <text>

@@ -478,7 +478,7 @@ export interface AgentTaskChanged {
 
 /** Active subagent explicitly killed by user from subagent tab close confirmation */
 export interface SubagentUserKilled {
-  readonly type: 'subagent_user_killed'
+  readonly type: 'worker_user_killed'
   readonly forkId: string
   readonly parentForkId: string | null
   readonly agentId: string
@@ -487,7 +487,7 @@ export interface SubagentUserKilled {
 
 /** Idle subagent tab explicitly closed by user from tab close (silent durable close) */
 export interface SubagentIdleClosed {
-  readonly type: 'subagent_idle_closed'
+  readonly type: 'worker_idle_closed'
   readonly forkId: string
   readonly parentForkId: string | null
   readonly agentId: string

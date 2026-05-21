@@ -14,7 +14,7 @@ mock.module('../hooks/use-theme', () => ({
   }),
 }))
 
-const { ThinkBlock } = await import('./think-block')
+const { TurnBlock } = await import('./turn-block')
 
 const htmlToText = (html: string): string => html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
 
@@ -22,29 +22,29 @@ function render(node: React.ReactNode) {
   return renderToStaticMarkup(<>{node}</>)
 }
 
-test('ThinkBlock renders worker started/finished/killed rows with structured fields', () => {
+test('TurnBlock renders worker started/finished/killed rows with structured fields', () => {
   const html = render(
-    <ThinkBlock
+    <TurnBlock
       block={{
         id: 'tb-1',
-        type: 'think_block',
+        type: 'turn_block',
         status: 'completed',
         timestamp: 1000,
         completedAt: 9000,
         steps: [
           {
             id: 's1',
-            type: 'subagent_started',
-            subagentType: 'builder',
-            subagentId: 'agent-7',
+            type: 'worker_resumed',
+            workerRole: 'builder',
+            workerId: 'agent-7',
             title: 'Investigate flaky test',
             resumed: false,
           },
           {
             id: 's2',
-            type: 'subagent_finished',
-            subagentType: 'builder',
-            subagentId: 'agent-7',
+            type: 'worker_finished',
+            workerRole: 'builder',
+            workerId: 'agent-7',
             cumulativeTotalTimeMs: 125000,
             cumulativeTotalToolsUsed: 3,
             resumed: false,
@@ -60,29 +60,29 @@ test('ThinkBlock renders worker started/finished/killed rows with structured fie
   expect(text).toContain('✓ Worker finished: ⚒ [builder] agent-7 · 2m 5s · 3 tools')
 })
 
-test('ThinkBlock includes resumed marker for worker lifecycle rows', () => {
+test('TurnBlock includes resumed marker for worker lifecycle rows', () => {
   const html = render(
-    <ThinkBlock
+    <TurnBlock
       block={{
         id: 'tb-2',
-        type: 'think_block',
+        type: 'turn_block',
         status: 'completed',
         timestamp: 1000,
         completedAt: 9000,
         steps: [
           {
             id: 's1',
-            type: 'subagent_started',
-            subagentType: 'researcher',
-            subagentId: 'agent-3',
+            type: 'worker_resumed',
+            workerRole: 'researcher',
+            workerId: 'agent-3',
             title: 'Trace root cause',
             resumed: true,
           },
           {
             id: 's2',
-            type: 'subagent_finished',
-            subagentType: 'researcher',
-            subagentId: 'agent-3',
+            type: 'worker_finished',
+            workerRole: 'researcher',
+            workerId: 'agent-3',
             cumulativeTotalTimeMs: 60000,
             cumulativeTotalToolsUsed: 1,
             resumed: true,
@@ -98,28 +98,28 @@ test('ThinkBlock includes resumed marker for worker lifecycle rows', () => {
   expect(text).toContain('✓ Worker finished: [researcher] agent-3 (resumed) · ↺ 1m · 1 tool')
 })
 
-test('ThinkBlock completed summary includes singular worker lifecycle counts', () => {
+test('TurnBlock completed summary includes singular worker lifecycle counts', () => {
   const html = render(
-    <ThinkBlock
+    <TurnBlock
       block={{
         id: 'tb-3',
-        type: 'think_block',
+        type: 'turn_block',
         status: 'completed',
         timestamp: 1000,
         completedAt: 9000,
         steps: [
           {
             id: 's1',
-            type: 'subagent_started',
-            subagentType: 'builder',
-            subagentId: 'agent-1',
+            type: 'worker_resumed',
+            workerRole: 'builder',
+            workerId: 'agent-1',
             title: 'Do thing',
             resumed: false,
           },
           {
             id: 's2',
-            type: 'subagent_finished',
-            subagentId: 'agent-1',
+            type: 'worker_finished',
+            workerId: 'agent-1',
             cumulativeTotalTimeMs: 1000,
             cumulativeTotalToolsUsed: 1,
             resumed: false,
@@ -134,44 +134,44 @@ test('ThinkBlock completed summary includes singular worker lifecycle counts', (
   expect(text).toContain('Completed in 8s (1 worker started, 1 worker finished)')
 })
 
-test('ThinkBlock completed summary includes plural worker lifecycle counts', () => {
+test('TurnBlock completed summary includes plural worker lifecycle counts', () => {
   const html = render(
-    <ThinkBlock
+    <TurnBlock
       block={{
         id: 'tb-4',
-        type: 'think_block',
+        type: 'turn_block',
         status: 'completed',
         timestamp: 1000,
         completedAt: 9000,
         steps: [
           {
             id: 's1',
-            type: 'subagent_started',
-            subagentType: 'builder',
-            subagentId: 'agent-1',
+            type: 'worker_resumed',
+            workerRole: 'builder',
+            workerId: 'agent-1',
             title: 'Do thing',
             resumed: false,
           },
           {
             id: 's2',
-            type: 'subagent_started',
-            subagentType: 'researcher',
-            subagentId: 'agent-2',
+            type: 'worker_resumed',
+            workerRole: 'researcher',
+            workerId: 'agent-2',
             title: 'Do another thing',
             resumed: false,
           },
           {
             id: 's3',
-            type: 'subagent_finished',
-            subagentId: 'agent-1',
+            type: 'worker_finished',
+            workerId: 'agent-1',
             cumulativeTotalTimeMs: 1000,
             cumulativeTotalToolsUsed: 1,
             resumed: false,
           },
           {
             id: 's4',
-            type: 'subagent_finished',
-            subagentId: 'agent-2',
+            type: 'worker_finished',
+            workerId: 'agent-2',
             cumulativeTotalTimeMs: 2000,
             cumulativeTotalToolsUsed: 2,
             resumed: false,
@@ -186,21 +186,21 @@ test('ThinkBlock completed summary includes plural worker lifecycle counts', () 
   expect(text).toContain('Completed in 8s (2 workers started, 2 workers finished)')
 })
 
-test('ThinkBlock summary includes killed worker counts from both kill sources', () => {
+test('TurnBlock summary includes killed worker counts from both kill sources', () => {
   const now = Date.now()
   const markup = render(
-    <ThinkBlock
+    <TurnBlock
       block={{
         id: 't5',
-        type: 'think_block',
+        type: 'turn_block',
         timestamp: now,
         status: 'completed',
         completedAt: now + 8000,
         steps: [
           {
             id: 's1',
-            type: 'subagent_started',
-            subagentId: 'researcher',
+            type: 'worker_resumed',
+            workerId: 'researcher',
             title: 'gather evidence',
             resumed: false,
             timestamp: now + 1000,
@@ -208,18 +208,18 @@ test('ThinkBlock summary includes killed worker counts from both kill sources', 
           },
           {
             id: 's2',
-            type: 'subagent_killed',
-            subagentType: 'researcher',
-            subagentId: 'researcher',
+            type: 'worker_killed',
+            workerRole: 'researcher',
+            workerId: 'researcher',
             title: 'gather evidence',
             timestamp: now + 2000,
             label: '',
           },
           {
             id: 's3',
-            type: 'subagent_user_killed',
-            subagentType: 'builder',
-            subagentId: 'builder',
+            type: 'worker_user_killed',
+            workerRole: 'builder',
+            workerId: 'builder',
             title: 'fix tests',
             timestamp: now + 3000,
             label: '',
@@ -234,22 +234,22 @@ test('ThinkBlock summary includes killed worker counts from both kill sources', 
   expect(text).toContain('Completed in 8s (1 worker started, 2 workers killed)')
 })
 
-test('ThinkBlock renders user-killed worker row with dedicated text', () => {
+test('TurnBlock renders user-killed worker row with dedicated text', () => {
   const now = Date.now()
   const markup = render(
-    <ThinkBlock
+    <TurnBlock
       block={{
         id: 't-user-killed',
-        type: 'think_block',
+        type: 'turn_block',
         timestamp: now,
         status: 'completed',
         completedAt: now + 1000,
         steps: [
           {
             id: 's1',
-            type: 'subagent_user_killed',
-            subagentType: 'researcher',
-            subagentId: 'researcher',
+            type: 'worker_user_killed',
+            workerRole: 'researcher',
+            workerId: 'researcher',
             title: 'gather evidence',
             timestamp: now + 500,
             label: '',
@@ -264,44 +264,44 @@ test('ThinkBlock renders user-killed worker row with dedicated text', () => {
   expect(text).toContain('■ Worker killed by user: [researcher] researcher - gather evidence')
 })
 
-test('ThinkBlock applies spacing around consecutive worker lifecycle rows, not between each row', () => {
+test('TurnBlock applies spacing around consecutive worker lifecycle rows, not between each row', () => {
   const html = render(
-    <ThinkBlock
+    <TurnBlock
       block={{
         id: 'tb-5',
-        type: 'think_block',
+        type: 'turn_block',
         status: 'completed',
         timestamp: 1000,
         completedAt: 9000,
         steps: [
           {
             id: 's1',
-            type: 'subagent_started',
-            subagentType: 'builder',
-            subagentId: 'agent-1',
+            type: 'worker_resumed',
+            workerRole: 'builder',
+            workerId: 'agent-1',
             title: 'First',
             resumed: false,
           },
           {
             id: 's2',
-            type: 'subagent_started',
-            subagentType: 'researcher',
-            subagentId: 'agent-2',
+            type: 'worker_resumed',
+            workerRole: 'researcher',
+            workerId: 'agent-2',
             title: 'Second',
             resumed: false,
           },
           {
             id: 's3',
-            type: 'subagent_finished',
-            subagentId: 'agent-1',
+            type: 'worker_finished',
+            workerId: 'agent-1',
             cumulativeTotalTimeMs: 1000,
             cumulativeTotalToolsUsed: 1,
             resumed: false,
           },
           {
             id: 's4',
-            type: 'subagent_finished',
-            subagentId: 'agent-2',
+            type: 'worker_finished',
+            workerId: 'agent-2',
             cumulativeTotalTimeMs: 2000,
             cumulativeTotalToolsUsed: 2,
             resumed: false,

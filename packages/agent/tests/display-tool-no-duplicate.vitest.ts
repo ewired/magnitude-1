@@ -74,8 +74,8 @@ describe('Display — toolKey routing & no-duplicate steps', () => {
       } as AppEvent,
     ])
 
-    const block = state.messages.find(m => m.type === 'think_block')
-    if (!block || block.type !== 'think_block') throw new Error('expected think block')
+    const block = state.messages.find(m => m.type === 'turn_block')
+    if (!block || block.type !== 'turn_block') throw new Error('expected turn block')
     const step = block.steps.find(s => s.id === toolCallId && s.type === 'tool') as ToolStep | undefined
     expect(step).toBeDefined()
     expect(step!.toolKey).toBe('fileTree')
@@ -106,8 +106,8 @@ describe('Display — toolKey routing & no-duplicate steps', () => {
       } as AppEvent,
     ])
 
-    const block = state.messages.find(m => m.type === 'think_block')
-    if (!block || block.type !== 'think_block') throw new Error('expected think block')
+    const block = state.messages.find(m => m.type === 'turn_block')
+    if (!block || block.type !== 'turn_block') throw new Error('expected turn block')
     const toolSteps = block.steps.filter(s => s.id === toolCallId && s.type === 'tool')
     expect(toolSteps.length).toBe(1)
   })
@@ -121,8 +121,8 @@ describe('Display — toolKey routing & no-duplicate steps', () => {
       } as AppEvent,
     ])
 
-    const block = state.messages.find(m => m.type === 'think_block')
-    if (!block || block.type !== 'think_block') {
+    const block = state.messages.find(m => m.type === 'turn_block')
+    if (!block || block.type !== 'turn_block') {
       // No think block at all is also acceptable
       return
     }

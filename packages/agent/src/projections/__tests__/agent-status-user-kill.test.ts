@@ -44,7 +44,7 @@ describe('AgentStatusProjection user kill semantics', () => {
       } as any)
 
       yield* bus.processEvent({
-        type: 'subagent_user_killed',
+        type: 'worker_user_killed',
         timestamp: ts(2),
         forkId: 'fork-sub',
         parentForkId: null,
@@ -60,7 +60,7 @@ describe('AgentStatusProjection user kill semantics', () => {
     expect(state.agentByForkId.size).toBe(0)
   })
 
-  it('removes agent on subagent_idle_closed without requiring agent_killed', async () => {
+  it('removes agent on worker_idle_closed without requiring agent_killed', async () => {
     const projectionBusLayer = Layer.provideMerge(
       makeProjectionBusLayer<AppEvent>(),
       Layer.provide(FrameworkErrorReporterLive, FrameworkErrorPubSubLive),
@@ -92,7 +92,7 @@ describe('AgentStatusProjection user kill semantics', () => {
       } as any)
 
       yield* bus.processEvent({
-        type: 'subagent_idle_closed',
+        type: 'worker_idle_closed',
         timestamp: ts(2),
         forkId: 'fork-sub',
         parentForkId: null,

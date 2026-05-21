@@ -10,7 +10,7 @@ import {
 import type { AppEvent } from '../../events'
 import { AgentStatusProjection } from '../agent-status'
 import { WindowProjection, type ForkWindowState } from '../../window'
-import { SubagentActivityProjection } from '../subagent-activity'
+import { WorkerActivityProjection } from '../worker-activity'
 import { UserPresenceProjection } from '../user-presence'
 import { OutboundMessagesProjection } from '../outbound-messages'
 import { UserMessageResolutionProjection } from '../user-message-resolution'
@@ -30,7 +30,7 @@ const makeRuntimeLayer = () => {
     Layer.provide(FrameworkErrorReporterLive, FrameworkErrorPubSubLive),
     projectionBusLayer,
     Layer.provide(AgentStatusProjection.Layer, projectionBusLayer),
-    Layer.provide(SubagentActivityProjection.Layer, projectionBusLayer),
+    Layer.provide(WorkerActivityProjection.Layer, projectionBusLayer),
     Layer.provide(UserPresenceProjection.Layer, projectionBusLayer),
     Layer.provide(OutboundMessagesProjection.Layer, projectionBusLayer),
     Layer.provide(UserMessageResolutionProjection.Layer, projectionBusLayer),

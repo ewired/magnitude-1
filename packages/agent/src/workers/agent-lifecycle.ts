@@ -47,7 +47,7 @@ export const AgentLifecycle = Worker.define<AppEvent>()({
       yield* execManager.disposeFork(event.forkId)
     }).pipe(Effect.orDie),
 
-    subagent_idle_closed: (event) => Effect.gen(function* () {
+    worker_idle_closed: (event) => Effect.gen(function* () {
       const execManager = yield* ExecutionManager
       yield* execManager.disposeFork(event.forkId)
     }).pipe(Effect.orDie),

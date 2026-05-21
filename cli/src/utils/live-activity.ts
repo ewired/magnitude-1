@@ -1,4 +1,4 @@
-import type { DisplayMessage, ThinkBlockStep } from '@magnitudedev/agent'
+import type { DisplayMessage, TurnBlockStep } from '@magnitudedev/agent'
 import { summarizeToolStep } from '../tool-displays/render'
 
 function normalize(text: string): string {
@@ -14,7 +14,7 @@ function joinLabelDetail(label: string, detail: string): string {
   return normalize(`${label} ${trimmedDetail}`)
 }
 
-function getToolLiveText(step: ThinkBlockStep): string | null {
+function getToolLiveText(step: TurnBlockStep): string | null {
   if (step.type !== 'tool') return null
   if (step.state) {
     const value = summarizeToolStep(step.toolKey, step.state)
@@ -56,7 +56,7 @@ function getToolLiveText(step: ThinkBlockStep): string | null {
 }
 
 export function selectLatestLiveActivityFromThinkSteps(
-  steps: readonly ThinkBlockStep[],
+  steps: readonly TurnBlockStep[],
 ): string | null {
   for (let i = steps.length - 1; i >= 0; i--) {
     const step = steps[i]
@@ -86,7 +86,7 @@ function getMessageLiveText(msg: DisplayMessage): string | null {
     return text.length > 0 ? text : null
   }
 
-  if (msg.type === 'think_block') {
+  if (msg.type === 'turn_block') {
     return selectLatestLiveActivityFromThinkSteps(msg.steps)
   }
 

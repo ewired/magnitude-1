@@ -393,7 +393,7 @@ export const TaskWorkerProjection = Projection.define<AppEvent, TaskWorkerState>
     subagent_user_killed: ({ event, state, read }) =>
       rebuild({ state, read, workerActivityByForkId: removeWorkerActivity(state.workerActivityByForkId, event.forkId) }),
 
-    subagent_idle_closed: ({ event, state, read }) =>
+    worker_idle_closed: ({ event, state, read }) =>
       rebuild({ state, read, workerActivityByForkId: removeWorkerActivity(state.workerActivityByForkId, event.forkId) }),
 
     task_created: ({ state, read }) => rebuild({ state, read }),

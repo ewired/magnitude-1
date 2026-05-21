@@ -19,7 +19,7 @@ import { SessionContextProjection } from './projections/session-context'
 import { TurnProjection } from './projections/turn'
 import { HarnessStateProjection } from './projections/harness-state'
 import { WindowProjection } from './window'
-import { SubagentActivityProjection } from './projections/subagent-activity'
+import { WorkerActivityProjection } from './projections/worker-activity'
 import { DisplayProjection } from './display'
 import { AutopilotStateProjection } from './projections/autopilot-state'
 
@@ -106,7 +106,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
     TurnProjection,
     HarnessStateProjection,
 
-    SubagentActivityProjection,
+    WorkerActivityProjection,
     OutboundMessagesProjection,
     UserMessageResolutionProjection,
 

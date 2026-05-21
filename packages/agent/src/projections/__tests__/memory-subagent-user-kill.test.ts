@@ -10,7 +10,7 @@ import type { AppEvent } from '../../events'
 import { AgentStatusProjection } from '../agent-status'
 import { WindowProjection, type ForkWindowState } from '../../window'
 
-import { SubagentActivityProjection } from '../subagent-activity'
+import { WorkerActivityProjection } from '../worker-activity'
 import { UserPresenceProjection } from '../user-presence'
 import { OutboundMessagesProjection } from '../outbound-messages'
 import { UserMessageResolutionProjection } from '../user-message-resolution'
@@ -30,7 +30,7 @@ describe('WindowProjection subagent_user_killed awareness', () => {
       Layer.provide(FrameworkErrorReporterLive, FrameworkErrorPubSubLive),
       projectionBusLayer,
       Layer.provide(AgentStatusProjection.Layer, projectionBusLayer),
-      Layer.provide(SubagentActivityProjection.Layer, projectionBusLayer),
+      Layer.provide(WorkerActivityProjection.Layer, projectionBusLayer),
         Layer.provide(UserPresenceProjection.Layer, projectionBusLayer),
       Layer.provide(OutboundMessagesProjection.Layer, projectionBusLayer),
       Layer.provide(UserMessageResolutionProjection.Layer, projectionBusLayer),
@@ -67,7 +67,7 @@ describe('WindowProjection subagent_user_killed awareness', () => {
       } as any)
 
       yield* bus.processEvent({
-        type: 'subagent_user_killed',
+        type: 'worker_user_killed',
         timestamp: ts(2),
         forkId: 'fork-sub',
         parentForkId: null,
@@ -93,13 +93,13 @@ describe('WindowProjection subagent_user_killed awareness', () => {
     const ctx = rootFork!.messages.findLast((m: any) => m.type === 'context') as any
     expect(ctx).toBeTruthy()
 
-    const userKilled = ctx.timeline.find((e: any) => e.kind === 'subagent_user_killed')
+    const userKilled = ctx.timeline.find((e: any) => e.kind === 'worker_user_killed')
     expect(userKilled).toBeTruthy()
     expect(userKilled.agentId).toBe('agent-sub')
     expect(userKilled.agentType).toBe('engineer')
   })
 
-  it('does not queue parent subagent_user_killed notification for subagent_idle_closed', async () => {
+  it('does not queue parent subagent_user_killed notification for worker_idle_closed', async () => {
     const projectionBusLayer = Layer.provideMerge(
       makeProjectionBusLayer<AppEvent>(),
       Layer.provide(FrameworkErrorReporterLive, FrameworkErrorPubSubLive),
@@ -110,7 +110,7 @@ describe('WindowProjection subagent_user_killed awareness', () => {
       Layer.provide(FrameworkErrorReporterLive, FrameworkErrorPubSubLive),
       projectionBusLayer,
       Layer.provide(AgentStatusProjection.Layer, projectionBusLayer),
-      Layer.provide(SubagentActivityProjection.Layer, projectionBusLayer),
+      Layer.provide(WorkerActivityProjection.Layer, projectionBusLayer),
         Layer.provide(UserPresenceProjection.Layer, projectionBusLayer),
       Layer.provide(OutboundMessagesProjection.Layer, projectionBusLayer),
       Layer.provide(UserMessageResolutionProjection.Layer, projectionBusLayer),
@@ -147,7 +147,7 @@ describe('WindowProjection subagent_user_killed awareness', () => {
       } as any)
 
       yield* bus.processEvent({
-        type: 'subagent_idle_closed',
+        type: 'worker_idle_closed',
         timestamp: ts(2),
         forkId: 'fork-sub',
         parentForkId: null,
@@ -176,7 +176,7 @@ describe('WindowProjection subagent_user_killed awareness', () => {
       return
     }
 
-    const userKilled = ctx.timeline.find((e: any) => e.kind === 'subagent_user_killed')
+    const userKilled = ctx.timeline.find((e: any) => e.kind === 'worker_user_killed')
     expect(userKilled).toBeUndefined()
   })
 })

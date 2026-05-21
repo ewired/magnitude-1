@@ -74,56 +74,55 @@ export interface StatusIndicatorStep {
   readonly style: 'dim'
 }
 
-export interface SubagentStartedStep {
+export interface WorkerResumedStep {
   readonly id: string
-  readonly type: 'subagent_started'
-  readonly subagentType: string
-  readonly subagentId: string
+  readonly type: 'worker_resumed'
+  readonly workerRole: string
+  readonly workerId: string
   readonly title: string
-  readonly resumed: boolean
 }
 
-export interface SubagentFinishedStep {
+export interface WorkerFinishedStep {
   readonly id: string
-  readonly type: 'subagent_finished'
-  readonly subagentType: string
-  readonly subagentId: string
+  readonly type: 'worker_finished'
+  readonly workerRole: string
+  readonly workerId: string
   readonly cumulativeTotalTimeMs: number
   readonly cumulativeTotalToolsUsed: number
   readonly resumed: boolean
 }
 
-export interface SubagentKilledStep {
+export interface WorkerKilledStep {
   readonly id: string
-  readonly type: 'subagent_killed'
-  readonly subagentType: string
-  readonly subagentId: string
+  readonly type: 'worker_killed'
+  readonly workerRole: string
+  readonly workerId: string
   readonly title: string
 }
 
-export interface SubagentUserKilledStep {
+export interface WorkerUserKilledStep {
   readonly id: string
-  readonly type: 'subagent_user_killed'
-  readonly subagentType: string
-  readonly subagentId: string
+  readonly type: 'worker_user_killed'
+  readonly workerRole: string
+  readonly workerId: string
   readonly title: string
 }
 
-export type ThinkBlockStep =
+export type TurnBlockStep =
   | ThinkingStep
   | ToolStep
   | CommunicationStep
   | StatusIndicatorStep
-  | SubagentStartedStep
-  | SubagentFinishedStep
-  | SubagentKilledStep
-  | SubagentUserKilledStep
+  | WorkerResumedStep
+  | WorkerFinishedStep
+  | WorkerKilledStep
+  | WorkerUserKilledStep
 
-export interface ThinkBlockMessage {
+export interface TurnBlockMessage {
   readonly id: string
-  readonly type: 'think_block'
+  readonly type: 'turn_block'
   readonly status: 'active' | 'completed'
-  readonly steps: readonly ThinkBlockStep[]
+  readonly steps: readonly TurnBlockStep[]
   readonly timestamp: number
   readonly completedAt?: number
 }
@@ -212,7 +211,7 @@ export type DisplayMessage =
   | UserMessageDisplay
   | QueuedUserMessageDisplay
   | AssistantMessageDisplay
-  | ThinkBlockMessage
+  | TurnBlockMessage
   | InterruptedMessage
   | ErrorDisplayMessage
   | ForkResultMessage
@@ -229,6 +228,10 @@ export interface DisplayState {
   readonly pendingInboundCommunications: readonly PendingInboundCommunicationDisplay[]
   readonly currentTurnId: string | null  // Tracks active turn for queuing decision
   readonly streamingMessageId: string | null  // Tracks streaming assistant message
-  readonly activeThinkBlockId: string | null
+  readonly activeTurnBlockId: string | null
   readonly showButton: 'send' | 'stop'
+  // Chain-level state — spans from user message to next user message
+  readonly chainStartTime: number | null
+  readonly chainStatus: 'active' | 'completed' | null  // null = no active chain
+  readonly chainEndTime: number | null
 }

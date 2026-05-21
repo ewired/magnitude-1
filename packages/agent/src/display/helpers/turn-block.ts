@@ -1,11 +1,11 @@
-import type { DisplayMessage, DisplayState, ThinkBlockMessage, ThinkBlockStep, ThinkingStep } from '../types'
+import type { DisplayMessage, DisplayState, TurnBlockMessage, TurnBlockStep, ThinkingStep } from '../types'
 import { flushHeld, heldBuffers } from './thinking'
 import { generateId, insertBeforeQueuedMessages } from './messages'
 import { finalizeOpenToolStepsAsInterruptedInSteps } from './interrupt'
 import type { ToolState } from '../../models/index'
 
-export const findThinkBlock = (messages: readonly DisplayMessage[], id: string): ThinkBlockMessage | undefined =>
-  messages.find((m): m is ThinkBlockMessage => m.type === 'think_block' && m.id === id)
+export const findTurnBlock = (messages: readonly DisplayMessage[], id: string): TurnBlockMessage | undefined =>
+  messages.find((m): m is TurnBlockMessage => m.type === 'turn_block' && m.id === id)
 
 export function updateMessageById<T extends DisplayMessage>(
   messages: readonly DisplayMessage[],
@@ -17,67 +17,67 @@ export function updateMessageById<T extends DisplayMessage>(
 }
 
 /**
- * Ensures there's an active ThinkBlock, creating one if needed.
- * New ThinkBlocks are inserted BEFORE queued messages.
+ * Ensures there's an active TurnBlock, creating one if needed.
+ * New TurnBlocks are inserted BEFORE queued messages.
  */
-export function ensureThinkBlock(
+export function ensureTurnBlock(
   state: DisplayState,
   timestamp: number
-): { fork: DisplayState; thinkBlockId: string } {
-  if (state.activeThinkBlockId) {
+): { fork: DisplayState; turnBlockId: string } {
+  if (state.activeTurnBlockId) {
     // Verify it still exists
-    const existing = findThinkBlock(state.messages, state.activeThinkBlockId)
+    const existing = findTurnBlock(state.messages, state.activeTurnBlockId)
     if (existing && existing.status === 'active') {
-      return { fork: state, thinkBlockId: state.activeThinkBlockId }
+      return { fork: state, turnBlockId: state.activeTurnBlockId }
     }
   }
 
-  const thinkBlockId = generateId()
-  const thinkBlock: ThinkBlockMessage = {
-    id: thinkBlockId,
-    type: 'think_block',
+  const turnBlockId = generateId()
+  const turnBlock: TurnBlockMessage = {
+    id: turnBlockId,
+    type: 'turn_block',
     status: 'active',
     steps: [],
     timestamp
   }
 
   // Insert before queued messages
-  const messages = insertBeforeQueuedMessages(state.messages, thinkBlock)
+  const messages = insertBeforeQueuedMessages(state.messages, turnBlock)
 
   return {
     fork: {
       ...state,
       messages,
-      activeThinkBlockId: thinkBlockId
+      activeTurnBlockId: turnBlockId
     },
-    thinkBlockId
+    turnBlockId
   }
 }
 
-export function addStepToThinkBlock(
+export function addStepToTurnBlock(
   messages: readonly DisplayMessage[],
-  thinkBlockId: string,
-  step: ThinkBlockStep
+  turnBlockId: string,
+  step: TurnBlockStep
 ): DisplayMessage[] {
-  return updateMessageById<ThinkBlockMessage>(messages, thinkBlockId, (block) => ({
+  return updateMessageById<TurnBlockMessage>(messages, turnBlockId, (block) => ({
     ...block,
     steps: [...block.steps, step]
   }))
 }
 
-export function updateStepInThinkBlock(
+export function updateStepInTurnBlock(
   messages: readonly DisplayMessage[],
-  thinkBlockId: string,
+  turnBlockId: string,
   stepId: string,
-  updater: (step: ThinkBlockStep) => ThinkBlockStep
+  updater: (step: TurnBlockStep) => TurnBlockStep
 ): DisplayMessage[] {
-  return updateMessageById<ThinkBlockMessage>(messages, thinkBlockId, (block) => ({
+  return updateMessageById<TurnBlockMessage>(messages, turnBlockId, (block) => ({
     ...block,
     steps: block.steps.map(s => s.id === stepId ? updater(s) : s)
   }))
 }
 
-function flushAllHeldInBlock(block: ThinkBlockMessage): ThinkBlockMessage {
+function flushAllHeldInBlock(block: TurnBlockMessage): TurnBlockMessage {
   const newSteps = block.steps.map((step) => {
     if (step.type !== 'thinking') return step
     const flushed = flushHeld(step.id)
@@ -89,34 +89,34 @@ function flushAllHeldInBlock(block: ThinkBlockMessage): ThinkBlockMessage {
   return { ...block, steps: newSteps }
 }
 
-export function addStepToThinkBlockFlush(
+export function addStepToTurnBlockFlush(
   messages: readonly DisplayMessage[],
-  thinkBlockId: string,
-  step: ThinkBlockStep
+  turnBlockId: string,
+  step: TurnBlockStep
 ): DisplayMessage[] {
-  const block = findThinkBlock(messages, thinkBlockId)
+  const block = findTurnBlock(messages, turnBlockId)
   if (block) {
     const lastStep = block.steps[block.steps.length - 1]
     if (lastStep?.type === 'thinking') {
       const flushed = flushHeld(lastStep.id)
       if (flushed) {
-        const flushedMessages = updateStepInThinkBlock(
+        const flushedMessages = updateStepInTurnBlock(
           messages,
-          thinkBlockId,
+          turnBlockId,
           lastStep.id,
           (s) => s.type === 'thinking' ? { ...s, content: s.content + flushed } : s
         )
-        return addStepToThinkBlock(flushedMessages, thinkBlockId, step)
+        return addStepToTurnBlock(flushedMessages, turnBlockId, step)
       }
     }
   }
-  return addStepToThinkBlock(messages, thinkBlockId, step)
+  return addStepToTurnBlock(messages, turnBlockId, step)
 }
 
-export function closeThinkBlock(state: DisplayState, timestamp: number): DisplayState {
-  if (!state.activeThinkBlockId) return state
+export function closeTurnBlock(state: DisplayState, timestamp: number): DisplayState {
+  if (!state.activeTurnBlockId) return state
 
-  const block = findThinkBlock(state.messages, state.activeThinkBlockId)
+  const block = findTurnBlock(state.messages, state.activeTurnBlockId)
   if (!block) return state
 
   // Flush held buffers for all thinking steps in the block
@@ -131,25 +131,25 @@ export function closeThinkBlock(state: DisplayState, timestamp: number): Display
     return true
   })
 
-  const updatedBlock: ThinkBlockMessage = { ...flushedBlock, steps: filteredSteps }
+  const updatedBlock: TurnBlockMessage = { ...flushedBlock, steps: filteredSteps }
 
-  // Remove empty think blocks
+  // Remove empty turn blocks
   if (updatedBlock.steps.length === 0) {
     return {
       ...state,
-      messages: state.messages.filter(m => m.id !== state.activeThinkBlockId),
-      activeThinkBlockId: null
+      messages: state.messages.filter(m => m.id !== state.activeTurnBlockId),
+      activeTurnBlockId: null
     }
   }
 
   return {
     ...state,
-    messages: updateMessageById<ThinkBlockMessage>(
+    messages: updateMessageById<TurnBlockMessage>(
       state.messages,
-      state.activeThinkBlockId,
+      state.activeTurnBlockId,
       (b) => (b.id === updatedBlock.id ? { ...updatedBlock, status: 'completed', completedAt: timestamp } : b)
     ),
-    activeThinkBlockId: null
+    activeTurnBlockId: null
   }
 }
 
@@ -157,8 +157,8 @@ export function finalizeOpenToolStepsAsInterrupted(
   state: DisplayState,
   toolStateFork: { readonly toolHandles: { readonly [callId: string]: { readonly state: ToolState } } }
 ): DisplayState {
-  if (!state.activeThinkBlockId) return state
-  const block = findThinkBlock(state.messages, state.activeThinkBlockId)
+  if (!state.activeTurnBlockId) return state
+  const block = findTurnBlock(state.messages, state.activeTurnBlockId)
   if (!block) return state
 
   const nextSteps = finalizeOpenToolStepsAsInterruptedInSteps(block.steps, (_toolKey, currentState, stepId) => {
@@ -172,8 +172,8 @@ export function finalizeOpenToolStepsAsInterrupted(
 
   return {
     ...state,
-    messages: updateMessageById<ThinkBlockMessage>(
-      state.messages, state.activeThinkBlockId,
+    messages: updateMessageById<TurnBlockMessage>(
+      state.messages, state.activeTurnBlockId,
       (b) => ({ ...b, steps: nextSteps })
     )
   }

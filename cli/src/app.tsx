@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Effect, Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId, type ThinkBlockMessage, type InterruptedMessage } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, computeChainStats, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId, type InterruptedMessage, type ChainStats } from '@magnitudedev/agent'
 import { matchKeyToChord } from './utils/chord'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
@@ -193,7 +193,7 @@ function AppInner({
   const [restoredQueuedInputText, setRestoredQueuedInputText] = useState<string | null>(null)
   const [tokenEstimate, setTokenEstimate] = useState(0)
   const [isCompacting, setIsCompacting] = useState(false)
-  const turnStartTimeRef = useRef<number | null>(null)
+  // turnStartTimeRef removed — timer now driven by chainStartTime from DisplayProjection
   const hasAnimatedRef = useRef(skipAnimation)
 
   // ── Autopilot state (TUI-only countdown) ──────────────────────────────
@@ -424,8 +424,11 @@ function AppInner({
         pendingInboundCommunications: [],
         currentTurnId: null,
         streamingMessageId: null,
-        activeThinkBlockId: null,
+        activeTurnBlockId: null,
         showButton: 'send',
+        chainStartTime: null,
+        chainStatus: null,
+        chainEndTime: null,
       })
       setClientFactory(async () => {
         const client = await createClient()
@@ -488,11 +491,6 @@ function AppInner({
     }
 
     const unsubscribe = client.state.display.subscribeFork(null, (state) => {
-      if (state.status === 'streaming' && turnStartTimeRef.current === null) {
-        turnStartTimeRef.current = Date.now()
-      } else if (state.status === 'idle') {
-        turnStartTimeRef.current = null
-      }
       if (state.streamingMessageId) {
         lastStreamingMessageIdRef.current = state.streamingMessageId
       }
@@ -1140,28 +1138,10 @@ function AppInner({
     projectRoot: process.cwd(),
   })
 
-  // Find active expanded think block for sticky header
-  const activeThinkBlock = useMemo(() => {
-    const messages = display?.messages ?? []
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i]
-      if (msg.type === 'think_block' && msg.status === 'active') {
-        return msg
-      }
-    }
-    return null
-  }, [display?.messages])
-
-  // Find most recently completed think block for the persistent summary footer
-  const lastCompletedThinkBlock = useMemo(() => {
-    const messages = (activeDisplay ?? display)?.messages ?? []
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i]
-      if (msg.type === 'think_block' && msg.status === 'completed') {
-        return msg
-      }
-    }
-    return null
+  // Derive chain stats from display state — scoped to current chain
+  const chainStats = useMemo(() => {
+    const displayState = activeDisplay ?? display
+    return computeChainStats(displayState)
   }, [activeDisplay, display])
 
   // Check if the last message is an interrupted display and agent is idle —
@@ -1453,9 +1433,10 @@ function AppInner({
             />
           )}
           <WorkingTimer
-            startTime={activeThinkBlock?.timestamp ?? turnStartTimeRef.current}
-            visible={display?.status === 'streaming' || display?.activeThinkBlockId !== null}
-            completedThinkBlock={lastCompletedThinkBlock}
+            chainStartTime={display?.chainStartTime ?? null}
+            chainStatus={display?.chainStatus ?? null}
+            chainEndTime={display?.chainEndTime ?? null}
+            chainStats={chainStats}
             interruptedMessage={lastInterruptedMessage}
           />
           <ChatController
@@ -1477,7 +1458,7 @@ function AppInner({
               attachmentsMaxWidth,
               composerCanFocus,
               widgetNavActive,
-              isSubagentView: selectedForkId !== null,
+              isWorkerView: selectedForkId !== null,
               supportsVision: activeModelSupportsVision,
               autopilotEnabled,
               autopilotGenerating,
@@ -1522,26 +1503,26 @@ function AppInner({
               handleWidgetKeyEvent: widgetNavigation.handleKeyEvent,
               enterBashMode: () => setBashMode(true),
               exitBashMode: exitBashMode,
-              requestIdleSubagentClose: ({ forkId, agentId }) => {
+              requestIdleWorkerClose: ({ forkId, agentId }) => {
                 const agent = agentStatusState
                   ? Array.from(agentStatusState.agents.values()).find((a) => a.forkId === forkId && a.agentId === agentId)
                   : undefined
                 const parentForkId = agent?.parentForkId ?? null
                 client?.send({
-                  type: 'subagent_idle_closed',
+                  type: 'worker_idle_closed',
                   forkId,
                   parentForkId,
                   agentId,
                   source: 'idle_tab_close',
                 })
               },
-              requestActiveSubagentKill: ({ forkId, agentId }) => {
+              requestActiveWorkerKill: ({ forkId, agentId }) => {
                 const agent = agentStatusState
                   ? Array.from(agentStatusState.agents.values()).find((a) => a.forkId === forkId && a.agentId === agentId)
                   : undefined
                 const parentForkId = agent?.parentForkId ?? null
                 client?.send({
-                  type: 'subagent_user_killed',
+                  type: 'worker_user_killed',
                   forkId,
                   parentForkId,
                   agentId,

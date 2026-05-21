@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import type { DisplayMessage, ThinkBlockStep } from '@magnitudedev/agent'
+import type { DisplayMessage, TurnBlockStep } from '@magnitudedev/agent'
 import {
   selectLatestLiveActivityForTask,
   selectLatestLiveActivityFromMessages,
@@ -10,7 +10,7 @@ describe('live-activity selector', () => {
   it('selects latest displayable activity by recency across message types', () => {
     const messages = [
       {
-        type: 'think_block',
+        type: 'turn_block',
         steps: [{ id: '1', type: 'thinking', content: 'first thought' }],
       },
       { type: 'agent_communication', preview: 'latest communication' },
@@ -22,14 +22,14 @@ describe('live-activity selector', () => {
   it('uses communication think step preview in live activity', () => {
     const steps = [
       { id: '1', type: 'communication', preview: 'pending inbound', content: 'pending inbound full' },
-    ] as any as ThinkBlockStep[]
+    ] as any as TurnBlockStep[]
     expect(selectLatestLiveActivityFromThinkSteps(steps)).toBe('pending inbound')
   })
 
   it('uses most recent producible activity for task status', () => {
     const messages = [
       {
-        type: 'think_block',
+        type: 'turn_block',
         steps: [{ id: '1', type: 'thinking', content: 'older think activity' }],
       },
       { type: 'agent_communication', preview: 'newer communication activity' },
@@ -41,7 +41,7 @@ describe('live-activity selector', () => {
   it('falls back to latest communication when task has no think activity', () => {
     const messages = [
       {
-        type: 'think_block',
+        type: 'turn_block',
         steps: [{ id: '1', type: 'thinking', content: '   ' }],
       },
       { type: 'agent_communication', preview: 'latest communication' },
@@ -59,7 +59,7 @@ describe('live-activity selector', () => {
         label: 'Generic tool label',
         visualState: { label: 'Navigate to ', detail: 'https://example.com' },
       },
-    ] as any as ThinkBlockStep[]
+    ] as any as TurnBlockStep[]
 
     expect(selectLatestLiveActivityFromThinkSteps(steps)).toBe('Navigate to https://example.com')
   })
@@ -72,7 +72,7 @@ describe('live-activity selector', () => {
         toolKey: 'unknownTool',
         label: 'Fallback label',
       },
-    ] as any as ThinkBlockStep[]
+    ] as any as TurnBlockStep[]
 
     expect(selectLatestLiveActivityFromThinkSteps(steps)).toBe('Fallback label')
   })
@@ -86,7 +86,7 @@ describe('live-activity selector', () => {
         label: 'Creating artifact via label fallback',
         visualState: { phase: 'streaming', name: 'draft' },
       },
-    ] as any as ThinkBlockStep[]
+    ] as any as TurnBlockStep[]
 
     expect(selectLatestLiveActivityFromThinkSteps(steps)).toBe('Creating artifact via label fallback')
   })
@@ -100,7 +100,7 @@ describe('live-activity selector', () => {
         label: 'fallback',
         visualState: { phase: 'streaming', name: 'draft' },
       },
-    ] as any as ThinkBlockStep[]
+    ] as any as TurnBlockStep[]
     const activeFileEdit = [
       {
         id: '1',
@@ -109,7 +109,7 @@ describe('live-activity selector', () => {
         label: 'fallback',
         visualState: { phase: 'running', path: 'src/app.ts' },
       },
-    ] as any as ThinkBlockStep[]
+    ] as any as TurnBlockStep[]
 
     expect(selectLatestLiveActivityFromThinkSteps(activeArtifactWrite)).toBe('Writing artifact draft')
     expect(selectLatestLiveActivityFromThinkSteps(activeFileEdit)).toBe('Editing src/app.ts')
@@ -123,7 +123,7 @@ describe('live-activity selector', () => {
         toolKey: 'shell',
         label: '$ bun test cli/src/utils/live-activity.test.ts',
       },
-    ] as any as ThinkBlockStep[]
+    ] as any as TurnBlockStep[]
 
     expect(selectLatestLiveActivityFromThinkSteps(steps)).toBe('$ bun test cli/src/utils/live-activity.test.ts')
   })
@@ -131,9 +131,9 @@ describe('live-activity selector', () => {
   it('ignores lifecycle-style started/finished step types in think steps', () => {
     const steps = [
       { id: '1', type: 'thinking', content: 'active thought' },
-      { id: '2', type: 'subagent_started', label: 'Started researcher' },
-      { id: '3', type: 'subagent_finished', label: 'Finished researcher' },
-    ] as any as ThinkBlockStep[]
+      { id: '2', type: 'worker_resumed', label: 'Started researcher' },
+      { id: '3', type: 'worker_finished', label: 'Finished researcher' },
+    ] as any as TurnBlockStep[]
 
     expect(selectLatestLiveActivityFromThinkSteps(steps)).toBe('active thought')
   })

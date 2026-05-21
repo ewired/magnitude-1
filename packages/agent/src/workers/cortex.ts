@@ -65,7 +65,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
 
   forkLifecycle: {
     activateOn: 'agent_created',
-    completeOn: ['agent_killed', 'subagent_user_killed', 'subagent_idle_closed'],
+    completeOn: ['agent_killed', 'worker_user_killed', 'worker_idle_closed'],
   },
 
   eventHandlers: {
@@ -74,7 +74,7 @@ export const Cortex = Worker.defineForked<AppEvent>()({
       return yield* Effect.interrupt
     }),
 
-    subagent_idle_closed: (event) => Effect.gen(function* () {
+    worker_idle_closed: (event) => Effect.gen(function* () {
       if (event.forkId === null) return
       return yield* Effect.interrupt
     }),

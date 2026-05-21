@@ -139,7 +139,7 @@ export const AgentStatusProjection = Projection.define<AppEvent, AgentStatusStat
     agentBecameWorking: Signal.create<AgentBecameWorkingSignal>('AgentStatus/agentBecameWorking'),
     agentKilled: Signal.create<AgentKilledSignal>('AgentStatus/agentKilled'),
     subagentUserKilled: Signal.create<SubagentUserKilledSignal>('AgentStatus/subagentUserKilled'),
-    subagentIdleClosed: Signal.create<SubagentIdleClosedSignal>('AgentStatus/subagentIdleClosed'),
+    workerIdleClosed: Signal.create<SubagentIdleClosedSignal>('AgentStatus/workerIdleClosed'),
   },
 
   eventHandlers: {
@@ -315,7 +315,7 @@ export const AgentStatusProjection = Projection.define<AppEvent, AgentStatusStat
       return removed.state
     },
 
-    subagent_idle_closed: ({ event, state, emit }) => {
+    worker_idle_closed: ({ event, state, emit }) => {
       const removed = removeKilledAgent({
         forkId: event.forkId,
         agentId: event.agentId,
@@ -324,7 +324,7 @@ export const AgentStatusProjection = Projection.define<AppEvent, AgentStatusStat
       })
       if (!removed.agent) return state
 
-      emit.subagentIdleClosed({
+      emit.workerIdleClosed({
         agentId: removed.agent.agentId,
         forkId: removed.agent.forkId,
         parentForkId: removed.agent.parentForkId,

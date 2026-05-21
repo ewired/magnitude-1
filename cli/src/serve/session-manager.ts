@@ -67,9 +67,12 @@ const DEFAULT_DISPLAY_STATE: DisplayState = {
   messages: [],
   currentTurnId: null,
   streamingMessageId: null,
-  activeThinkBlockId: null,
+  activeTurnBlockId: null,
   showButton: 'send',
   pendingInboundCommunications: [],
+  chainStartTime: null,
+  chainStatus: null,
+  chainEndTime: null,
 }
 
 const DEFAULT_FORK_STATE: AgentStatusState = {

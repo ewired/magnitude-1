@@ -1,7 +1,7 @@
 import type { DisplayMessage, DisplayState, ForkActivityMessage, ForkActivityToolCounts, CommunicationStep } from '../types'
 import { EMPTY_TOOL_COUNTS } from '../constants'
 import type { ToolKey } from '../../tools/toolkits'
-import { findThinkBlock, ensureThinkBlock, updateStepInThinkBlock, addStepToThinkBlockFlush } from './think-block'
+import { findTurnBlock, ensureTurnBlock, updateStepInTurnBlock, addStepToTurnBlockFlush } from './turn-block'
 import { generateId, toPreview } from './messages'
 
 export function incrementToolCount(counts: ForkActivityToolCounts, toolKey: ToolKey): ForkActivityToolCounts {
@@ -48,17 +48,17 @@ export function upsertStreamingCommunicationStep(
   textDelta: string
 ): DisplayState {
   if (message.forkId === null) return fork
-  const { fork: stateWithBlock, thinkBlockId } = ensureThinkBlock(fork, message.timestamp)
-  const block = findThinkBlock(stateWithBlock.messages, thinkBlockId)
+  const { fork: stateWithBlock, turnBlockId } = ensureTurnBlock(fork, message.timestamp)
+  const block = findTurnBlock(stateWithBlock.messages, turnBlockId)
   const last = block?.steps[block.steps.length - 1]
 
   if (last?.type === 'communication' && last.streamId === streamId) {
     const content = last.content + textDelta
     return {
       ...stateWithBlock,
-      messages: updateStepInThinkBlock(
+      messages: updateStepInTurnBlock(
         stateWithBlock.messages,
-        thinkBlockId,
+        turnBlockId,
         last.id,
         (s) => s.type === 'communication'
           ? { ...s, content, preview: toPreview(content), status: 'streaming' }
@@ -80,7 +80,7 @@ export function upsertStreamingCommunicationStep(
 
   return {
     ...stateWithBlock,
-    messages: addStepToThinkBlockFlush(stateWithBlock.messages, thinkBlockId, step)
+    messages: addStepToTurnBlockFlush(stateWithBlock.messages, turnBlockId, step)
   }
 }
 
@@ -88,17 +88,17 @@ export function finalizeCommunicationStreamInFork(
   fork: DisplayState,
   streamId: string
 ): DisplayState {
-  if (!fork.activeThinkBlockId) return fork
-  const block = findThinkBlock(fork.messages, fork.activeThinkBlockId)
+  if (!fork.activeTurnBlockId) return fork
+  const block = findTurnBlock(fork.messages, fork.activeTurnBlockId)
   if (!block) return fork
   const step = block.steps.find((s): s is CommunicationStep => s.type === 'communication' && s.streamId === streamId)
   if (!step) return fork
 
   return {
     ...fork,
-    messages: updateStepInThinkBlock(
+    messages: updateStepInTurnBlock(
       fork.messages,
-      fork.activeThinkBlockId,
+      fork.activeTurnBlockId,
       step.id,
       (s) => s.type === 'communication'
         ? { ...s, preview: toPreview(s.content), status: 'completed' }

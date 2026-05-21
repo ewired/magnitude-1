@@ -77,7 +77,7 @@ export function toTimelineSubagentUserKilled(args: {
   agentType: string
 }): TimelineEntry {
   return {
-    kind: 'subagent_user_killed',
+    kind: 'worker_user_killed',
     ...args,
   }
 }

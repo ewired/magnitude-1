@@ -45,7 +45,7 @@ const makeRootDisplay = async (events: AppEvent[]) => {
 }
 
 describe('display subagent lifecycle think steps', () => {
-  it('adds root think-block started/finished steps with cumulative resumed semantics', async () => {
+  it('adds root turn-block started/finished steps with cumulative resumed semantics', async () => {
     const rootDisplay = await makeRootDisplay([
       {
         type: 'turn_started',
@@ -126,7 +126,7 @@ describe('display subagent lifecycle think steps', () => {
       } as any,
     ])
 
-    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'think_block' ? m.steps : [])
+    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'turn_block' ? m.steps : [])
 
     const forkActivity = rootDisplay.messages.filter(
       (m): m is Extract<DisplayMessage, { type: 'fork_activity' }> =>
@@ -154,39 +154,35 @@ describe('display subagent lifecycle think steps', () => {
     })
     expect(forkActivity[0].id).not.toBe(forkActivity[1].id)
 
-    const started = allSteps.filter((s: any) => s.type === 'subagent_started')
-    const finished = allSteps.filter((s: any) => s.type === 'subagent_finished')
+    const resumed = allSteps.filter((s: any) => s.type === 'worker_resumed')
+    const finished = allSteps.filter((s: any) => s.type === 'worker_finished')
 
-    expect(started.length).toBe(2)
-    expect(started[0]).toMatchObject({
-      subagentType: 'engineer',
-      subagentId: 'agent-sub',
+    // Initial creation doesn't get a WorkerResumedStep — spawnWorker tool step covers it
+    expect(resumed.length).toBe(1)
+    expect(resumed[0]).toMatchObject({
+      workerRole: 'engineer',
+      workerId: 'agent-sub',
       title: 'Builder',
-      resumed: false,
-    })
-    expect(started[1]).toMatchObject({
-      subagentId: 'agent-sub',
-      resumed: true,
     })
 
     expect(finished.length).toBe(2)
     expect(finished[0]).toMatchObject({
-      subagentType: 'engineer',
-      subagentId: 'agent-sub',
+      workerRole: 'engineer',
+      workerId: 'agent-sub',
       cumulativeTotalTimeMs: 5,
       cumulativeTotalToolsUsed: 1,
       resumed: false,
     })
     expect(finished[1]).toMatchObject({
-      subagentType: 'engineer',
-      subagentId: 'agent-sub',
+      workerRole: 'engineer',
+      workerId: 'agent-sub',
       cumulativeTotalTimeMs: 10,
       cumulativeTotalToolsUsed: 2,
       resumed: true,
     })
   })
 
-  it('adds subagent_killed step (without subagent_finished) and removes fork activity for agent_killed', async () => {
+  it('adds worker_killed step (without worker_finished) and removes fork activity for agent_killed', async () => {
     const rootDisplay = await makeRootDisplay([
       {
         type: 'agent_created',
@@ -214,20 +210,20 @@ describe('display subagent lifecycle think steps', () => {
     const forkActivity = rootDisplay.messages.filter((m: any) => m.type === 'fork_activity' && m.forkId === 'fork-sub')
     expect(forkActivity.length).toBe(0)
 
-    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'think_block' ? m.steps : [])
-    const finished = allSteps.filter((s: any) => s.type === 'subagent_finished')
+    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'turn_block' ? m.steps : [])
+    const finished = allSteps.filter((s: any) => s.type === 'worker_finished')
     expect(finished.length).toBe(0)
 
-    const killed = allSteps.filter((s: any) => s.type === 'subagent_killed')
+    const killed = allSteps.filter((s: any) => s.type === 'worker_killed')
     expect(killed.length).toBe(1)
     expect(killed[0]).toMatchObject({
-      subagentType: 'engineer',
-      subagentId: 'agent-sub',
+      workerRole: 'engineer',
+      workerId: 'agent-sub',
       title: 'Builder',
     })
   })
 
-  it('removes fork activity and adds subagent_user_killed think step for subagent_user_killed', async () => {
+  it('removes fork activity and adds worker_user_killed step for worker_user_killed', async () => {
     const rootDisplay = await makeRootDisplay([
       {
         type: 'agent_created',
@@ -255,17 +251,17 @@ describe('display subagent lifecycle think steps', () => {
     const forkActivity = rootDisplay.messages.filter((m: any) => m.type === 'fork_activity' && m.forkId === 'fork-sub')
     expect(forkActivity.length).toBe(0)
 
-    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'think_block' ? m.steps : [])
-    const userKilled = allSteps.filter((s: any) => s.type === 'subagent_user_killed')
+    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'turn_block' ? m.steps : [])
+    const userKilled = allSteps.filter((s: any) => s.type === 'worker_user_killed')
     expect(userKilled.length).toBe(1)
     expect(userKilled[0]).toMatchObject({
-      subagentType: 'engineer',
-      subagentId: 'agent-sub',
+      workerRole: 'engineer',
+      workerId: 'agent-sub',
       title: 'Builder',
     })
   })
 
-  it('removes fork activity and does not add subagent_user_killed/subagent_killed think steps for subagent_idle_closed', async () => {
+  it('removes fork activity and does not add worker steps for worker_idle_closed', async () => {
     const rootDisplay = await makeRootDisplay([
       {
         type: 'agent_created',
@@ -281,7 +277,7 @@ describe('display subagent lifecycle think steps', () => {
         message: null,
       } as any,
       {
-        type: 'subagent_idle_closed',
+        type: 'worker_idle_closed',
         timestamp: ts(2),
         forkId: 'fork-sub',
         parentForkId: null,
@@ -293,9 +289,9 @@ describe('display subagent lifecycle think steps', () => {
     const forkActivity = rootDisplay.messages.filter((m: any) => m.type === 'fork_activity' && m.forkId === 'fork-sub')
     expect(forkActivity.length).toBe(0)
 
-    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'think_block' ? m.steps : [])
-    const userKilled = allSteps.filter((s: any) => s.type === 'subagent_user_killed')
-    const killed = allSteps.filter((s: any) => s.type === 'subagent_killed')
+    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'turn_block' ? m.steps : [])
+    const userKilled = allSteps.filter((s: any) => s.type === 'worker_user_killed')
+    const killed = allSteps.filter((s: any) => s.type === 'worker_killed')
     expect(userKilled.length).toBe(0)
     expect(killed.length).toBe(0)
   })

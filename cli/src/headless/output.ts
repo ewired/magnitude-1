@@ -123,13 +123,13 @@ export function createHeadlessOutputRenderer() {
         break
       }
 
-      case 'subagent_user_killed': {
+      case 'worker_user_killed': {
         const agent = agentForFork(event.forkId, agentsByFork)
         lines.push(`■ ${agentLabel(agent, event.forkId)} stopped by user`)
         break
       }
 
-      case 'subagent_idle_closed': {
+      case 'worker_idle_closed': {
         const agent = agentForFork(event.forkId, agentsByFork)
         lines.push(`✓ ${agentLabel(agent, event.forkId)} closed`)
         break

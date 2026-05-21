@@ -66,7 +66,7 @@ export const CompactionWorker = Worker.defineForked<AppEvent>()({
 
   forkLifecycle: {
     activateOn: 'agent_created',
-    completeOn: ['agent_killed', 'subagent_user_killed', 'subagent_idle_closed'],
+    completeOn: ['agent_killed', 'worker_user_killed', 'worker_idle_closed'],
   },
 
   signalHandlers: (on) => [

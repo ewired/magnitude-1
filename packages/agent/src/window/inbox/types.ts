@@ -97,7 +97,7 @@ export type TimelineEntry =
       readonly role: string
       readonly atoms: readonly AgentAtom[]
     })
-  | (Timestamped<'subagent_user_killed'> & { readonly agentId: string; readonly agentType: string })
+  | (Timestamped<'worker_user_killed'> & { readonly agentId: string; readonly agentType: string })
   | (TimestampedText<'user_presence'> & { readonly confirmed: boolean })
   | (Timestamped<'lifecycle_hook'> & {
       readonly agentId: string

@@ -7,7 +7,7 @@ import type { ForkableEvent } from '../projection/defineForked'
 type TestEvent =
   | { type: 'agent_created'; forkId: string | null }
   | { type: 'agent_killed'; forkId: string | null }
-  | { type: 'subagent_user_killed'; forkId: string | null }
+  | { type: 'worker_user_killed'; forkId: string | null }
   | { type: 'turn_started'; forkId: string | null }
 
 describe('Worker.defineForked completeOn lifecycle', () => {
@@ -58,7 +58,7 @@ describe('Worker.defineForked completeOn lifecycle', () => {
       name: 'ForkedWorkerTest',
       forkLifecycle: {
         activateOn: 'agent_created',
-        completeOn: ['agent_killed', 'subagent_user_killed'],
+        completeOn: ['agent_killed', 'worker_user_killed'],
       },
       eventHandlers: {
         turn_started: (event) => {
@@ -78,7 +78,7 @@ describe('Worker.defineForked completeOn lifecycle', () => {
     try {
       await client.send({ type: 'agent_created', forkId: 'fork-a' })
       await client.send({ type: 'turn_started', forkId: 'fork-a' })
-      await client.send({ type: 'subagent_user_killed', forkId: 'fork-a' })
+      await client.send({ type: 'worker_user_killed', forkId: 'fork-a' })
       await client.send({ type: 'turn_started', forkId: 'fork-a' })
 
       await new Promise((r) => setTimeout(r, 30))

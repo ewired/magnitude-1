@@ -1,7 +1,7 @@
 /**
  * DisplayProjection (Forked)
  *
- * UI state with messages and ThinkBlocks, per-fork.
+ * UI state with messages and TurnBlocks, per-fork.
  * Each fork has independent display state for its conversation.
  *
  * Key invariants:
@@ -16,7 +16,7 @@ import { textOf } from '../content'
 import { outcomeWillChainContinue } from '../events'
 
 import { AgentRoutingProjection } from '../projections/agent-routing'
-import { AgentStatusProjection, getAgentByForkId } from '../projections/agent-status'
+import { AgentStatusProjection, getAgentByForkId, type AgentStatusState } from '../projections/agent-status'
 import { UserMessageResolutionProjection } from '../projections/user-message-resolution'
 import { TurnProjection } from '../projections/turn'
 import { HarnessStateProjection, getToolHandlesRecord } from '../projections/harness-state'
@@ -31,11 +31,11 @@ import {
   ToolStep,
   CommunicationStep,
   StatusIndicatorStep,
-  SubagentStartedStep,
-  SubagentFinishedStep,
-  SubagentKilledStep,
-  SubagentUserKilledStep,
-  ThinkBlockMessage,
+  WorkerResumedStep,
+  WorkerFinishedStep,
+  WorkerKilledStep,
+  WorkerUserKilledStep,
+  TurnBlockMessage,
   DisplayState,
   DisplayMessage,
   ErrorDisplayMessage,
@@ -54,6 +54,23 @@ import {
 } from './helpers/messages'
 import type { ToolKey } from '../tools/toolkits'
 
+
+function anyAgentsWorking(agentState: AgentStatusState): boolean {
+  for (const agent of agentState.agents.values()) {
+    if (agent.status === 'working') return true
+  }
+  return false
+}
+
+function closeChain(fork: DisplayState, timestamp: number): DisplayState {
+  if (fork.chainStatus !== 'active') return fork
+  return {
+    ...fork,
+    chainStatus: 'completed',
+    chainEndTime: timestamp,
+  }
+}
+
 function getToolCluster(toolKey: ToolKey): string | undefined {
   switch (toolKey) {
     case 'fileRead': return 'read'
@@ -67,15 +84,15 @@ function getToolCluster(toolKey: ToolKey): string | undefined {
 }
 
 import {
-  findThinkBlock,
+  findTurnBlock,
   updateMessageById,
-  ensureThinkBlock,
-  addStepToThinkBlock,
-  updateStepInThinkBlock,
-  addStepToThinkBlockFlush,
-  closeThinkBlock,
+  ensureTurnBlock,
+  addStepToTurnBlock,
+  updateStepInTurnBlock,
+  addStepToTurnBlockFlush,
+  closeTurnBlock,
   finalizeOpenToolStepsAsInterrupted,
-} from './helpers/think-block'
+} from './helpers/turn-block'
 
 import { processThinkingChunk, heldBuffers } from './helpers/thinking'
 
@@ -107,8 +124,11 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
     pendingInboundCommunications: [],
     currentTurnId: null,
     streamingMessageId: null,
-    activeThinkBlockId: null,
+    activeTurnBlockId: null,
     showButton: 'send',
+    chainStartTime: null,
+    chainStatus: null,
+    chainEndTime: null,
   },
 
   signals: {
@@ -146,7 +166,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       // If promoting queued messages, close the current think block first
       // so the new think block appears AFTER the promoted user messages
-      const stateBeforePromotion = hasQueuedMessages ? closeThinkBlock(fork, event.timestamp) : fork
+      const stateBeforePromotion = hasQueuedMessages ? closeTurnBlock(fork, event.timestamp) : fork
 
       // Promote queued messages to user messages
       const messages = stateBeforePromotion.messages.map(msg => {
@@ -159,16 +179,23 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         return msg
       })
 
-      // Ensure ThinkBlock exists - reuse existing if there is one, create if not
+      // Ensure TurnBlock exists - reuse existing if there is one, create if not
       const stateWithMessages = { ...stateBeforePromotion, messages }
-      const { fork: newState } = ensureThinkBlock(stateWithMessages, event.timestamp)
+      const { fork: newState } = ensureTurnBlock(stateWithMessages, event.timestamp)
 
+      // Start chain if not already active
+      const chainStarting = newState.chainStatus !== 'active'
       return {
         ...newState,
         currentTurnId: event.turnId,  // Track the turn for queuing
         status: 'streaming' as const,
         showButton: 'stop' as const,
         pendingInboundCommunications: [],
+        ...(chainStarting ? {
+          chainStartTime: event.timestamp,
+          chainStatus: 'active' as const,
+          chainEndTime: null,
+        } : {}),
       }
     },
 
@@ -183,8 +210,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         return fork
       }
 
-      // Close any active ThinkBlock before starting assistant message
-      const closedState = closeThinkBlock(fork, event.timestamp)
+      // Close any active TurnBlock before starting assistant message
+      const closedState = closeTurnBlock(fork, event.timestamp)
 
       const msgId = generateId()
       const assistantMessage: AssistantMessageDisplay = {
@@ -229,7 +256,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         return fork
       }
 
-      // Don't create optimistic ThinkBlock if there are queued messages.
+      // Don't create optimistic TurnBlock if there are queued messages.
       // turn_started will create it at the correct position after promoting them.
       const hasQueuedMessages = fork.messages.some(m => m.type === 'queued_user_message')
       if (hasQueuedMessages) {
@@ -239,9 +266,9 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         }
       }
 
-      // Create optimistic ThinkBlock for potential follow-up work
+      // Create optimistic TurnBlock for potential follow-up work
       // It will be removed if empty when the turn outcome arrives
-      const { fork: newState } = ensureThinkBlock(fork, event.timestamp)
+      const { fork: newState } = ensureTurnBlock(fork, event.timestamp)
 
       return {
         ...newState,
@@ -255,8 +282,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         return fork
       }
 
-      const { fork: newState, thinkBlockId } = ensureThinkBlock(fork, event.timestamp)
-      const block = findThinkBlock(newState.messages, thinkBlockId)
+      const { fork: newState, turnBlockId } = ensureTurnBlock(fork, event.timestamp)
+      const block = findTurnBlock(newState.messages, turnBlockId)
 
       if (!block) return newState
 
@@ -271,9 +298,9 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           heldBuffers.delete(lastStep.id)
           return {
             ...newState,
-            messages: updateMessageById<ThinkBlockMessage>(
+            messages: updateMessageById<TurnBlockMessage>(
               newState.messages,
-              thinkBlockId,
+              turnBlockId,
               (b) => ({ ...b, steps: filteredSteps })
             ),
           }
@@ -286,9 +313,9 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
         return {
           ...newState,
-          messages: updateStepInThinkBlock(
+          messages: updateStepInTurnBlock(
             newState.messages,
-            thinkBlockId,
+            turnBlockId,
             lastStep.id,
             (s) => s.type === 'thinking'
               ? { ...s, content: s.content + contentToAppend }
@@ -316,7 +343,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         // Add the step with empty content so future chunks can append to it
         return {
           ...newState,
-          messages: addStepToThinkBlock(newState.messages, thinkBlockId, {
+          messages: addStepToTurnBlock(newState.messages, turnBlockId, {
             id: stepId,
             type: 'thinking',
             content: '',
@@ -326,7 +353,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       return {
         ...newState,
-        messages: addStepToThinkBlock(newState.messages, thinkBlockId, {
+        messages: addStepToTurnBlock(newState.messages, turnBlockId, {
           id: stepId,
           type: 'thinking',
           content: contentToAppend,
@@ -353,10 +380,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             return fork
           }
 
-          const { fork: newState, thinkBlockId } = ensureThinkBlock(fork, event.timestamp)
+          const { fork: newState, turnBlockId } = ensureTurnBlock(fork, event.timestamp)
           return {
             ...newState,
-            messages: addStepToThinkBlockFlush(newState.messages, thinkBlockId, {
+            messages: addStepToTurnBlockFlush(newState.messages, turnBlockId, {
               id: event.toolCallId,
               type: 'tool',
               toolKey: event.toolKey,
@@ -370,13 +397,13 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
         case 'ToolInputReady': {
           if (fork.currentTurnId !== event.turnId) return fork
-          if (!fork.activeThinkBlockId) return fork
+          if (!fork.activeTurnBlockId) return fork
 
           return {
             ...fork,
-            messages: updateStepInThinkBlock(
+            messages: updateStepInTurnBlock(
               fork.messages,
-              fork.activeThinkBlockId,
+              fork.activeTurnBlockId,
               event.toolCallId,
               (s) => s.type === 'tool'
                 ? {
@@ -399,13 +426,13 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             return fork
           }
 
-          if (!fork.activeThinkBlockId) return fork
+          if (!fork.activeTurnBlockId) return fork
 
           return {
             ...fork,
-            messages: updateStepInThinkBlock(
+            messages: updateStepInTurnBlock(
               fork.messages,
-              fork.activeThinkBlockId,
+              fork.activeTurnBlockId,
               event.toolCallId,
               (s) => {
                 if (s.type !== 'tool') return s
@@ -421,16 +448,16 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
         default: {
           if (fork.currentTurnId !== event.turnId) return fork
-          if (!fork.activeThinkBlockId) return fork
+          if (!fork.activeTurnBlockId) return fork
 
           const vs = getVisualState(toolStateFork, event.toolCallId)
           if (!vs) return fork
 
           return {
             ...fork,
-            messages: updateStepInThinkBlock(
+            messages: updateStepInTurnBlock(
               fork.messages,
-              fork.activeThinkBlockId,
+              fork.activeTurnBlockId,
               event.toolCallId,
               (s) => s.type === 'tool'
                 ? { ...s, state: vs }
@@ -441,7 +468,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       }
     },
 
-    turn_outcome: ({ event, fork }) => {
+    turn_outcome: ({ event, fork, read }) => {
       if (fork.currentTurnId !== event.turnId) {
         return fork
       }
@@ -455,14 +482,15 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           status: 'idle' as const,
           streamingMessageId: null,
           showButton: 'send' as const,
+          // Chain stays active — lead idle but chain continues
         }
       }
 
       if (event.outcome._tag === 'ConnectionFailure') {
-        const { fork: stateWithBlock, thinkBlockId } = ensureThinkBlock(fork, event.timestamp)
+        const { fork: stateWithBlock, turnBlockId } = ensureTurnBlock(fork, event.timestamp)
         return {
           ...stateWithBlock,
-          messages: addStepToThinkBlockFlush(stateWithBlock.messages, thinkBlockId, {
+          messages: addStepToTurnBlockFlush(stateWithBlock.messages, turnBlockId, {
             type: 'status_indicator' as const,
             id: generateId(),
             message: 'Connection issue: retrying',
@@ -472,14 +500,14 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       }
 
       if (event.outcome._tag === 'Overthinking') {
-        const { fork: stateWithBlock, thinkBlockId } = ensureThinkBlock(fork, event.timestamp)
-        const withIndicator = addStepToThinkBlockFlush(stateWithBlock.messages, thinkBlockId, {
+        const { fork: stateWithBlock, turnBlockId } = ensureTurnBlock(fork, event.timestamp)
+        const withIndicator = addStepToTurnBlockFlush(stateWithBlock.messages, turnBlockId, {
           type: 'status_indicator' as const,
           id: generateId(),
           message: `Thinking exceeded ${event.outcome.limit} character limit — continuing with feedback`,
           style: 'dim' as const,
         })
-        const closedState = closeThinkBlock({ ...stateWithBlock, messages: withIndicator }, event.timestamp)
+        const closedState = closeTurnBlock({ ...stateWithBlock, messages: withIndicator }, event.timestamp)
         return {
           ...closedState,
           currentTurnId: null,
@@ -489,11 +517,22 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         }
       }
 
-      const closedState = closeThinkBlock(fork, event.timestamp)
+      const closedState = closeTurnBlock(fork, event.timestamp)
+
+      // Close chain if no agents are still working — the chain is complete.
+      // When lead yields to workers, agents ARE working so chain stays open.
+      // When workers finish and lead resumes, next turn_outcome will check again.
+      let withChain: DisplayState = closedState
+      if (closedState.chainStatus === 'active') {
+        const agentState = read(AgentStatusProjection)
+        if (!anyAgentsWorking(agentState)) {
+          withChain = closeChain(closedState, event.timestamp)
+        }
+      }
 
       if (event.outcome._tag === 'Completed') {
         return {
-          ...closedState,
+          ...withChain,
           currentTurnId: null,
           status: 'idle' as const,
           streamingMessageId: null,
@@ -502,15 +541,15 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       }
 
       if (event.outcome._tag === 'Cancelled') {
-        const alreadyInterrupted = closedState.messages.some(
+        const alreadyInterrupted = withChain.messages.some(
           (message) => message.type === 'interrupted' && message.timestamp === event.timestamp,
         )
         return {
-          ...closedState,
+          ...withChain,
           messages: alreadyInterrupted
-            ? closedState.messages
+            ? withChain.messages
             : [
-                ...closedState.messages,
+                ...withChain.messages,
                 {
                   id: generateId(),
                   type: 'interrupted' as const,
@@ -530,7 +569,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         || event.outcome._tag === 'ContextWindowExceeded'
       ) {
         return {
-          ...closedState,
+          ...withChain,
           currentTurnId: null,
           status: 'idle' as const,
           streamingMessageId: null,
@@ -541,8 +580,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       const errorMessage = toErrorDisplayMessage(event.outcome, event.timestamp)
 
       return {
-        ...closedState,
-        messages: errorMessage ? [...closedState.messages, errorMessage] : closedState.messages,
+        ...withChain,
+        messages: errorMessage ? [...withChain.messages, errorMessage] : withChain.messages,
         currentTurnId: null,
         status: 'idle' as const,
         streamingMessageId: null,
@@ -587,7 +626,9 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       const interruptedState = finalizeOpenToolStepsAsInterrupted(fork, toolStateFork)
 
       // Close think block and remove queued messages
-      const closedState = closeThinkBlock(interruptedState, event.timestamp)
+      const closedTurnBlock = closeTurnBlock(interruptedState, event.timestamp)
+      // Close chain on interrupt
+      const closedState = closedTurnBlock.chainStatus === 'active' ? closeChain(closedTurnBlock, event.timestamp) : closedTurnBlock
       const messagesWithoutQueued = closedState.messages.filter(
         m => m.type !== 'queued_user_message'
       )
@@ -617,10 +658,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       if (!content) return fork
       if (event.forkId === null) return fork
 
-      const { fork: newState, thinkBlockId } = ensureThinkBlock(fork, event.timestamp)
+      const { fork: newState, turnBlockId } = ensureTurnBlock(fork, event.timestamp)
       return {
         ...newState,
-        messages: addStepToThinkBlockFlush(newState.messages, thinkBlockId, {
+        messages: addStepToTurnBlockFlush(newState.messages, turnBlockId, {
           id: generateId(),
           type: 'communication',
           direction: 'from_agent',
@@ -638,7 +679,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
     agent_killed: ({ fork }) => fork,
     subagent_user_killed: ({ fork }) => fork,
-    subagent_idle_closed: ({ fork }) => fork,
+    worker_idle_closed: ({ fork }) => fork,
 
   },
 
@@ -647,17 +688,23 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       const displayFork = state.forks.get(value.forkId)
       if (!displayFork) return state
 
+      // Close chain if active (new user message = new chain)
+      let workingFork = displayFork
+      if (displayFork.chainStatus === 'active') {
+        workingFork = closeChain(displayFork, value.timestamp)
+      }
+
       const messageId = generateId()
       const content = textOf(value.content)
       const messageType: 'user_message' | 'queued_user_message' =
-        displayFork.currentTurnId !== null ? 'queued_user_message' : 'user_message'
+        workingFork.currentTurnId !== null ? 'queued_user_message' : 'user_message'
 
       return {
         ...state,
         forks: new Map(state.forks).set(value.forkId, {
-          ...displayFork,
+          ...workingFork,
           messages: [
-            ...displayFork.messages,
+            ...workingFork.messages,
             {
               id: messageId,
               type: messageType,
@@ -705,7 +752,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       }
 
       if (parentForkId === null) {
-        const withBlock = ensureThinkBlock(nextParentState, value.timestamp)
+        const withBlock = ensureTurnBlock(nextParentState, value.timestamp)
         nextParentState = withBlock.fork
       }
 
@@ -744,7 +791,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
     }),
 
     // Mark fork activity as completed when agent becomes idle
-    on(AgentStatusProjection.signals.agentBecameIdle, ({ value, state }) => {
+    on(AgentStatusProjection.signals.agentBecameIdle, ({ value, state, read }) => {
       const { forkId, parentForkId } = value
 
       const parentState = state.forks.get(parentForkId)
@@ -769,19 +816,19 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       let nextParentState: DisplayState = { ...parentState, messages: newMessages }
 
       if (parentForkId === null && value.reason !== 'interrupt') {
-        const withBlock = ensureThinkBlock(nextParentState, value.timestamp)
-        const step: SubagentFinishedStep = {
+        const withBlock = ensureTurnBlock(nextParentState, value.timestamp)
+        const step: WorkerFinishedStep = {
           id: generateId(),
-          type: 'subagent_finished',
-          subagentType: value.role,
-          subagentId: value.agentId,
+          type: 'worker_finished',
+          workerRole: value.role,
+          workerId: value.agentId,
           cumulativeTotalTimeMs,
           cumulativeTotalToolsUsed: totalToolsUsed(msg.toolCounts),
           resumed: (msg.resumeCount ?? 0) > 0,
         }
         nextParentState = {
           ...withBlock.fork,
-          messages: addStepToThinkBlockFlush(withBlock.fork.messages, withBlock.thinkBlockId, step),
+          messages: addStepToTurnBlockFlush(withBlock.fork.messages, withBlock.turnBlockId, step),
         }
       }
 
@@ -812,9 +859,11 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             timestamp: value.timestamp,
           }
 
+          let nextParentState = { ...parentState, messages: newMessages }
+
           return {
             ...state,
-            forks: new Map(state.forks).set(parentForkId, { ...parentState, messages: newMessages })
+            forks: new Map(state.forks).set(parentForkId, nextParentState)
           }
         }
         return state
@@ -842,18 +891,17 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       }
 
       if (parentForkId === null) {
-        const withBlock = ensureThinkBlock(nextParentState, value.timestamp)
-        const step: SubagentStartedStep = {
+        const withBlock = ensureTurnBlock(nextParentState, value.timestamp)
+        const step: WorkerResumedStep = {
           id: generateId(),
-          type: 'subagent_started',
-          subagentType: value.role,
-          subagentId: value.agentId,
+          type: 'worker_resumed',
+          workerRole: value.role,
+          workerId: value.agentId,
           title: message.name,
-          resumed: true,
         }
         nextParentState = {
           ...withBlock.fork,
-          messages: addStepToThinkBlockFlush(withBlock.fork.messages, withBlock.thinkBlockId, step),
+          messages: addStepToTurnBlockFlush(withBlock.fork.messages, withBlock.turnBlockId, step),
         }
       }
 
@@ -870,17 +918,17 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       const messages = parentState.messages.filter((m) => !(m.type === 'fork_activity' && m.forkId === value.forkId))
       let nextParentState: DisplayState = { ...parentState, messages }
 
-      const withBlock = ensureThinkBlock(nextParentState, value.timestamp)
-      const step: SubagentKilledStep = {
+      const withBlock = ensureTurnBlock(nextParentState, value.timestamp)
+      const step: WorkerKilledStep = {
         id: generateId(),
-        type: 'subagent_killed',
-        subagentType: value.role,
-        subagentId: value.agentId,
+        type: 'worker_killed',
+        workerRole: value.role,
+        workerId: value.agentId,
         title: value.title,
       }
       nextParentState = {
         ...withBlock.fork,
-        messages: addStepToThinkBlockFlush(withBlock.fork.messages, withBlock.thinkBlockId, step),
+        messages: addStepToTurnBlockFlush(withBlock.fork.messages, withBlock.turnBlockId, step),
       }
 
       return {
@@ -896,17 +944,17 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       const messages = parentState.messages.filter((m) => !(m.type === 'fork_activity' && m.forkId === value.forkId))
       let nextParentState: DisplayState = { ...parentState, messages }
 
-      const withBlock = ensureThinkBlock(nextParentState, value.timestamp)
-      const step: SubagentUserKilledStep = {
+      const withBlock = ensureTurnBlock(nextParentState, value.timestamp)
+      const step: WorkerUserKilledStep = {
         id: generateId(),
-        type: 'subagent_user_killed',
-        subagentType: value.role,
-        subagentId: value.agentId,
+        type: 'worker_user_killed',
+        workerRole: value.role,
+        workerId: value.agentId,
         title: value.title,
       }
       nextParentState = {
         ...withBlock.fork,
-        messages: addStepToThinkBlockFlush(withBlock.fork.messages, withBlock.thinkBlockId, step),
+        messages: addStepToTurnBlockFlush(withBlock.fork.messages, withBlock.turnBlockId, step),
       }
 
       return {
@@ -915,7 +963,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       }
     }),
 
-    on(AgentStatusProjection.signals.subagentIdleClosed, ({ value, state }) => {
+    on(AgentStatusProjection.signals.workerIdleClosed, ({ value, state }) => {
       const parentState = state.forks.get(value.parentForkId)
       if (!parentState) return state
 
@@ -1052,10 +1100,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       if (value.forkId !== null) {
         for (const pending of value.messages.filter((message) => message.source === 'agent')) {
           const targetAgent = getAgentByForkId(agentState, value.forkId)
-          const withBlock = ensureThinkBlock(nextFork, value.timestamp)
+          const withBlock = ensureTurnBlock(nextFork, value.timestamp)
           nextFork = {
             ...withBlock.fork,
-            messages: addStepToThinkBlockFlush(withBlock.fork.messages, withBlock.thinkBlockId, {
+            messages: addStepToTurnBlockFlush(withBlock.fork.messages, withBlock.turnBlockId, {
               id: pending.id,
               type: 'communication',
               direction: 'from_agent',
