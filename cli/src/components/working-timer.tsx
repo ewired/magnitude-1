@@ -1,11 +1,12 @@
 import { memo, useEffect, useState } from 'react'
-import type { ThinkBlockMessage } from '@magnitudedev/agent'
+import type { ThinkBlockMessage, InterruptedMessage } from '@magnitudedev/agent'
 import { useTheme } from '../hooks/use-theme'
 
 interface WorkingTimerProps {
   startTime: number | null
   visible: boolean
   completedThinkBlock: ThinkBlockMessage | null
+  interruptedMessage?: InterruptedMessage | null
 }
 
 function formatElapsed(totalSeconds: number): string {
@@ -109,6 +110,7 @@ export const WorkingTimer = memo(function WorkingTimer({
   startTime,
   visible,
   completedThinkBlock,
+  interruptedMessage,
 }: WorkingTimerProps) {
   const theme = useTheme()
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -139,6 +141,23 @@ export const WorkingTimer = memo(function WorkingTimer({
         <text style={{ fg: theme.muted }}>
           Working... {formatElapsed(elapsedSeconds)}
         </text>
+      </box>
+    )
+  }
+
+  // Interrupted state: show interrupt text in place of the work summary
+  if (interruptedMessage) {
+    let interruptText: string
+    if (interruptedMessage.context === 'fork') {
+      interruptText = '[Stopped] · Agent was stopped by user'
+    } else if (interruptedMessage.allKilled) {
+      interruptText = '[Interrupted] · All agents were stopped. What would you like to do?'
+    } else {
+      interruptText = '[Interrupted] · What would you like to do instead?'
+    }
+    return (
+      <box style={{ flexShrink: 0, paddingLeft: 2, paddingTop: 0, paddingBottom: 0 }}>
+        <text style={{ fg: theme.warning }}>{interruptText}</text>
       </box>
     )
   }

@@ -81,7 +81,7 @@ export const MessageView = memo(function MessageView({
           interruptText = '[Interrupted] · What would you like to do instead?'
         }
         return (
-          <box>
+          <box style={{ marginBottom: 1 }}>
             <text style={{ fg: theme.warning }}>{interruptText}</text>
           </box>
         )

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Effect, Layer, Cause } from 'effect'
 
-import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId, type ThinkBlockMessage } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId, type ThinkBlockMessage, type InterruptedMessage } from '@magnitudedev/agent'
 import { matchKeyToChord } from './utils/chord'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
@@ -492,8 +492,13 @@ function AppInner({
       }
       if (state.status === 'streaming') {
         interruptedMessageIdRef.current = null
-      } else if (state.status === 'idle' && state.messages.some(m => m.type === 'interrupted')) {
-        interruptedMessageIdRef.current = lastStreamingMessageIdRef.current
+      } else if (state.status === 'idle') {
+        const lastMsg = state.messages[state.messages.length - 1]
+        if (lastMsg?.type === 'interrupted') {
+          interruptedMessageIdRef.current = lastStreamingMessageIdRef.current
+        } else {
+          interruptedMessageIdRef.current = null
+        }
       }
       setDisplay(state)
     })
@@ -1143,7 +1148,7 @@ function AppInner({
 
   // Find most recently completed think block for the persistent summary footer
   const lastCompletedThinkBlock = useMemo(() => {
-    const messages = display?.messages ?? []
+    const messages = (activeDisplay ?? display)?.messages ?? []
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i]
       if (msg.type === 'think_block' && msg.status === 'completed') {
@@ -1151,7 +1156,18 @@ function AppInner({
       }
     }
     return null
-  }, [display?.messages])
+  }, [activeDisplay, display])
+
+  // Check if the last message is an interrupted display and agent is idle —
+  // it should be shown in the WorkingTimer slot instead of the scrollbox
+  const lastInterruptedMessage: InterruptedMessage | null = useMemo(() => {
+    const displayState = activeDisplay ?? display
+    if (displayState?.status !== 'idle') return null
+    const messages = displayState?.messages ?? []
+    if (messages.length === 0) return null
+    const last = messages[messages.length - 1]
+    return last.type === 'interrupted' ? last : null
+  }, [activeDisplay, display])
 
   // Scroll-tracking for sticky header
   const scrollboxRef = useRef<any>(null)
@@ -1342,6 +1358,8 @@ function AppInner({
           switch (item.kind) {
             case 'chat': {
               const msg = item.message
+              // Skip the last interrupted message — it renders in the WorkingTimer slot instead
+              if (msg.type === 'interrupted' && lastInterruptedMessage && msg.id === lastInterruptedMessage.id) return null
               const isStreamingMsg = display.status === 'streaming'
                 && display.streamingMessageId === msg.id
               const isInterrupted = interruptedMessageIdRef.current === msg.id
@@ -1428,6 +1446,7 @@ function AppInner({
             startTime={activeThinkBlock?.timestamp ?? turnStartTimeRef.current}
             visible={display?.status === 'streaming' || display?.activeThinkBlockId !== null}
             completedThinkBlock={lastCompletedThinkBlock}
+            interruptedMessage={lastInterruptedMessage}
           />
           <ChatController
             isBlockingOverlayActive={isBlockingOverlayActive}
