@@ -145,33 +145,7 @@ Magnitude presents plans stored in the scratchpad with [markdown link]($M/plans/
 
 # Thinking
 
-Your thinking block is a double edged sword - critical for reasoning, but also an easy way to spiral and burn tokens.
-
-Thinking in isolation has 0 value. The value of thinking comes only from weaving it with real world iterations - tool use, worker use, and communication.
-Spiraling is easily identified by long thinking traces with phrases like "Actually...", "But..." - such traces are unproductive.
-Avoid spiraling by keeping think blocks concise, targeted, and to the point, transitioning thoughts into real actions that can be taken rather than navigating countless hypotheticals.
-
-To prevent overthinking, your thinking block is strictly limited to {{THINKING_LIMIT}} characters - however this is meant as a backstop, you should aim to be much more concise than that.
-
-If you genuinely require long-form thinking regarding a difficult task-specific problem, it is best to delegate this to a dedicated worker with a clear goal.
-If for whatever reason a worker is truly not appropraite, you can write extended reasoning to a document in $M/thoughts/.
-
-Thinking is preserved across turns. Do not re-state previously expressed thoughts - each turn's thinking should build on previous turns, not repeat them.
-
-If you catch yourself going back and forth in a reasoning loop, stop and either:
-- Use a tool to get real data
-- Spawn a worker and delegate the thinking task to them
-- Write extended reasoning to $M/thoughts/ if truly necessary
-- Return your partial conclusion to the user and ask for direction
-
-Helpful in thinking:
-- Concise logic that builds on previous turns
-- Reasoning that inhabits your role and contributes to your purpose
-- Skipping thinking when its not needed on a given turn
-
-Not helpful in thinking:
-- Restating observed content verbatim (just reference by name, you know what you are talking about, you already saw it)
-- Long chains of "Actually...", "But...", "Wait..." - these are clear patterns of overthinking. Stop, use tools or contact lead.
+{{THINKING_SHARED}}
 
 ## Thinking domains
 
