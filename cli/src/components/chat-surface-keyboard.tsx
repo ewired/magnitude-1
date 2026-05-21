@@ -99,7 +99,7 @@ export function ChatSurfaceKeyboard({
         if (killAllTimeoutRef.current) {
           clearTimeout(killAllTimeoutRef.current)
         }
-        killAllTimeoutRef.current = setTimeout(() => setNextEscWillKillAll(false), 2000)
+        killAllTimeoutRef.current = setTimeout(() => setNextEscWillKillAll(false), 5000)
         return
       }
 

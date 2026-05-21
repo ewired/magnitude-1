@@ -1353,7 +1353,7 @@ function AppInner({
           ...visibleItems.map(item => ({ kind: 'timeline' as const, item })),
         ].sort((a, b) => a.item.timestamp - b.item.timestamp)
 
-        return mergedItems.map((merged) => {
+        return mergedItems.map((merged, idx) => {
           const item = merged.item
           switch (item.kind) {
             case 'chat': {
@@ -1363,6 +1363,9 @@ function AppInner({
               const isStreamingMsg = display.status === 'streaming'
                 && display.streamingMessageId === msg.id
               const isInterrupted = interruptedMessageIdRef.current === msg.id
+              // Check if the next message is also interrupted (for margin logic)
+              const nextItem = idx + 1 < mergedItems.length ? mergedItems[idx + 1] : null
+              const nextMsgInterrupted = nextItem?.item.kind === 'chat' && nextItem.item.message.type === 'interrupted'
               return (
                 <ErrorBoundary key={msg.id} fallback={(err) => (
                   <box style={{ paddingLeft: 1 }}>
@@ -1373,6 +1376,7 @@ function AppInner({
                     message={msg}
                     isStreaming={isStreamingMsg}
                     isInterrupted={isInterrupted}
+                    nextMessageInterrupted={nextMsgInterrupted}
                     mode={displayMode}
                     onApprove={handleApprove}
                     onReject={handleReject}

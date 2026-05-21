@@ -9,11 +9,13 @@ import { ApprovalRequest } from './approval-request'
 import { AgentCommunicationCard } from './agent-communication-card'
 import { ErrorMessage } from './error-message'
 import { useTheme } from '../hooks/use-theme'
+import { red } from '../utils/theme'
 
 interface MessageViewProps {
   message: DisplayMessage
   isStreaming: boolean
   isInterrupted?: boolean
+  nextMessageInterrupted?: boolean
   onApprove?: () => void
   onReject?: () => void
   onWorkApprove?: () => void
@@ -29,6 +31,7 @@ export const MessageView = memo(function MessageView({
   message,
   isStreaming,
   isInterrupted,
+  nextMessageInterrupted,
   onApprove,
   onReject,
   onWorkApprove,
@@ -74,15 +77,15 @@ export const MessageView = memo(function MessageView({
       case 'interrupted': {
         let interruptText: string
         if (message.context === 'fork') {
-          interruptText = '[Stopped] · Agent was stopped by user'
+          interruptText = '■ Agent stopped'
         } else if (message.allKilled) {
-          interruptText = '[Interrupted] · All agents were stopped. What would you like to do?'
+          interruptText = '■ All agents interrupted. What would you like to do?'
         } else {
-          interruptText = '[Interrupted] · What would you like to do instead?'
+          interruptText = '■ Lead interrupted. What would you like to do?'
         }
         return (
-          <box style={{ marginBottom: 1 }}>
-            <text style={{ fg: theme.warning }}>{interruptText}</text>
+          <box style={{ marginBottom: nextMessageInterrupted ? 0 : 1 }}>
+            <text style={{ fg: red[400] }}>{interruptText}</text>
           </box>
         )
       }

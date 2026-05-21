@@ -279,7 +279,7 @@ export const TurnProjection = Projection.defineForked<AppEvent, TurnLifecycleSta
       return TurnLifecycle.transition(fork, 'idle', {
         completedTurns: fork.completedTurns + 1,
         triggers: nextTriggers,
-        softInterrupted: false,
+        softInterrupted: event.outcome._tag === 'Cancelled',
         connectionRetryCount: nextRetryCount,
       })
     },

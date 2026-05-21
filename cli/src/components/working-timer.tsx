@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from 'react'
 import type { ThinkBlockMessage, InterruptedMessage } from '@magnitudedev/agent'
 import { useTheme } from '../hooks/use-theme'
+import { red } from '../utils/theme'
 
 interface WorkingTimerProps {
   startTime: number | null
@@ -149,15 +150,15 @@ export const WorkingTimer = memo(function WorkingTimer({
   if (interruptedMessage) {
     let interruptText: string
     if (interruptedMessage.context === 'fork') {
-      interruptText = '[Stopped] · Agent was stopped by user'
+      interruptText = '■ Agent stopped'
     } else if (interruptedMessage.allKilled) {
-      interruptText = '[Interrupted] · All agents were stopped. What would you like to do?'
+      interruptText = '■ All agents interrupted. What would you like to do?'
     } else {
-      interruptText = '[Interrupted] · What would you like to do instead?'
+      interruptText = '■ Lead interrupted. What would you like to do?'
     }
     return (
       <box style={{ flexShrink: 0, paddingLeft: 2, paddingTop: 0, paddingBottom: 0 }}>
-        <text style={{ fg: theme.warning }}>{interruptText}</text>
+        <text style={{ fg: red[400] }}>{interruptText}</text>
       </box>
     )
   }
