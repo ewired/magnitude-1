@@ -7,6 +7,7 @@ import { ShimmerText } from '../../components/shimmer-text';
 import { DiffHunk } from '../../components/diff-hunk';
 import { useStreamingReveal } from '../../hooks/use-streaming-reveal';
 import { useTheme } from '../../hooks/use-theme';
+import { green, red } from '../../utils/theme';
 import { useSelectedFile } from '../../hooks/use-file-viewer';
 
 const SHIMMER_INTERVAL_MS = 160;
@@ -57,15 +58,15 @@ export const diffDisplay = createToolDisplay<DiffState>({
             </Button>
             {state.diffs.length > 0 && (
               <text>
-                <span style={{ fg: theme.syntax.string }} attributes={TextAttributes.DIM}>{` +${totals.added}`}</span>
+                <span style={{ fg: green[500] }} attributes={TextAttributes.DIM}>{` +${totals.added}`}</span>
                 <span style={{ fg: theme.secondary }} attributes={TextAttributes.DIM}>{'/'}</span>
-                <span style={{ fg: theme.error }} attributes={TextAttributes.DIM}>{`-${totals.removed}`}</span>
+                <span style={{ fg: red[400] }} attributes={TextAttributes.DIM}>{`-${totals.removed}`}</span>
               </text>
             )}
           </box>
 
           {state.diffs.length > 0 && (
-            <box style={{ flexDirection: 'column', paddingLeft: 2 }}>
+            <box style={{ flexDirection: 'column' }}>
               {state.diffs.map((diff, index) => (
                 <DiffHunk
                   key={`${String(path ?? 'file')}-${index}`}

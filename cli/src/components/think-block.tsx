@@ -387,11 +387,14 @@ export const ThinkBlock = memo(function ThinkBlock({
           const prevGroup = gi > 0 ? visibleGroups[gi - 1] : null
           const prevHadThinking = prevGroup != null && prevGroup.steps.some(s => s.type === 'thinking')
           const currentHasTool = group.steps.some(s => s.type === 'tool' || s.type === 'subagent_started')
-          // Add spacing after shell groups (shell to shell, or shell to non-shell)
-          const isShellGroup = group.steps.some(s => s.type === 'tool' && s.toolKey === 'shell')
-          const prevIsShellGroup = prevGroup != null && prevGroup.steps.some(s => s.type === 'tool' && s.toolKey === 'shell')
-          const hasShellSpacing = (isShellGroup || prevIsShellGroup) && prevGroup != null
-          const hasMarginTop = (prevHadThinking && currentHasTool) || hasShellSpacing
+          // Add spacing between block-level tool groups (shell, edit, write)
+          const BLOCK_TOOLS = new Set(['shell', 'fileEdit', 'fileWrite'])
+          const isBlockGroup = group.steps.some(s => s.type === 'tool' && BLOCK_TOOLS.has(s.toolKey))
+          const prevIsBlockGroup = prevGroup != null && prevGroup.steps.some(s => s.type === 'tool' && BLOCK_TOOLS.has(s.toolKey))
+          const hasBlockSpacing = (isBlockGroup || prevIsBlockGroup) && prevGroup != null
+          const prevHadTool = prevGroup != null && prevGroup.steps.some(s => s.type === 'tool' || s.type === 'subagent_started')
+          const currentHasThinking = group.steps.some(s => s.type === 'thinking')
+          const hasMarginTop = (prevHadThinking && currentHasTool) || hasBlockSpacing || (prevHadTool && currentHasThinking)
 
           return (
             <ClusterContainer key={gi} cluster={group.cluster} hasMarginTop={hasMarginTop}>

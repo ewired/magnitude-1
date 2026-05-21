@@ -231,6 +231,8 @@ const DEFAULT_CHAT_THEME: ChatTheme = {
   agentFocusedBg: slate[700],
   agentContentBg: '#000000',
   terminalBg: 'transparent',
+  diffGreenBg: '#122b22',
+  diffRedBg: '#2c1919',
   inputFg: slate[100],
   inputFocusedFg: '#ffffff',
 
@@ -304,6 +306,8 @@ const DEFAULT_LIGHT_THEME: ChatTheme = {
   agentFocusedBg: slate[100],
   agentContentBg: '#ffffff',
   terminalBg: '#f0f0f0',
+  diffGreenBg: '#e6f5ee',
+  diffRedBg: '#f5e6e6',
   inputFg: slate[900],
   inputFocusedFg: '#000000',
 

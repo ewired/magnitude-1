@@ -32,35 +32,58 @@ export const slate = {
   900: '#0f172a',
 } as const
 
-export const red = {
-  400: '#f87171',
-  500: '#ef4444',
-  600: '#dc2626',
-} as const
-
-export const orange = {
-  300: '#fdba74',
-  400: '#fb923c',
-  500: '#f97316',
-  600: '#ea580c',
-  700: '#c2410c',
-} as const
-
 export const green = {
+  200: '#b8f5e1',
   300: '#7ee8c7',
   400: '#4dd4a8',
   500: '#2ab88a',
   600: '#1f9670',
   700: '#17785a',
+  800: '#106148',
+} as const
+
+export const rose = {
+  200: '#fad4de',
+  300: '#f2b8c6',
+  400: '#e494a7',
+  500: '#d17088',
+  600: '#b5536e',
+  700: '#954458',
 } as const
 
 export const violet = {
+  200: '#ddd6fe',
   300: '#c4b5fd',
+  400: '#a78bfa',
   500: '#8b5cf6',
   600: '#7c3aed',
+  700: '#6d28d9',
 } as const
 
 export const indigo = {
+  200: '#bccef9',
+  300: '#93b4f8',
+  400: '#6b93f2',
+  500: '#4573ea',
   600: '#1d4ed8',
   700: '#1e40af',
+} as const
+
+export const orange = {
+  200: '#fde0b8',
+  300: '#f5c890',
+  400: '#e8a55c',
+  500: '#d48a38',
+  600: '#b87224',
+  700: '#965a1a',
+} as const
+
+export const red = {
+  200: '#fcd4d2',
+  300: '#f8ada8',
+  400: '#e8736e',
+  500: '#d4524d',
+  600: '#b93a36',
+  700: '#982d2a',
+  800: '#7d2321',
 } as const

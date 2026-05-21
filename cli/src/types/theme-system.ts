@@ -113,6 +113,12 @@ export interface ChatTheme {
   /** Terminal/shell command block background */
   terminalBg: string
 
+  /** Diff added line background */
+  diffGreenBg: string
+
+  /** Diff removed line background */
+  diffRedBg: string
+
   /** Input text color */
   inputFg: ThemeColor
 

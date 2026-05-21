@@ -23,7 +23,7 @@ const initial: Omit<FileEditState, 'phase'> = {
   diffs: [],
 }
 
-const CONTEXT_LINES = 5
+const CONTEXT_LINES = 3
 
 function findUniqueMatchRange(content: string, needle: string): { start: number; end: number } | null {
   if (!content || !needle) return null
