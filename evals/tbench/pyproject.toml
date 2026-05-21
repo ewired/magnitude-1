@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "magnitude-tbench"
+version = "0.1.0"
+description = "CLI and TUI for running Magnitude against Terminal Bench 2.1"
+requires-python = ">=3.12"
+dependencies = [
+    "cyclopts>=4.0",
+    "rich>=13.0",
+    "pydantic>=2.0",
+    "toml>=0.10",
+    "harbor>=0.5",
+    "modal>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy"]
+
+[project.scripts]
+tbench = "tbench.cli:main"
+
+[project.entry-points."cyclopts"]
+tbench = "tbench.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tbench"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120

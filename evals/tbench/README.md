@@ -65,9 +65,86 @@ harbor run -d terminal-bench/terminal-bench-2-1 \
   --env modal \
   --environment-kwarg 'volumes={"/magnitude-binaries":"magnitude-binaries"}' \
   -n 100
+
+# All easy tasks, 3 trials each
+harbor run -d terminal-bench/terminal-bench-2-1 \
+  --agent-import-path evals.tbench.magnitude_agent:MagnitudeAgent \
+  --env modal \
+  --environment-kwarg 'volumes={"/magnitude-binaries":"magnitude-binaries"}' \
+  -k 3 \
+  -i "terminal-bench/cobol-modernization" \
+  -i "terminal-bench/fix-git" \
+  -i "terminal-bench/overfull-hbox" \
+  -i "terminal-bench/prove-plus-comm"
 ```
 
 > **Tip:** The interactive runner (`bun evals/tbench/run.ts`) adds these flags automatically when you select a cloud environment.
+
+## tbench CLI
+
+The `tbench` command provides analysis and management utilities on top of Harbor.
+
+```bash
+# Install (from project root)
+cd ~/magnitude
+uv run --project evals/tbench tbench --help
+```
+
+### List jobs & tasks
+
+```bash
+tbench jobs                         # recent jobs with pass/fail/mean/runtime
+tbench jobs --since 2026-05-20      # only jobs after a date
+tbench jobs --limit 5               # show fewer
+tbench tasks                        # all 89 TB2 tasks with description, difficulty, tags
+tbench tasks --category security     # filter by category
+tbench tasks --difficulty hard       # filter by difficulty
+```
+
+### Inspect a task
+
+```bash
+tbench tasks fix-git               # full details: instruction, metadata, tbench.ai link
+tbench tasks fix-git --open-link   # opens in browser
+```
+
+### Job results
+
+```bash
+tbench show                       # latest completed job — pass/fail/mean/regressions
+tbench show 2026-05-20__17-29-34  # specific job
+tbench inspect <job> fix-git      # ATIF timeline for a failed task
+tbench inspect <job> fix-git --errors-only   # only error steps
+tbench logs <job> fix-git         # raw agent log
+tbench logs <job> fix-git --follow          # tail -f
+```
+
+### Compare runs
+
+```bash
+tbench diff                       # last two same-binary jobs
+tbench diff <job-a> <job-b>       # specific pair
+tbench diff --task fix-git        # diff only one task
+```
+
+### Build & deploy
+
+```bash
+tbench build                      # build Linux binary (skips if up-to-date)
+tbench build --force              # always rebuild
+tbench build --check              # just check staleness
+tbench seed                       # upload binary to Modal volume
+tbench seed --force               # re-upload even if hash matches
+```
+
+### JSON output
+
+All commands support `TBENCH_JSON=1` for machine-readable output:
+
+```bash
+TBENCH_JSON=1 tbench ls | jq .
+TBENCH_JSON=1 tbench show | jq '.overview'
+```
 
 ## View results
 
