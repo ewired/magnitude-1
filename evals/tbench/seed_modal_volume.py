@@ -31,7 +31,7 @@ def sha256_file(path: Path) -> str:
 
 
 @app.local_entrypoint()
-def main(force: bool = False):
+def main(force: bool = True):
     binary_path = Path(DEFAULT_BINARY_PATH).expanduser().resolve()
     if not binary_path.is_file():
         raise FileNotFoundError(f"Binary not found: {binary_path}")

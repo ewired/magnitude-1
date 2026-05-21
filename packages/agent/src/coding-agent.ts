@@ -8,7 +8,7 @@
  * - Supports session persistence and hydration
  */
 
-import { Effect, Layer, Stream, SubscriptionRef } from 'effect'
+import { Effect, Layer, Stream } from 'effect'
 import { Agent } from '@magnitudedev/event-core'
 import { HydrationContext, EventSinkTag } from '@magnitudedev/event-core'
 import type { AppEvent, SessionContext } from './events'
@@ -34,7 +34,6 @@ import { UserPresenceProjection } from './projections/user-presence'
 import { OutboundMessagesProjection } from './projections/outbound-messages'
 import { UserMessageResolutionProjection } from './projections/user-message-resolution'
 import { AtifProjection } from './projections/atif/projection'
-import { serializeAtif } from './projections/atif/serialize'
 
 
 // Workers
@@ -54,6 +53,7 @@ import { isRoleId, type RoleId } from './agents/role-validation'
 import { UserPresenceWorker } from './workers/user-presence-worker'
 import { FileMentionResolver } from './workers/file-mention-resolver'
 import { SessionTitleWorker } from './workers/session-title-worker'
+import { AtifWriter } from './workers/atif-writer'
 import { FsLive } from './services/fs'
 
 // Execution
@@ -133,6 +133,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
 
     UserPresenceWorker,
     SessionTitleWorker,
+    AtifWriter,
   ],
 
   expose: {
@@ -533,27 +534,6 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
   const originalDispose = client.dispose.bind(client)
 
   const dispose = async () => {
-    try {
-      // Write ATIF trajectory before disposing
-      if (options.atifPath) {
-        const forks = await client.runEffect(Effect.gen(function* () {
-          const atifInstance = yield* AtifProjection.Tag
-          const atifState = yield* SubscriptionRef.get(atifInstance.state)
-          return atifState.forks
-        }))
-        const trajectory = serializeAtif(forks, { sessionId: sessionMetadata?.sessionId })
-        const fs = await import('node:fs/promises')
-        const dir = options.atifPath.includes('/')
-          ? options.atifPath.slice(0, options.atifPath.lastIndexOf('/'))
-          : '.'
-        await fs.mkdir(dir, { recursive: true })
-        await fs.writeFile(options.atifPath, JSON.stringify(trajectory, null, 2), 'utf-8')
-        logger.info({ filePath: options.atifPath, steps: trajectory.steps?.length ?? 0 }, 'ATIF trajectory written')
-      }
-    } catch (err) {
-      logger.error({ err }, 'Failed to write ATIF trajectory')
-    }
-
     try {
       // Best-effort flush of pending events to disk. If the session was mid-turn,
       // hydration recovery will detect non-stable forks on next startup and emit
