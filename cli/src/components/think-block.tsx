@@ -1,9 +1,11 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { TextAttributes } from '@opentui/core'
+import stringWidth from 'string-width'
 import type { ThinkBlockMessage, ThinkBlockStep, DisplayMessage, ToolKey } from '@magnitudedev/agent'
 import { Button } from './button'
 import { AgentCommunicationCard } from './agent-communication-card'
 import { useTheme } from '../hooks/use-theme'
+import { useLocalWidth } from '../hooks/use-local-width'
 import { violet } from '../utils/theme'
 
 import { renderToolStep } from '../tool-displays/render'
@@ -206,41 +208,141 @@ function ClusterContainer({
 }
 
 // =============================================================================
+// Width-aware item fitting
+// =============================================================================
+
+/**
+ * Fit a list of display items into a maximum width, truncating items and
+ * dropping items as needed. Always reserves room for "+N more" suffix when
+ * items are dropped.
+ *
+ * Returns the items to show (potentially truncated with …) and the count of
+ * items that were dropped.
+ */
+function fitItems(items: string[], maxWidth: number): { shown: string[]; remaining: number } {
+  if (items.length === 0) return { shown: [], remaining: 0 }
+
+  const MIN_ITEM_WIDTH = 4 // minimum width to show anything useful (e.g. "a…")
+  const shown: string[] = []
+  let used = 0
+  let i = 0
+
+  while (i < items.length) {
+    const item = items[i]
+    const itemWidth = stringWidth(item)
+    // Separator width: ", " between items
+    const sepWidth = shown.length > 0 ? 2 : 0
+    // Reserve space for "+N more" if there are items after this one
+    const suffixWidth = i < items.length - 1 ? stringWidth(` +${items.length - i - 1} more`) : 0
+    const available = maxWidth - used - sepWidth - suffixWidth
+
+    if (available < MIN_ITEM_WIDTH) break
+
+    if (itemWidth <= available) {
+      shown.push(item)
+      used += sepWidth + itemWidth
+      i++
+    } else {
+      // Truncate with … to fit
+      const truncated = truncateToWidth(item, available)
+      shown.push(truncated)
+      used += sepWidth + stringWidth(truncated)
+      i++
+      // Continue — there may still be room for shorter items after a truncated one
+    }
+  }
+
+  return { shown, remaining: items.length - i }
+}
+
+/**
+ * Truncate a string to fit within `maxWidth` columns, appending …
+ */
+function truncateToWidth(s: string, maxWidth: number): string {
+  const w = stringWidth(s)
+  if (w <= maxWidth) return s
+  if (maxWidth <= 1) return '…'
+  // Binary search for the truncation point
+  let lo = 0
+  let hi = s.length
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    if (stringWidth(s.slice(0, mid) + '…') <= maxWidth) {
+      lo = mid
+    } else {
+      hi = mid - 1
+    }
+  }
+  return s.slice(0, lo) + '…'
+}
+
+// =============================================================================
 // Cluster summary — consolidated line for groupable tools in default mode
 // =============================================================================
 
-function ClusterSummaryRow({ cluster, steps }: { cluster: string; steps: Extract<ThinkBlockStep, { type: 'tool' }>[] }) {
+function ClusterSummaryRow({ cluster, steps, width }: { cluster: string; steps: Extract<ThinkBlockStep, { type: 'tool' }>[]; width: number }) {
   const theme = useTheme()
 
   switch (cluster) {
     case 'read': {
-      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean)
-      const displayPaths = paths.slice(0, 3).join(', ')
-      const suffix = paths.length > 3 ? ` +${paths.length - 3} more` : ''
-      return <text><span style={{ fg: theme.info }}>{'→ '}</span><span style={{ fg: theme.foreground }}>{`Read ${steps.length} file${steps.length > 1 ? 's' : ''}`}</span>{displayPaths && <span style={{ fg: theme.muted }}>{` (${displayPaths}${suffix})`}</span>}</text>
+      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean) as string[]
+      const prefix = `→ Read ${steps.length} file${steps.length > 1 ? 's' : ''}`
+      const prefixWidth = stringWidth(prefix)
+      const detailWidth = width - prefixWidth - 2 // 2 for parens
+      const { shown, remaining } = detailWidth > 0 ? fitItems(paths, detailWidth) : { shown: [], remaining: paths.length }
+      const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
+      return <text><span style={{ fg: theme.info }}>{'→ '}</span><span style={{ fg: theme.foreground }}>{`Read ${steps.length} file${steps.length > 1 ? 's' : ''}`}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
     }
     case 'search': {
       const totalMatches = steps.reduce((sum, s) => sum + ((s.state as any)?.matchCount ?? 0), 0)
       const uniqueFiles = new Set(steps.flatMap(s => ((s.state as any)?.matches ?? []) as any[]).map((m: any) => m?.file)).size
-      const pattern = (steps[0].state as any)?.pattern ?? (steps[0].state as any)?.query
-      return <text><span style={{ fg: theme.info }}>{'/ '}</span><span style={{ fg: theme.foreground }}>{`${totalMatches} match${totalMatches !== 1 ? 'es' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`}</span>{pattern && <span style={{ fg: theme.muted }}>{` (pattern: "${String(pattern).slice(0, 40)}")`}</span>}</text>
+      const patterns = steps.map(s => (s.state as any)?.pattern ?? (s.state as any)?.query).filter(Boolean) as string[]
+      const label = `${totalMatches} match${totalMatches !== 1 ? 'es' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`
+      const labelWidth = stringWidth('/ ') + stringWidth(label)
+      const detailWidth = width - labelWidth - 2
+      const quotedPatterns = patterns.map(p => `"${p}"`)
+      const { shown, remaining } = detailWidth > 0 ? fitItems(quotedPatterns, detailWidth) : { shown: [], remaining: patterns.length }
+      const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
+      return <text><span style={{ fg: theme.info }}>{'/ '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (pattern: ${detail})`}</span>}</text>
     }
     case 'web_search': {
       const totalSources = steps.reduce((sum, s) => sum + ((s.state as any)?.sources?.length ?? 0), 0)
-      const query = (steps[0].state as any)?.query ?? ''
-      return <text><span style={{ fg: theme.info }}>{'[⌕] '}</span><span style={{ fg: theme.foreground }}>{`Web searched ${totalSources} source${totalSources !== 1 ? 's' : ''}`}</span>{query && <span style={{ fg: theme.muted }}>{` ("${String(query).slice(0, 40)}")`}</span>}</text>
+      const queries = steps.map(s => (s.state as any)?.query).filter(Boolean) as string[]
+      const count = steps.length
+      const label = `${count} web search${count !== 1 ? 'es' : ''}, ${totalSources} total source${totalSources !== 1 ? 's' : ''}`
+      const labelWidth = stringWidth('[⌕] ') + stringWidth(label)
+      const detailWidth = width - labelWidth - 2
+      const quotedQueries = queries.map(q => `"${q}"`)
+      const { shown, remaining } = detailWidth > 0 ? fitItems(quotedQueries, detailWidth) : { shown: [], remaining: queries.length }
+      const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
+      return <text><span style={{ fg: theme.info }}>{'[⌕] '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
     }
     case 'web_fetch': {
-      const urls = steps.map(s => (s.state as any)?.url).filter(Boolean)
-      return <text><span style={{ fg: theme.info }}>{'[↓] '}</span><span style={{ fg: theme.foreground }}>{`Fetched ${urls.length} URL${urls.length > 1 ? 's' : ''}`}</span>{urls.length === 1 && <span style={{ fg: theme.muted }}>{` (${String(urls[0]).slice(0, 50)})`}</span>}</text>
+      const urls = steps.map(s => (s.state as any)?.url).filter(Boolean) as string[]
+      const label = `Fetched ${urls.length} URL${urls.length > 1 ? 's' : ''}`
+      const labelWidth = stringWidth('[↓] ') + stringWidth(label)
+      const detailWidth = width - labelWidth - 2
+      const { shown, remaining } = detailWidth > 0 ? fitItems(urls, detailWidth) : { shown: [], remaining: urls.length }
+      const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
+      return <text><span style={{ fg: theme.info }}>{'[↓] '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
     }
     case 'tree': {
-      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean)
-      return <text><span style={{ fg: theme.info }}>{'◫ '}</span><span style={{ fg: theme.foreground }}>{`Listed files`}</span>{paths.length > 0 && <span style={{ fg: theme.muted }}>{` (${paths.join(', ')})`}</span>}</text>
+      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean) as string[]
+      const label = `Listed files`
+      const labelWidth = stringWidth('◫ ') + stringWidth(label)
+      const detailWidth = width - labelWidth - 2
+      const { shown, remaining } = detailWidth > 0 ? fitItems(paths, detailWidth) : { shown: [], remaining: paths.length }
+      const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
+      return <text><span style={{ fg: theme.info }}>{'◫ '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
     }
     case 'view': {
-      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean)
-      return <text><span style={{ fg: theme.info }}>{'⚲ '}</span><span style={{ fg: theme.foreground }}>{`Viewed ${steps.length} file${steps.length > 1 ? 's' : ''}`}</span>{paths.length > 0 && <span style={{ fg: theme.muted }}>{` (${paths.join(', ')})`}</span>}</text>
+      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean) as string[]
+      const label = `Viewed ${steps.length} file${steps.length > 1 ? 's' : ''}`
+      const labelWidth = stringWidth('⚲ ') + stringWidth(label)
+      const detailWidth = width - labelWidth - 2
+      const { shown, remaining } = detailWidth > 0 ? fitItems(paths, detailWidth) : { shown: [], remaining: paths.length }
+      const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
+      return <text><span style={{ fg: theme.info }}>{'⚲ '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
     }
     default:
       return null
@@ -258,6 +360,7 @@ const StepGroupView = memo(function StepGroupView({
   isActive,
   isInterrupted,
   lastThinkingStepId,
+  width,
 }: {
   group: StepGroup
   mode: 'default' | 'transcript'
@@ -265,6 +368,7 @@ const StepGroupView = memo(function StepGroupView({
   isActive?: boolean
   isInterrupted?: boolean
   lastThinkingStepId?: string
+  width: number
 }) {
   const theme = useTheme()
 
@@ -272,7 +376,7 @@ const StepGroupView = memo(function StepGroupView({
   if (mode === 'default' && group.cluster && group.cluster !== '__subagent_lifecycle__') {
     const toolSteps = group.steps.filter((s): s is Extract<ThinkBlockStep, { type: 'tool' }> => s.type === 'tool')
     if (toolSteps.length > 0) {
-      return <ClusterSummaryRow key={group.steps[0].id} cluster={group.cluster!} steps={toolSteps} />
+      return <ClusterSummaryRow key={group.steps[0].id} cluster={group.cluster!} steps={toolSteps} width={width} />
     }
     return null
   }
@@ -358,6 +462,7 @@ export const ThinkBlock = memo(function ThinkBlock({
 }: ThinkBlockProps) {
   const theme = useTheme()
   const isActive = block.status === 'active'
+  const localWidth = useLocalWidth()
 
   // Group steps by visual cluster
   const groups = groupByCluster(block.steps)
@@ -375,8 +480,11 @@ export const ThinkBlock = memo(function ThinkBlock({
   // In default mode, hide the entire ThinkBlock if there are no visible groups
   if (mode === 'default' && visibleGroups.length === 0) return null
 
+  // Use measured width, fall back to 80 if not yet measured
+  const contentWidth = localWidth.width ?? 80
+
   return (
-    <box style={{ marginBottom: 1, flexDirection: 'column' }}>
+    <box ref={localWidth.ref} onSizeChange={localWidth.onSizeChange} style={{ marginBottom: 1, flexDirection: 'column' }}>
       {/* No header — WorkingTimer at the bottom handles all timing/summary */}
 
       {/* Content — cluster-grouped, registry-driven rendering */}
@@ -405,6 +513,7 @@ export const ThinkBlock = memo(function ThinkBlock({
                 isActive={isActive}
                 isInterrupted={isInterrupted}
                 lastThinkingStepId={lastStepId}
+                width={contentWidth}
               />
             </ClusterContainer>
           )
