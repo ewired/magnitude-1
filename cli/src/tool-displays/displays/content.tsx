@@ -4,13 +4,10 @@ import { type ContentState } from '@magnitudedev/agent/src/models';
 import { createToolDisplay } from '../types';
 import { Button } from '../../components/button';
 import { ShimmerText } from '../../components/shimmer-text';
-import { StreamingMarkdownContent } from '../../markdown/markdown-content';
-import { highlightFile } from '../../markdown/highlight-file';
-import { isMarkdownFile, renderCodeLines } from '../../utils/file-lang';
-import { BOX_CHARS } from '../../utils/ui-constants';
+import { DiffHunk } from '../../components/diff-hunk';
 import { useTheme } from '../../hooks/use-theme';
 import { useStreamingReveal } from '../../hooks/use-streaming-reveal';
-import { useSelectedFile } from '../../hooks/use-file-viewer';
+import { green } from '../../utils/theme';
 
 const SHIMMER_INTERVAL_MS = 160;
 
@@ -19,18 +16,51 @@ export const contentDisplay = createToolDisplay<ContentState>({
     const theme = useTheme();
     const path = state.path;
     const content = state.body ?? '';
+    const [isHovered, setIsHovered] = useState(false);
+
     const isStreaming = state.phase === 'streaming' || state.phase === 'executing';
     const isDone = state.phase === 'completed';
     const isError = state.phase === 'error' || state.phase === 'interrupted' || state.phase === 'rejected';
-    const [isHovered, setIsHovered] = useState(false);
-    const selectedFile = useSelectedFile();
-    const isViewerShowingSameFile = !!path && selectedFile?.path === path;
 
     const { displayedContent, showCursor } = useStreamingReveal(content, isStreaming);
-    const codeLines = useMemo(
-      () => (path && !isMarkdownFile(String(path))) ? highlightFile(displayedContent, String(path), theme.syntax) : null,
-      [displayedContent, path, theme.syntax],
+
+    const lines = useMemo(
+      () => displayedContent.split('\n').filter((_, i, arr) => i < arr.length - 1 || arr[i] !== ''),
+      [displayedContent],
     );
+
+    if (isDone) {
+      return (
+        <box style={{ flexDirection: 'column' }}>
+          <box style={{ flexDirection: 'row' }}>
+            <text>
+              <span style={{ fg: theme.info }}>{'✎ '}</span>
+              <span style={{ fg: theme.foreground }}>{'Write '}</span>
+            </text>
+            <Button
+              onClick={() => { if (path) onFileClick?.(path) }}
+              onMouseOver={() => setIsHovered(true)}
+              onMouseOut={() => setIsHovered(false)}
+            >
+              <text>
+                <span style={{ fg: isHovered ? theme.link : theme.primary }} attributes={TextAttributes.UNDERLINE}>{String(path ?? 'file')}</span>
+              </text>
+            </Button>
+            <text>
+              <span style={{ fg: green[500] }} attributes={TextAttributes.DIM}>{` +${state.lineCount}`}</span>
+            </text>
+          </box>
+
+          {lines.length > 0 && (
+            <DiffHunk
+              removedLines={[]}
+              addedLines={lines}
+              startLine={1}
+            />
+          )}
+        </box>
+      );
+    }
 
     return (
       <box style={{ flexDirection: 'column' }}>
@@ -42,13 +72,7 @@ export const contentDisplay = createToolDisplay<ContentState>({
           <box style={{ flexDirection: 'column' }}>
             <text style={{ wrapMode: 'word' }}>
               <span style={{ fg: isError ? theme.error : theme.info }}>{isError ? '✗ ' : '✎ '}</span>
-              {isDone ? (
-                <>
-                  <span style={{ fg: theme.foreground }}>{'Write '}</span>
-                  <span style={{ fg: isHovered ? theme.link : theme.primary }} attributes={TextAttributes.UNDERLINE}>{String(path ?? 'file')}</span>
-                  <span style={{ fg: theme.muted }}>{` (${state.lineCount} lines)`}</span>
-                </>
-              ) : isError ? (
+              {isError ? (
                 <>
                   <span style={{ fg: theme.foreground }}>{'Write '}</span>
                   <span style={{ fg: theme.muted }}>{String(path ?? '...')}</span>
@@ -62,51 +86,17 @@ export const contentDisplay = createToolDisplay<ContentState>({
                 </>
               )}
             </text>
-            {isStreaming && (
-              <text style={{ fg: theme.muted }} attributes={TextAttributes.DIM}>
-                {`${state.charCount} chars · ${state.lineCount} lines`}
-              </text>
-            )}
-            {isStreaming && content.length > 0 && !isViewerShowingSameFile && (
-              <box style={{
-                borderStyle: 'single',
-                borderColor: isHovered ? (theme.link) : (theme.border || theme.muted),
-                customBorderChars: BOX_CHARS,
-                height: 12,
-              }}>
-                <scrollbox
-                  onMouseScroll={(e) => e.stopPropagation()}
-                  stickyScroll
-                  stickyStart="bottom"
-                  scrollX={false}
-                  scrollbarOptions={{ visible: false }}
-                  verticalScrollbarOptions={{ visible: false }}
-                  style={{
-                    flexGrow: 1,
-                    rootOptions: { flexGrow: 1, backgroundColor: 'transparent' },
-                    wrapperOptions: { border: false, backgroundColor: 'transparent', paddingLeft: 1, paddingRight: 1 },
-                    contentOptions: { justifyContent: 'flex-start' },
-                  }}
-                >
-                  {codeLines === null ? (
-                    <StreamingMarkdownContent content={displayedContent} showCursor={showCursor} />
-                  ) : (
-                    <box style={{ flexDirection: 'column' }}>
-                      {codeLines.map((line, idx) => (
-                        <text key={idx} style={{ fg: theme.foreground }}>
-                          <span style={{ fg: theme.muted }}>{String(idx + 1).padStart(4, ' ') + ' │ '}</span>
-                          {line.map((span, i) => (
-                            <span key={i} style={{ fg: span.fg ?? theme.foreground }}>{span.text}</span>
-                          ))}
-                        </text>
-                      ))}
-                    </box>
-                  )}
-                </scrollbox>
-              </box>
-            )}
           </box>
         </Button>
+
+        {isStreaming && lines.length > 0 && (
+          <DiffHunk
+            removedLines={[]}
+            addedLines={lines}
+            streamingCursor={showCursor}
+            startLine={1}
+          />
+        )}
       </box>
     );
   },

@@ -8,7 +8,6 @@ import { DiffHunk } from '../../components/diff-hunk';
 import { useStreamingReveal } from '../../hooks/use-streaming-reveal';
 import { useTheme } from '../../hooks/use-theme';
 import { green, red } from '../../utils/theme';
-import { useSelectedFile } from '../../hooks/use-file-viewer';
 
 const SHIMMER_INTERVAL_MS = 160;
 
@@ -18,8 +17,6 @@ export const diffDisplay = createToolDisplay<DiffState>({
     const path = state.path;
     const newText = state.newText ?? '';
     const [isHovered, setIsHovered] = useState(false);
-    const selectedFile = useSelectedFile();
-    const isViewerShowingSameFile = !!path && selectedFile?.path === path;
 
     const totals = useMemo(() => {
       const added = state.diffs.reduce((sum, d) => sum + d.addedLines.length, 0);
@@ -107,7 +104,7 @@ export const diffDisplay = createToolDisplay<DiffState>({
                 </>
               )}
             </text>
-            {showStreamingDiff && !isViewerShowingSameFile && (
+            {showStreamingDiff && (
               <DiffHunk
                 contextBefore={streamingDiff.contextBefore}
                 removedLines={streamingDiff.removedLines}
