@@ -7,7 +7,6 @@ import type { ChatTheme } from '../../types/theme-system'
 
 export type ChatControllerEnv = {
   status: DisplayState['status']
-  pendingApproval: boolean
   hasRunningForks: boolean
   bashMode: boolean
   modelsConfigured: boolean
@@ -71,8 +70,6 @@ export type ChatControllerProps = {
   isBlockingOverlayActive: boolean
   selectedFileOpen: boolean
   onCloseFilePanel: () => void
-  onApprove: () => void
-  onReject: () => void
   onInputHasTextChange?: (hasText: boolean) => void
   restoredQueuedInputText?: string | null
   onRestoredQueuedInputHandled?: () => void

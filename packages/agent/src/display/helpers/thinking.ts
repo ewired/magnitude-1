@@ -1,13 +1,13 @@
-import type { ThinkingStep } from '../types'
+import type { ThinkingMessage, DisplayMessage } from '../types'
 import { HIDE_THINKING_LABELS, TRAIT_LABELS } from '../constants'
 
-/** Module-level map for held buffer state during streaming — keyed by thinking step ID.
+/** Module-level map for held buffer state during streaming — keyed by thinking message ID.
  *  Used to avoid flicker when labels are split across chunk boundaries.
  */
 export const heldBuffers = new Map<string, string>()
 
 export function processThinkingChunk(
-  step: ThinkingStep,
+  step: ThinkingMessage,
   newText: string
 ): { contentToAppend: string; shouldSuppress: boolean } {
   if (!HIDE_THINKING_LABELS) {
@@ -59,4 +59,49 @@ export function flushHeld(stepId: string): string {
     return held
   }
   return ''
+}
+
+/**
+ * Find index of the last message that is NOT a queued_user_message.
+ * Returns -1 if no such message exists.
+ */
+export function findLastNonQueuedIndex(messages: readonly DisplayMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].type !== 'queued_user_message') return i
+  }
+  return -1
+}
+
+/**
+ * If the last non-queued message is a thinking message, flush any
+ * held buffer into it and return the updated messages array.
+ */
+export function flushLastThinking(
+  messages: readonly DisplayMessage[]
+): readonly DisplayMessage[] {
+  const idx = findLastNonQueuedIndex(messages)
+  if (idx === -1) return messages
+  const msg = messages[idx]
+  if (msg.type !== 'thinking') return messages
+
+  const held = heldBuffers.get(msg.id)
+  if (!held) return messages
+  heldBuffers.delete(msg.id)
+
+  const result = [...messages]
+  result[idx] = { ...msg, content: msg.content + held }
+  return result
+}
+
+/** Remove any thinking messages whose content is empty, cleaning heldBuffers. */
+export function removeEmptyThinkingMessages(
+  messages: readonly DisplayMessage[]
+): readonly DisplayMessage[] {
+  return messages.filter(m => {
+    if (m.type === 'thinking' && m.content === '') {
+      heldBuffers.delete(m.id)
+      return false
+    }
+    return true
+  })
 }

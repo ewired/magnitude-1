@@ -182,7 +182,6 @@ function makeProps(): ChatControllerProps {
   return {
     env: {
       status: 'idle',
-      pendingApproval: false,
       hasRunningForks: false,
       bashMode: false,
       modelsConfigured: true,
@@ -231,8 +230,6 @@ function makeProps(): ChatControllerProps {
     isBlockingOverlayActive: false,
     selectedFileOpen: false,
     onCloseFilePanel: noop,
-    onApprove: noop,
-    onReject: noop,
     onInputHasTextChange: noop,
     restoredQueuedInputText: null,
     onRestoredQueuedInputHandled: noop,

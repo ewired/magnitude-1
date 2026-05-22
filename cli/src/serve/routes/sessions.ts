@@ -91,26 +91,6 @@ export async function handleSessionsRoute(req: Request, url: URL, manager: Sessi
         return new Response(null, { status: 202 })
       }
 
-      if (req.method === 'POST' && parts.length === 5 && parts[2] === 'tools' && parts[4] === 'approve') {
-        const toolCallId = parts[3]
-        await manager.approveTool(sessionId, toolCallId)
-        return new Response(null, { status: 202 })
-      }
-
-      if (req.method === 'POST' && parts.length === 5 && parts[2] === 'tools' && parts[4] === 'reject') {
-        const toolCallId = parts[3]
-        let reason: string | undefined
-        const contentType = req.headers.get('content-type') ?? ''
-        if (contentType.toLowerCase().includes('application/json')) {
-          const body = await parseJsonBody<{ reason?: unknown }>(req)
-          if (body.reason !== undefined && typeof body.reason !== 'string') {
-            return badRequest('reason must be a string')
-          }
-          reason = body.reason
-        }
-        await manager.rejectTool(sessionId, toolCallId, reason)
-        return new Response(null, { status: 202 })
-      }
     } catch (error) {
       if (error instanceof SessionNotFoundError) {
         return json({ error: 'Session not found' }, 404)

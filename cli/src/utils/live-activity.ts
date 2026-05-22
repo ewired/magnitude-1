@@ -1,4 +1,4 @@
-import type { DisplayMessage, TurnBlockStep } from '@magnitudedev/agent'
+import type { DisplayMessage, ToolMessage } from '@magnitudedev/agent'
 import { summarizeToolStep } from '../tool-displays/render'
 
 function normalize(text: string): string {
@@ -14,7 +14,7 @@ function joinLabelDetail(label: string, detail: string): string {
   return normalize(`${label} ${trimmedDetail}`)
 }
 
-function getToolLiveText(step: TurnBlockStep): string | null {
+function getToolLiveText(step: ToolMessage): string | null {
   if (step.type !== 'tool') return null
   if (step.state) {
     const value = summarizeToolStep(step.toolKey, step.state)
@@ -55,39 +55,19 @@ function getToolLiveText(step: TurnBlockStep): string | null {
   return null
 }
 
-export function selectLatestLiveActivityFromThinkSteps(
-  steps: readonly TurnBlockStep[],
-): string | null {
-  for (let i = steps.length - 1; i >= 0; i--) {
-    const step = steps[i]
-    if (step.type === 'tool') {
-      const text = getToolLiveText(step)
-      if (text) return text
-      continue
-    }
-    if (step.type === 'communication') {
-      const text = normalize(step.preview)
-      if (text.length > 0) return text
-      const fallback = normalize(step.content)
-      if (fallback.length > 0) return fallback
-      continue
-    }
-    if (step.type === 'thinking' && typeof step.content === 'string') {
-      const text = normalize(step.content)
-      if (text.length > 0) return text
-    }
-  }
-  return null
-}
-
 function getMessageLiveText(msg: DisplayMessage): string | null {
   if (msg.type === 'agent_communication') {
     const text = normalize(msg.preview)
     return text.length > 0 ? text : null
   }
 
-  if (msg.type === 'turn_block') {
-    return selectLatestLiveActivityFromThinkSteps(msg.steps)
+  if (msg.type === 'tool') {
+    return getToolLiveText(msg)
+  }
+
+  if (msg.type === 'thinking' && typeof msg.content === 'string') {
+    const text = normalize(msg.content)
+    return text.length > 0 ? text : null
   }
 
   return null

@@ -28,9 +28,6 @@ function renderKeyboard(overrides: Partial<Parameters<typeof ChatSurfaceKeyboard
       onClearInput={() => {}}
       bashMode={false}
       onExitBashMode={() => {}}
-      pendingApproval={false}
-      onApprove={() => {}}
-      onReject={() => {}}
       {...overrides}
     />,
   )

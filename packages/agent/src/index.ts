@@ -112,22 +112,18 @@ export type {
   UserMessageDisplay,
   QueuedUserMessageDisplay,
   AssistantMessageDisplay,
-  TurnBlockMessage,
-  TurnBlockStep,
-  ThinkingStep,
-  ToolStep,
-  CommunicationStep,
-  StatusIndicatorStep,
-  WorkerResumedStep,
-  WorkerFinishedStep,
-  WorkerKilledStep,
-  WorkerUserKilledStep,
+  ThinkingMessage,
+  ToolMessage,
+  StatusIndicatorMessage,
+  WorkerResumedMessage,
+  WorkerFinishedMessage,
+  WorkerKilledMessage,
+  WorkerUserKilledMessage,
   InterruptedMessage,
   ErrorDisplayMessage,
   ForkResultMessage,
   ForkActivityMessage,
   ForkActivityToolCounts,
-  ApprovalRequestMessage,
   PendingInboundCommunicationDisplay,
 } from './display'
 
@@ -208,7 +204,6 @@ export { AgentLifecycle } from './workers/agent-lifecycle'
 export { LifecycleCoordinator } from './workers/lifecycle-coordinator'
 export { Autopilot } from './workers/autopilot'
 export type { AutopilotState } from './projections/autopilot-state'
-export { ApprovalWorker } from './workers/approval-worker'
 
 export { SessionTitleWorker } from './workers/session-title-worker'
 

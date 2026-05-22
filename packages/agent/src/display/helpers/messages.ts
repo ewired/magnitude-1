@@ -65,3 +65,14 @@ export function toPreview(text: string): string {
   if (normalized.length <= 120) return normalized
   return normalized.slice(0, 117) + '...'
 }
+
+/**
+ * Update a message in the messages array by id, returning a new array.
+ */
+export function updateMessageById<T extends DisplayMessage>(
+  messages: readonly DisplayMessage[],
+  id: string,
+  updater: (msg: T) => T
+): DisplayMessage[] {
+  return messages.map(m => m.id === id ? updater(m as T) : m)
+}

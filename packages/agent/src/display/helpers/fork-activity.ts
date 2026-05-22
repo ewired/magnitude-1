@@ -1,8 +1,8 @@
-import type { DisplayMessage, DisplayState, ForkActivityMessage, ForkActivityToolCounts, CommunicationStep } from '../types'
+import type { DisplayMessage, DisplayState, ForkActivityMessage, ForkActivityToolCounts, AgentCommunicationMessage } from '../types'
 import { EMPTY_TOOL_COUNTS } from '../constants'
 import type { ToolKey } from '../../tools/toolkits'
-import { findTurnBlock, ensureTurnBlock, updateStepInTurnBlock, addStepToTurnBlockFlush } from './turn-block'
-import { generateId, toPreview } from './messages'
+import { generateId, toPreview, insertBeforeQueuedMessages } from './messages'
+import { findLastNonQueuedIndex } from './thinking'
 
 export function incrementToolCount(counts: ForkActivityToolCounts, toolKey: ToolKey): ForkActivityToolCounts {
   switch (toolKey) {
@@ -44,65 +44,60 @@ export function totalToolsUsed(counts: ForkActivityToolCounts): number {
 export function upsertStreamingCommunicationStep(
   fork: DisplayState,
   streamId: string,
-  message: Omit<CommunicationStep, 'id' | 'type' | 'preview' | 'streamId' | 'status' | 'content'>,
+  message: Omit<AgentCommunicationMessage, 'id' | 'type' | 'preview' | 'streamId' | 'status' | 'content'>,
   textDelta: string
 ): DisplayState {
   if (message.forkId === null) return fork
-  const { fork: stateWithBlock, turnBlockId } = ensureTurnBlock(fork, message.timestamp)
-  const block = findTurnBlock(stateWithBlock.messages, turnBlockId)
-  const last = block?.steps[block.steps.length - 1]
 
-  if (last?.type === 'communication' && last.streamId === streamId) {
-    const content = last.content + textDelta
-    return {
-      ...stateWithBlock,
-      messages: updateStepInTurnBlock(
-        stateWithBlock.messages,
-        turnBlockId,
-        last.id,
-        (s) => s.type === 'communication'
-          ? { ...s, content, preview: toPreview(content), status: 'streaming' }
-          : s
-      )
+  // Find the last non-queued message — if it's a streaming communication with the same streamId, append
+  const lastIdx = findLastNonQueuedIndex(fork.messages)
+  const lastMsg = lastIdx >= 0 ? fork.messages[lastIdx] : undefined
+
+  if (lastMsg?.type === 'agent_communication' && lastMsg.streamId === streamId) {
+    const content = lastMsg.content + textDelta
+    const newMessages = [...fork.messages]
+    newMessages[lastIdx] = {
+      ...lastMsg,
+      content,
+      preview: toPreview(content),
+      status: 'streaming' as const,
     }
+    return { ...fork, messages: newMessages }
   }
 
+  // New communication — insert as top-level message
   const content = textDelta
-  const step: CommunicationStep = {
+  const msg: AgentCommunicationMessage = {
     id: generateId(),
-    type: 'communication',
+    type: 'agent_communication',
     streamId,
     ...message,
     content,
     preview: toPreview(content),
-    status: 'streaming',
+    status: 'streaming' as const,
   }
 
-  return {
-    ...stateWithBlock,
-    messages: addStepToTurnBlockFlush(stateWithBlock.messages, turnBlockId, step)
-  }
+  return { ...fork, messages: insertBeforeQueuedMessages(fork.messages, msg) }
 }
 
 export function finalizeCommunicationStreamInFork(
   fork: DisplayState,
   streamId: string
 ): DisplayState {
-  if (!fork.activeTurnBlockId) return fork
-  const block = findTurnBlock(fork.messages, fork.activeTurnBlockId)
-  if (!block) return fork
-  const step = block.steps.find((s): s is CommunicationStep => s.type === 'communication' && s.streamId === streamId)
-  if (!step) return fork
+  // Find the communication message with this streamId
+  const idx = fork.messages.findIndex(
+    (m): m is AgentCommunicationMessage => m.type === 'agent_communication' && m.streamId === streamId
+  )
+  if (idx === -1) return fork
 
-  return {
-    ...fork,
-    messages: updateStepInTurnBlock(
-      fork.messages,
-      fork.activeTurnBlockId,
-      step.id,
-      (s) => s.type === 'communication'
-        ? { ...s, preview: toPreview(s.content), status: 'completed' }
-        : s
-    )
+  const msg = fork.messages[idx]
+  if (msg.type !== 'agent_communication') return fork
+
+  const newMessages = [...fork.messages]
+  newMessages[idx] = {
+    ...msg,
+    preview: toPreview(msg.content),
+    status: 'completed' as const,
   }
+  return { ...fork, messages: newMessages }
 }

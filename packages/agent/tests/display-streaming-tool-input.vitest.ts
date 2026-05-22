@@ -22,7 +22,7 @@ import { AgentStatusProjection } from '../src/projections/agent-status'
 import { DisplayProjection } from '../src/display'
 import { HarnessStateProjection } from '../src/projections/harness-state'
 import { UserMessageResolutionProjection } from '../src/projections/user-message-resolution'
-import type { DisplayState, ToolStep } from '../src/display'
+import type { DisplayState } from '../src/display'
 
 const ts = (n: number) => 1_700_100_000_000 + n
 
@@ -80,11 +80,11 @@ describe('Display projection — tool lifecycle events', () => {
       } as AppEvent,
     ])
 
-    const thinkBlock = state.messages.find(m => m.type === 'turn_block')
-    expect(thinkBlock).toBeDefined()
-    if (!thinkBlock || thinkBlock.type !== 'turn_block') return
+    const msg = state.messages.find(m => m.type === 'tool')
+    expect(msg).toBeDefined()
+    if (!msg || msg.type !== 'tool') return
 
-    const toolStep = thinkBlock.steps.find(s => s.id === toolCallId && s.type === 'tool') as ToolStep | undefined
+    const toolStep = state.messages.find(s => s.id === toolCallId && s.type === 'tool') 
     expect(toolStep).toBeDefined()
     expect(toolStep!.toolKey).toBe('shell')
   })
@@ -119,12 +119,12 @@ describe('Display projection — tool lifecycle events', () => {
       } as AppEvent,
     ])
 
-    const thinkBlock = state.messages.find(m => m.type === 'turn_block')
-    if (!thinkBlock || thinkBlock.type !== 'turn_block') {
+    const msg = state.messages.find(m => m.type === 'tool')
+    if (!msg || msg.type !== 'tool') {
       throw new Error('Expected turn block')
     }
 
-    const toolStep = thinkBlock.steps.find(s => s.id === toolCallId && s.type === 'tool') as ToolStep | undefined
+    const toolStep = state.messages.find(s => s.id === toolCallId && s.type === 'tool') 
     expect(toolStep).toBeDefined()
     expect(toolStep!.toolKey).toBe('shell')
   })
@@ -142,11 +142,11 @@ describe('Display projection — tool lifecycle events', () => {
       } as AppEvent,
     ])
 
-    const thinkBlock = state.messages.find(m => m.type === 'turn_block')
-    if (!thinkBlock || thinkBlock.type !== 'turn_block') throw new Error('Expected turn block')
+    const msg = state.messages.find(m => m.type === 'tool')
+    if (!msg || msg.type !== 'tool') throw new Error('Expected turn block')
 
-    const step1 = thinkBlock.steps.find(s => s.id === 'tc-1' && s.type === 'tool') as ToolStep | undefined
-    const step2 = thinkBlock.steps.find(s => s.id === 'tc-2' && s.type === 'tool') as ToolStep | undefined
+    const step1 = state.messages.find(s => s.id === 'tc-1' && s.type === 'tool') 
+    const step2 = state.messages.find(s => s.id === 'tc-2' && s.type === 'tool') 
 
     expect(step1).toBeDefined()
     expect(step1!.toolKey).toBe('shell')

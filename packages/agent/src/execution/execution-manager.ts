@@ -15,7 +15,6 @@ import { isRoleId, type RoleId } from '../agents/role-validation'
 import { getAgentDefinition } from '../agents/registry'
 import { buildPolicyInterceptor, type AgentResolver } from './permission-gate'
 export { IDENTICAL_RESPONSE_BREAKER_THRESHOLD } from './types'
-import { createApprovalState, ApprovalStateTag, type ApprovalStateService } from './approval-state'
 
 import { AgentStateReaderTag, type AgentStateReader } from '../tools/fork'
 import { AgentRegistryStateReaderTag, type AgentRegistryStateReader } from '../tools/agent-registry-reader'
@@ -57,7 +56,7 @@ type AgentDef = RoleDefinition
 
 /**
  * Build the unified Effect layer for a fork — covers tool execution, interceptor, and emit.
- * Tools use reader services, interceptor uses PolicyContextProvider + ApprovalState.
+ * Tools use reader services, interceptor uses PolicyContextProvider.
  */
 function makeForkLayers(
   forkId: string | null,
@@ -70,7 +69,6 @@ function makeForkLayers(
   taskGraphProjection: Projection.ProjectionInstance<TaskGraphState>,
 
   conversationProjection: Projection.ProjectionInstance<ConversationState>,
-  approvalState: ApprovalStateService,
   persistenceLayer: Layer.Layer<ChatPersistence, never, never>,
   policyInterceptor: ReturnType<typeof buildPolicyInterceptor>,
 
@@ -114,7 +112,6 @@ function makeForkLayers(
       policyInterceptor(ctx).pipe(
         Effect.provideService(ForkContext, { forkId, roleId }),
         Effect.provideService(PolicyContextProviderTag, policyCtxProvider),
-        Effect.provideService(ApprovalStateTag, approvalState),
       ),
   }
 
@@ -127,7 +124,6 @@ function makeForkLayers(
     agentStateReaderLayer,
 
 
-    Layer.succeed(ApprovalStateTag, approvalState),
     Layer.succeed(WorkingDirectoryTag, { cwd, scratchpadPath }),
     Layer.succeed(EphemeralSessionContextTag, ephemeralSessionContext),
     Layer.succeed(PolicyContextProviderTag, policyCtxProvider),
@@ -155,7 +151,6 @@ const makeExecutionManager = Effect.gen(function* () {
   const boundObservables = new Map<string | null, BoundObservable[]>()
 
   // Approval state for gated tool calls
-  const approvalState = createApprovalState()
   // Maps forkId → roleId, populated when forks are created.
   const forkRoles = new Map<string, RoleId>()
 
@@ -219,7 +214,6 @@ const makeExecutionManager = Effect.gen(function* () {
         sessionContextProjection, agentProjection, agentStatusProjection,
         workingStateProjection, taskGraphProjection,
         conversationProjection,
-        approvalState,
         persistenceLayer, policyInterceptor, cwd, scratchpadPath, ephemeralSessionContext,
       )
       forkCwds.set(forkId, cwd)
@@ -311,7 +305,6 @@ const makeExecutionManager = Effect.gen(function* () {
       return forkId
     }),
 
-    approvalState,
 
     getObservables: (forkId) => boundObservables.get(forkId) ?? [],
 

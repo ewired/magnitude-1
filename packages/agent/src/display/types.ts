@@ -35,14 +35,15 @@ export interface AssistantMessageDisplay {
   readonly timestamp: number
 }
 
-export interface ThinkingStep {
+export interface ThinkingMessage {
   readonly id: string
   readonly type: 'thinking'
   readonly content: string
   readonly label?: string
+  readonly timestamp: number
 }
 
-export interface ToolStep {
+export interface ToolMessage {
   readonly id: string
   readonly type: 'tool'
   readonly toolKey: ToolKey
@@ -50,39 +51,27 @@ export interface ToolStep {
   readonly state?: ToolState
   readonly filter?: string | null  // Filter query that was applied
   readonly resultFilePath?: string | null  // Path to full result file for retroactive disclosure
-}
-
-export interface CommunicationStep {
-  readonly id: string
-  readonly type: 'communication'
-  readonly streamId?: string
-  readonly direction: 'to_agent' | 'from_agent'
-  readonly agentId: string
-  readonly agentName?: string
-  readonly agentRole?: string
-  readonly forkId: string | null
-  readonly content: string
-  readonly preview: string
   readonly timestamp: number
-  readonly status?: 'streaming' | 'completed'
 }
 
-export interface StatusIndicatorStep {
+export interface StatusIndicatorMessage {
   readonly id: string
   readonly type: 'status_indicator'
   readonly message: string
   readonly style: 'dim'
+  readonly timestamp: number
 }
 
-export interface WorkerResumedStep {
+export interface WorkerResumedMessage {
   readonly id: string
   readonly type: 'worker_resumed'
   readonly workerRole: string
   readonly workerId: string
   readonly title: string
+  readonly timestamp: number
 }
 
-export interface WorkerFinishedStep {
+export interface WorkerFinishedMessage {
   readonly id: string
   readonly type: 'worker_finished'
   readonly workerRole: string
@@ -90,41 +79,25 @@ export interface WorkerFinishedStep {
   readonly cumulativeTotalTimeMs: number
   readonly cumulativeTotalToolsUsed: number
   readonly resumed: boolean
+  readonly timestamp: number
 }
 
-export interface WorkerKilledStep {
+export interface WorkerKilledMessage {
   readonly id: string
   readonly type: 'worker_killed'
   readonly workerRole: string
   readonly workerId: string
   readonly title: string
+  readonly timestamp: number
 }
 
-export interface WorkerUserKilledStep {
+export interface WorkerUserKilledMessage {
   readonly id: string
   readonly type: 'worker_user_killed'
   readonly workerRole: string
   readonly workerId: string
   readonly title: string
-}
-
-export type TurnBlockStep =
-  | ThinkingStep
-  | ToolStep
-  | CommunicationStep
-  | StatusIndicatorStep
-  | WorkerResumedStep
-  | WorkerFinishedStep
-  | WorkerKilledStep
-  | WorkerUserKilledStep
-
-export interface TurnBlockMessage {
-  readonly id: string
-  readonly type: 'turn_block'
-  readonly status: 'active' | 'completed'
-  readonly steps: readonly TurnBlockStep[]
   readonly timestamp: number
-  readonly completedAt?: number
 }
 
 export interface InterruptedMessage {
@@ -193,11 +166,10 @@ export interface AgentCommunicationMessage {
   readonly content: string
   readonly preview: string
   readonly timestamp: number
+  readonly status?: 'streaming' | 'completed'
 }
 
-export interface ApprovalRequestMessage {
   readonly id: string
-  readonly type: 'approval_request'
   readonly toolCallId: string
   readonly toolKey: ToolKey
   readonly input: unknown
@@ -211,13 +183,18 @@ export type DisplayMessage =
   | UserMessageDisplay
   | QueuedUserMessageDisplay
   | AssistantMessageDisplay
-  | TurnBlockMessage
+  | ThinkingMessage
+  | ToolMessage
+  | StatusIndicatorMessage
+  | WorkerResumedMessage
+  | WorkerFinishedMessage
+  | WorkerKilledMessage
+  | WorkerUserKilledMessage
   | InterruptedMessage
   | ErrorDisplayMessage
   | ForkResultMessage
   | ForkActivityMessage
   | AgentCommunicationMessage
-  | ApprovalRequestMessage
 
 /** Per-fork display state */
 export interface PendingInboundCommunicationDisplay extends PendingInboundCommunication {}
@@ -228,7 +205,6 @@ export interface DisplayState {
   readonly pendingInboundCommunications: readonly PendingInboundCommunicationDisplay[]
   readonly currentTurnId: string | null  // Tracks active turn for queuing decision
   readonly streamingMessageId: string | null  // Tracks streaming assistant message
-  readonly activeTurnBlockId: string | null
   readonly showButton: 'send' | 'stop'
   // Chain-level state — spans from user message to next user message
   readonly chainStartTime: number | null

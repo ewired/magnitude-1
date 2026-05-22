@@ -126,7 +126,7 @@ describe('display subagent lifecycle think steps', () => {
       } as any,
     ])
 
-    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'turn_block' ? m.steps : [])
+    const allSteps = rootDisplay.messages.filter((m: any) => m.type === "worker_resumed" || m.type === "worker_finished" || m.type === "worker_killed" || m.type === "worker_user_killed")
 
     const forkActivity = rootDisplay.messages.filter(
       (m): m is Extract<DisplayMessage, { type: 'fork_activity' }> =>
@@ -210,7 +210,7 @@ describe('display subagent lifecycle think steps', () => {
     const forkActivity = rootDisplay.messages.filter((m: any) => m.type === 'fork_activity' && m.forkId === 'fork-sub')
     expect(forkActivity.length).toBe(0)
 
-    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'turn_block' ? m.steps : [])
+    const allSteps = rootDisplay.messages.filter((m: any) => m.type === "worker_resumed" || m.type === "worker_finished" || m.type === "worker_killed" || m.type === "worker_user_killed")
     const finished = allSteps.filter((s: any) => s.type === 'worker_finished')
     expect(finished.length).toBe(0)
 
@@ -251,7 +251,7 @@ describe('display subagent lifecycle think steps', () => {
     const forkActivity = rootDisplay.messages.filter((m: any) => m.type === 'fork_activity' && m.forkId === 'fork-sub')
     expect(forkActivity.length).toBe(0)
 
-    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'turn_block' ? m.steps : [])
+    const allSteps = rootDisplay.messages.filter((m: any) => m.type === "worker_resumed" || m.type === "worker_finished" || m.type === "worker_killed" || m.type === "worker_user_killed")
     const userKilled = allSteps.filter((s: any) => s.type === 'worker_user_killed')
     expect(userKilled.length).toBe(1)
     expect(userKilled[0]).toMatchObject({
@@ -289,7 +289,7 @@ describe('display subagent lifecycle think steps', () => {
     const forkActivity = rootDisplay.messages.filter((m: any) => m.type === 'fork_activity' && m.forkId === 'fork-sub')
     expect(forkActivity.length).toBe(0)
 
-    const allSteps = rootDisplay.messages.flatMap(m => m.type === 'turn_block' ? m.steps : [])
+    const allSteps = rootDisplay.messages.filter((m: any) => m.type === "worker_resumed" || m.type === "worker_finished" || m.type === "worker_killed" || m.type === "worker_user_killed")
     const userKilled = allSteps.filter((s: any) => s.type === 'worker_user_killed')
     const killed = allSteps.filter((s: any) => s.type === 'worker_killed')
     expect(userKilled.length).toBe(0)

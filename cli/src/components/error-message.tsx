@@ -101,7 +101,7 @@ export const ErrorMessage = memo(function ErrorMessage({ tag, message, timestamp
 
   return (
     <box
-      style={{ flexDirection: 'column', position: 'relative' }}
+      style={{ flexDirection: 'column', position: 'relative', marginBottom: 1 }}
       onMouseDown={cta ? undefined : handleMouseDown}
       onMouseUp={cta ? undefined : handleMouseUp}
       onMouseOver={handleMouseOver}

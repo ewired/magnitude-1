@@ -24,7 +24,7 @@ import { AgentStatusProjection } from '../src/projections/agent-status'
 import { DisplayProjection } from '../src/display'
 import { HarnessStateProjection } from '../src/projections/harness-state'
 import { UserMessageResolutionProjection } from '../src/projections/user-message-resolution'
-import type { DisplayState, ToolStep } from '../src/display'
+import type { DisplayState } from '../src/display'
 
 const ts = (n: number) => 1_700_200_000_000 + n
 
@@ -74,9 +74,9 @@ describe('Display — toolKey routing & no-duplicate steps', () => {
       } as AppEvent,
     ])
 
-    const block = state.messages.find(m => m.type === 'turn_block')
-    if (!block || block.type !== 'turn_block') throw new Error('expected turn block')
-    const step = block.steps.find(s => s.id === toolCallId && s.type === 'tool') as ToolStep | undefined
+    const msg = state.messages.find(m => m.type === 'tool')
+    if (!msg || msg.type !== 'tool') throw new Error('expected turn block')
+    const step = state.messages.find(s => s.id === toolCallId && s.type === 'tool') 
     expect(step).toBeDefined()
     expect(step!.toolKey).toBe('fileTree')
   })
@@ -106,9 +106,9 @@ describe('Display — toolKey routing & no-duplicate steps', () => {
       } as AppEvent,
     ])
 
-    const block = state.messages.find(m => m.type === 'turn_block')
-    if (!block || block.type !== 'turn_block') throw new Error('expected turn block')
-    const toolSteps = block.steps.filter(s => s.id === toolCallId && s.type === 'tool')
+    const msg = state.messages.find(m => m.type === 'tool')
+    if (!msg || msg.type !== 'tool') throw new Error('expected turn block')
+    const toolSteps = state.messages.filter(s => s.id === toolCallId && s.type === 'tool')
     expect(toolSteps.length).toBe(1)
   })
 
@@ -121,12 +121,12 @@ describe('Display — toolKey routing & no-duplicate steps', () => {
       } as AppEvent,
     ])
 
-    const block = state.messages.find(m => m.type === 'turn_block')
-    if (!block || block.type !== 'turn_block') {
+    const msg = state.messages.find(m => m.type === 'tool')
+    if (!msg || msg.type !== 'tool') {
       // No think block at all is also acceptable
       return
     }
-    const step = block.steps.find(s => s.id === toolCallId)
+    const step = state.messages.find(s => s.id === toolCallId)
     expect(step).toBeUndefined()
   })
 })

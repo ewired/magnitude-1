@@ -10,6 +10,7 @@ import { JsonChatPersistence, loadSessionMeta } from './persistence'
 
 import { MessageView } from './components/message-view'
 import { ErrorBoundary } from './components/error-boundary'
+import { ClusterSummaryRow } from './components/tool-cluster'
 
 import { WorkingTimer } from './components/working-timer'
 import { PendingCommunicationsPanel } from './components/pending-communications-panel'
@@ -17,6 +18,7 @@ import { LoadPreviousButton } from './components/chat-controls'
 
 
 import { usePaginatedTimeline } from './hooks/use-paginated-timeline'
+import { groupClusters, type MergedItem } from './types/timeline'
 
 import { useTheme } from './hooks/use-theme'
 import { SelectedFileProvider } from './hooks/use-file-viewer'
@@ -424,7 +426,7 @@ function AppInner({
         pendingInboundCommunications: [],
         currentTurnId: null,
         streamingMessageId: null,
-        activeTurnBlockId: null,
+
         showButton: 'send',
         chainStartTime: null,
         chainStatus: null,
@@ -797,38 +799,6 @@ function AppInner({
   const hasRunningForks = agentStatusState
     ? Array.from(agentStatusState.agents.values()).some(a => a.status === 'working')
     : false
-
-  // Find pending approval request from display messages (for keyboard intercept)
-  const pendingApproval = useMemo(() => {
-    if (!display) return null
-    const msg = display.messages.find(
-      m => m.type === 'approval_request' && m.status === 'pending'
-    )
-    return msg?.type === 'approval_request' ? msg : null
-  }, [display?.messages])
-
-
-  const handleApprove = useCallback(() => {
-    if (!client || !pendingApproval) return
-    logger.info({ toolCallId: pendingApproval.toolCallId }, 'Approving tool call')
-    client.send({
-      type: 'tool_approved',
-      forkId: null,
-      toolCallId: pendingApproval.toolCallId,
-    })
-  }, [client, pendingApproval])
-
-  const handleReject = useCallback(() => {
-    if (!client || !pendingApproval) return
-    logger.info({ toolCallId: pendingApproval.toolCallId }, 'Rejecting tool call')
-    client.send({
-      type: 'tool_rejected',
-      forkId: null,
-      toolCallId: pendingApproval.toolCallId,
-      reason: 'User rejected',
-    })
-  }, [client, pendingApproval])
-
 
   // Slash command context
   const resetConversation = useCallback(() => {
@@ -1333,25 +1303,21 @@ function AppInner({
         <LoadPreviousButton hiddenCount={hiddenCount} onLoadMore={loadMore} />
       )}
       {(() => {
-        type MergedItem = { kind: 'timeline'; item: (typeof visibleItems)[number] }
-
-        const mergedItems: MergedItem[] = [
-          ...visibleItems.map(item => ({ kind: 'timeline' as const, item })),
-        ].sort((a, b) => a.item.timestamp - b.item.timestamp)
+        const sorted = [...visibleItems].sort((a, b) => a.timestamp - b.timestamp)
+        const mergedItems = groupClusters(sorted)
 
         return mergedItems.map((merged, idx) => {
-          const item = merged.item
-          switch (item.kind) {
+          switch (merged.kind) {
             case 'chat': {
-              const msg = item.message
+              const msg = merged.message
               // Skip the last interrupted message — it renders in the WorkingTimer slot instead
               if (msg.type === 'interrupted' && lastInterruptedMessage && msg.id === lastInterruptedMessage.id) return null
               const isStreamingMsg = display.status === 'streaming'
                 && display.streamingMessageId === msg.id
               const isInterrupted = interruptedMessageIdRef.current === msg.id
               // Check if the next message is also interrupted (for margin logic)
-              const nextItem = idx + 1 < mergedItems.length ? mergedItems[idx + 1] : null
-              const nextMsgInterrupted = nextItem?.item.kind === 'chat' && nextItem.item.message.type === 'interrupted'
+              const nextMerged = idx + 1 < mergedItems.length ? mergedItems[idx + 1] : null
+              const nextMsgInterrupted = nextMerged?.kind === 'chat' && nextMerged.message.type === 'interrupted'
               return (
                 <ErrorBoundary key={msg.id} fallback={(err) => (
                   <box style={{ paddingLeft: 1 }}>
@@ -1364,10 +1330,6 @@ function AppInner({
                     isInterrupted={isInterrupted}
                     nextMessageInterrupted={nextMsgInterrupted}
                     mode={displayMode}
-                    onApprove={handleApprove}
-                    onReject={handleReject}
-
-                    inputHasText={composerHasContent}
                     onFileClick={openFile}
                     onForkExpand={pushForkOverlay}
                     onErrorAction={dispatchErrorAction}
@@ -1375,16 +1337,35 @@ function AppInner({
                 </ErrorBoundary>
               )
             }
+            case 'cluster': {
+              // Tool cluster summary row
+              return (
+                <ErrorBoundary key={merged.id} fallback={(err) => (
+                  <box style={{ paddingLeft: 1 }}>
+                    <text style={{ fg: theme.error }}>[Render error: {err.message}]</text>
+                  </box>
+                )}>
+                  <box style={{ paddingLeft: 1, marginBottom: 1 }}>
+                    <ClusterSummaryRow
+                      cluster={merged.cluster}
+                      steps={merged.steps}
+                      width={chatColumnWidth - 2}
+                      mode={displayMode}
+                    />
+                  </box>
+                </ErrorBoundary>
+              )
+            }
             case 'bash':
               return (
-                <box key={item.id} style={{ paddingLeft: 1 }}>
-                  <BashOutput result={item.result} />
+                <box key={merged.id} style={{ paddingLeft: 1 }}>
+                  <BashOutput result={merged.result} />
                 </box>
               )
             case 'system':
               return (
-                <box key={item.id} style={{ paddingLeft: 1, paddingBottom: 1 }}>
-                  <text style={{ fg: theme.muted }}>{item.text}</text>
+                <box key={merged.id} style={{ paddingLeft: 1, marginBottom: 1 }}>
+                  <text style={{ fg: theme.muted }}>{merged.text}</text>
                 </box>
               )
           }
@@ -1443,7 +1424,6 @@ function AppInner({
             isBlockingOverlayActive={isBlockingOverlayActive}
             env={{
               status: (activeDisplay ?? display)?.status ?? 'idle',
-              pendingApproval: pendingApproval != null,
               hasRunningForks,
               bashMode,
               modelsConfigured: true,
@@ -1543,8 +1523,6 @@ function AppInner({
             subscribeForkWindow={subscribeForkWindow}
             selectedFileOpen={isFilePanelOpen}
             onCloseFilePanel={closeFilePanel}
-            onApprove={handleApprove}
-            onReject={handleReject}
             onInputHasTextChange={setComposerHasContent}
             restoredQueuedInputText={restoredQueuedInputText}
             onRestoredQueuedInputHandled={() => setRestoredQueuedInputText(null)}

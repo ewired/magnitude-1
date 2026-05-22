@@ -48,7 +48,6 @@ import { EffectLoggerLayer } from './runtime/effect-logger'
 
 import { Autopilot } from './workers/autopilot'
 import { CompactionWorker } from './compaction/worker'
-import { ApprovalWorker } from './workers/approval-worker'
 import { isRoleId, type RoleId } from './agents/role-validation'
 import { UserPresenceWorker } from './workers/user-presence-worker'
 import { FileMentionResolver } from './workers/file-mention-resolver'
@@ -61,7 +60,6 @@ import { ExecutionManager } from './execution/types'
 import { ExecutionManagerLive } from './execution/execution-manager'
 
 import { FetchHttpClient } from '@effect/platform'
-import { registerApprovalBridge } from './execution/approval-bridge'
 
 // Persistence
 import { ChatPersistence } from './persistence/chat-persistence-service'
@@ -127,7 +125,6 @@ export const CodingAgent = Agent.define<AppEvent>()({
     RetryController,
     Autopilot,
     CompactionWorker,
-    ApprovalWorker,
 
     FileMentionResolver,
 
@@ -312,7 +309,6 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     const eventSink = yield* EventSinkTag<AppEvent>()
 
     // Bridge approval state into display and turn projections
-    yield* registerApprovalBridge
 
     const events = yield* persistence.loadEvents()
 

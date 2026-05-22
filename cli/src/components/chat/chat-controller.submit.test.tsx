@@ -67,7 +67,6 @@ function makeProps(overrides: Partial<ChatControllerProps> = {}): ChatController
   return {
     env: {
       status: 'idle',
-      pendingApproval: false,
       hasRunningForks: false,
       bashMode: false,
       modelsConfigured: true,
@@ -124,8 +123,6 @@ function makeProps(overrides: Partial<ChatControllerProps> = {}): ChatController
     isBlockingOverlayActive: false,
     selectedFileOpen: false,
     onCloseFilePanel: () => {},
-    onApprove: () => {},
-    onReject: () => {},
     ...overrides,
   }
 }

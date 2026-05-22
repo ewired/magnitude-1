@@ -16,7 +16,6 @@ import type { TaskGraphState } from '../projections/task-graph'
 import type { ForkTurnState } from '../projections/turn'
 import type { SessionContextState } from '../projections/session-context'
 import type { ConversationState } from '../projections/conversation'
-import type { ApprovalStateService } from './approval-state'
 import type { ChatPersistence } from '../persistence/chat-persistence-service'
 import type { BoundObservable } from '../observables/types'
 import type { JsonSchema } from '../prompts/fork-context'
@@ -108,7 +107,7 @@ export interface ExecutionManagerService {
 
   /**
    * Returns the cached fork-scoped Layer (built by initFork). Includes
-   * WorkingDirectory, ApprovalState, EphemeralSessionContext, all reader
+   * WorkingDirectory, EphemeralSessionContext, all reader
    * services, ToolInterceptor, etc. Used by Cortex to provide tool-execution
    * context for the native paradigm.
    */
@@ -130,7 +129,6 @@ export interface ExecutionManagerService {
     Projection.ProjectionInstance<SessionContextState> | Projection.ProjectionInstance<AgentRoutingState> | Projection.ProjectionInstance<AgentStatusState> | Projection.ForkedProjectionInstance<ForkTurnState> | Projection.ProjectionInstance<ConversationState> | ChatPersistence | WorkerBusService<AppEvent>
   >
 
-  readonly approvalState: ApprovalStateService
 }
 
 export class ExecutionManager extends Context.Tag('ExecutionManager')<

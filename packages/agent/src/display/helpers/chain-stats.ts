@@ -37,16 +37,12 @@ export function computeChainStats(state: DisplayState | null | undefined): Chain
     : Infinity
 
   for (const msg of state.messages) {
-    if (msg.type !== 'turn_block') continue
+    if (msg.type !== 'tool') continue
     if (msg.timestamp < state.chainStartTime || msg.timestamp > endTime) continue
-    for (const step of msg.steps) {
-      if (step.type === 'tool') {
-        if (step.toolKey === 'spawnWorker') {
-          stats.workersStarted++
-        } else {
-          incrementToolCount(stats, step.toolKey)
-        }
-      }
+    if (msg.toolKey === 'spawnWorker') {
+      stats.workersStarted++
+    } else {
+      incrementToolCount(stats, msg.toolKey)
     }
   }
   return stats

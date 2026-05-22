@@ -15,9 +15,6 @@ interface ChatSurfaceKeyboardProps {
   onClearInput: () => void
   bashMode: boolean
   onExitBashMode: () => void
-  pendingApproval: boolean
-  onApprove: () => void
-  onReject: () => void
   onToggleAutopilot?: () => void
 }
 
@@ -34,9 +31,6 @@ export function ChatSurfaceKeyboard({
   onClearInput,
   bashMode,
   onExitBashMode,
-  pendingApproval,
-  onApprove,
-  onReject,
   onToggleAutopilot,
 }: ChatSurfaceKeyboardProps) {
   useKeyboard(
@@ -65,21 +59,6 @@ export function ChatSurfaceKeyboard({
         key.preventDefault()
         onExitBashMode()
         return
-      }
-
-      if (pendingApproval) {
-        const isApprove = key.name === 'a' || key.name === 'enter' || key.name === 'return'
-        const isReject = key.name === 'd' || isEscape
-        if (isApprove && !key.ctrl && !key.meta && !key.option) {
-          key.preventDefault()
-          onApprove()
-          return
-        }
-        if (isReject && !key.ctrl && !key.meta && !key.option) {
-          key.preventDefault()
-          onReject()
-          return
-        }
       }
 
       if (isEscape && nextEscWillKillAll) {
@@ -123,9 +102,6 @@ export function ChatSurfaceKeyboard({
       onClearInput,
       bashMode,
       onExitBashMode,
-      pendingApproval,
-      onApprove,
-      onReject,
       onToggleAutopilot,
     ]),
   )

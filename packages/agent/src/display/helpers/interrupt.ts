@@ -1,3 +1,5 @@
+import type { DisplayMessage } from '../types'
+
 interface InterruptStateLike {
   readonly phase?: string
 }
@@ -39,4 +41,15 @@ export function finalizeOpenToolStepsAsInterruptedInSteps<TStep extends { readon
 
     return step
   })
+}
+
+/**
+ * Finalize open tool messages as interrupted in a flat DisplayMessage[].
+ * Same logic as finalizeOpenToolStepsAsInterruptedInSteps but typed for the flat message list.
+ */
+export function finalizeOpenToolMessagesAsInterrupted(
+  messages: readonly DisplayMessage[],
+  reduceVisual: (toolKey: string | undefined, state: unknown, stepId: string | undefined) => unknown
+): readonly DisplayMessage[] {
+  return finalizeOpenToolStepsAsInterruptedInSteps(messages, reduceVisual)
 }

@@ -67,7 +67,6 @@ const DEFAULT_DISPLAY_STATE: DisplayState = {
   messages: [],
   currentTurnId: null,
   streamingMessageId: null,
-  activeTurnBlockId: null,
   showButton: 'send',
   pendingInboundCommunications: [],
   chainStartTime: null,
@@ -281,16 +280,6 @@ export class SessionManager {
   async interrupt(id: string): Promise<void> {
     const record = this.requireSession(id)
     await record.client.send({ type: 'interrupt', forkId: null })
-  }
-
-  async approveTool(id: string, toolCallId: string): Promise<void> {
-    const record = this.requireSession(id)
-    await record.client.send({ type: 'tool_approved', forkId: null, toolCallId })
-  }
-
-  async rejectTool(id: string, toolCallId: string, reason?: string): Promise<void> {
-    const record = this.requireSession(id)
-    await record.client.send({ type: 'tool_rejected', forkId: null, toolCallId, reason })
   }
 
   subscribeSessionEvents(

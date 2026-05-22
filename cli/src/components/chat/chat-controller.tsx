@@ -168,8 +168,6 @@ export function ChatController(props: ChatControllerProps) {
     isBlockingOverlayActive,
     selectedFileOpen,
     onCloseFilePanel,
-    onApprove,
-    onReject,
     onInputHasTextChange,
     restoredQueuedInputText,
     onRestoredQueuedInputHandled,
@@ -355,7 +353,6 @@ export function ChatController(props: ChatControllerProps) {
   const handleInterruptAll = useCallback(() => services.interruptAll(), [services])
 
   const handleKeyIntercept = useCallback((key: KeyEvent): boolean => {
-    if (env.pendingApproval) return true
     if (!env.bashMode && fileMentions.handleKeyIntercept(key)) return true
     if (!env.bashMode && shouldHandleSlashCommandInTab(selectedForkId) && slashCommands.handleKeyIntercept(key)) return true
     const hasContent = inputValue.text.trim().length > 0 || attachments.length > 0
@@ -410,7 +407,7 @@ export function ChatController(props: ChatControllerProps) {
     }
 
     return false
-  }, [env.pendingApproval, env.bashMode, env.widgetNavActive, fileMentions, slashCommands, services, history, historyIndex, inputValue.text, savedDraft, setComposerText, selectedForkId])
+  }, [env.bashMode, env.widgetNavActive, fileMentions, slashCommands, services, history, historyIndex, inputValue.text, savedDraft, setComposerText, selectedForkId])
 
   const handleInputChange = useCallback((value: InputValue) => {
     if (!env.bashMode && value.text === '!') {
@@ -551,9 +548,6 @@ export function ChatController(props: ChatControllerProps) {
           services.exitBashMode()
           clearComposer()
         }}
-        pendingApproval={env.pendingApproval}
-        onApprove={onApprove}
-        onReject={onReject}
         onToggleAutopilot={services.toggleAutopilot}
       />
 
@@ -605,9 +599,9 @@ export function ChatController(props: ChatControllerProps) {
                     onSubmit={handleInputSubmit}
                     onPaste={handlePaste}
                     onKeyIntercept={handleKeyIntercept}
-                    focused={env.composerCanFocus && !env.pendingApproval}
+                    focused={env.composerCanFocus}
                     highlightColor={env.bashMode ? orange[400] : undefined}
-                    placeholder={env.pendingApproval ? 'Approve or reject the pending action...' : env.bashMode ? 'Enter a command...' : env.isWorkerView ? `Chat directly with worker ${selectedWorkerAgentId}...` : env.status === 'streaming' ? 'Type to queue a message...' : 'Chat with the agent...'}
+                    placeholder={env.bashMode ? 'Enter a command...' : env.isWorkerView ? `Chat directly with worker ${selectedWorkerAgentId}...` : env.status === 'streaming' ? 'Type to queue a message...' : 'Chat with the agent...'}
                     maxHeight={10}
                     minHeight={1}
                     bulkInsertEpoch={bulkInsertEpoch}
