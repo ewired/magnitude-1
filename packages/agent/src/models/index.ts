@@ -26,6 +26,7 @@ export { reassignWorkerModel, type ReassignWorkerState } from './reassign-worker
 export { shellModel, type ShellState } from './shell'
 export { skillActivationModel, type SkillActivationState } from './skill-activation'
 export { fileViewModel, type FileViewState } from './file-view'
+export { queryImageModel, type QueryImageState } from './query-image'
 export { isToolKey, type ToolKey } from '../tools/toolkits'
 
 // Aliases for display compatibility

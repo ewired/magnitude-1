@@ -12,6 +12,7 @@ import type { ConfigState } from '../ambient/config-ambient'
 
 // --- Tools ---
 import { readTool, writeTool, editTool, treeTool, grepTool, viewTool } from './fs'
+import { queryImageTool } from './query-image'
 import { shellTool } from './shell'
 import { webSearchTool } from './web-search'
 import { webFetchTool } from './web-fetch-tool'
@@ -26,6 +27,7 @@ import { fileEditModel } from '../models/file-edit'
 import { fileTreeModel } from '../models/file-tree'
 import { fileSearchModel } from '../models/file-search'
 import { fileViewModel } from '../models/file-view'
+import { queryImageModel } from '../models/query-image'
 import { shellModel } from '../models/shell'
 import { webSearchModel } from '../models/web-search'
 import { webFetchModel } from '../models/web-fetch'
@@ -50,6 +52,7 @@ export const fsToolkit = defineToolkit({
   fileTree:   { tool: treeTool,   state: fileTreeModel },
   fileSearch: { tool: grepTool,   state: fileSearchModel },
   fileView:   { tool: viewTool,   state: fileViewModel },
+  queryImage: { tool: queryImageTool, state: queryImageModel },
 })
 
 export const shellToolkit = defineToolkit({
@@ -118,7 +121,7 @@ const ROLE_TOOLKITS: Record<RoleId, Toolkit> = {
 }
 
 // =============================================================================
-// ToolKey — derived from the leader toolkit (superset of all role toolkits)
+// ToolKey — derived from leaderToolkit (now contains both fileView and queryImage)
 // =============================================================================
 
 /** Tools that should not be displayed in the UI */
@@ -135,7 +138,7 @@ export function isToolKey(value: string): value is ToolKey {
  * Returns a Toolkit with entries keyed by the canonical tool keys
  * (fileRead, shell, webSearch, etc.).
  */
-export function getToolkitForRole(roleId: RoleId): Toolkit {
+function getBaseToolkit(roleId: RoleId): Toolkit {
   return ROLE_TOOLKITS[roleId]
 }
 
@@ -143,20 +146,20 @@ export function getToolkitForRole(roleId: RoleId): Toolkit {
  * Get the effective toolkit for a role, with runtime availability filtering applied.
  *
  * Currently filters:
- * - `webSearch`: removed when the role's provider is not `magnitude` and `EXA_API_KEY` is absent
+ * - `fileView`/`queryImage`: one removed based on model vision capability
  */
-export function getEffectiveToolkit(roleId: RoleId, configState: ConfigState): Toolkit {
-  const toolkit = getToolkitForRole(roleId)
+export function getEffectiveToolkit(
+  roleId: RoleId,
+  configState: ConfigState,
+): Toolkit {
+  let toolkit = getBaseToolkit(roleId)
 
-  // webSearch is only available via Magnitude provider or with an EXA API key
-  const hasWebSearch = 'webSearch' in toolkit.entries
-  if (hasWebSearch) {
-    const roleConfig = configState.byRole[roleId]
-    const isMagnitudeProvider = roleConfig.modelId.startsWith('role/')
-    const hasExaKey = !!process.env.EXA_API_KEY
-    if (!isMagnitudeProvider && !hasExaKey) {
-      return toolkit.omit('webSearch')
-    }
+  // Vision-based image tool selection
+  if ('fileView' in toolkit.entries) {
+    const hasVision = configState.byRole[roleId]?.profile?.capabilities?.vision ?? true
+    toolkit = hasVision
+      ? toolkit.omit('queryImage')
+      : toolkit.omit('fileView')
   }
 
   return toolkit

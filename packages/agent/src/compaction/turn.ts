@@ -19,7 +19,7 @@ import { SessionContextProjection } from '../projections/session-context'
 import { AgentModelResolver } from '../model/model-resolver'
 import { getAgentByForkId } from '../projections/agent-status'
 import { getAgentDefinition } from '../agents/registry'
-import { getToolkitForRole } from '../tools/toolkits'
+import { getEffectiveToolkit } from '../tools/toolkits'
 import { buildSystemPrompt } from '../prompts/system-prompt-builder'
 import { buildCompactionPrompt } from './prompt'
 import { createToolResultFormatter } from '@magnitudedev/harness'
@@ -38,6 +38,7 @@ import { buildStandardHooks } from '../execution/harness-hooks'
 import type { RoleId } from '../agents/role-validation'
 import { COMPACTION_MAX_RETRIES } from '../constants'
 import type { AgentStatusState } from '../projections/agent-status'
+import { ConfigAmbient } from '../ambient/config-ambient'
 
 export interface CompactionTurnResult {
   readonly turn: CompletedTurn
@@ -66,7 +67,9 @@ export function runCompactionTurn(
     const agentModel = yield* modelResolver.resolve(roleId, agentId)
 
     // Get toolkit and fork layer (same as Cortex)
-    const toolkit = getToolkitForRole(roleId)
+    const ambientService = yield* AmbientServiceTag
+    const configState = ambientService.getValue(ConfigAmbient)
+    const toolkit = getEffectiveToolkit(roleId, configState)
     const execManager = yield* ExecutionManager
     const forkLayer = execManager.getForkLayer(forkId)
     if (!forkLayer) {
@@ -76,7 +79,6 @@ export function runCompactionTurn(
     // Session context
     const sessionCtx = yield* read(SessionContextProjection)
     const scratchpadPath = sessionCtx.context?.scratchpadPath ?? process.cwd()
-    const ambientService = yield* AmbientServiceTag
     const skills = ambientService.getValue(SkillsAmbient)
 
     // Compute budget for compact() tool

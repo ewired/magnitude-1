@@ -15,6 +15,7 @@ export function incrementToolCount(counts: ForkActivityToolCounts, toolKey: Tool
     case 'webFetch': return { ...counts, webFetches: counts.webFetches + 1 }
     case 'webSearch': return { ...counts, webSearches: counts.webSearches + 1 }
     case 'fileView':
+    case 'queryImage':
       return { ...counts, other: counts.other + 1 }
     default:
       return { ...counts, other: counts.other + 1 }

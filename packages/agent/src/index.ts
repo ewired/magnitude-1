@@ -192,7 +192,7 @@ export type {
 export { globalTools } from './tools/globals'
 export { shellTool } from './tools/shell'
 export { readTool, writeTool, editTool, treeTool, grepTool, fsTools } from './tools/fs'
-// webSearchTool disabled — awaiting Exa reimplementation
+export { webSearchTool } from './tools/web-search'
 export { webFetchTool } from './tools/web-fetch-tool'
 
 export type { AgentStateReader } from './tools/fork'

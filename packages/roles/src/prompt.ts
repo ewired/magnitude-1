@@ -1,5 +1,6 @@
 import agentCommonRaw from './prompts/shared/agent-common.txt' with { type: 'text' }
 import workerBaseRaw from './prompts/shared/worker-base.txt' with { type: 'text' }
+import thinkingSharedRaw from './prompts/shared/thinking-shared.txt' with { type: 'text' }
 
 /**
  * A strongly typed prompt template. The type parameter captures which
@@ -28,6 +29,7 @@ export function definePrompt<TVars extends string = never>(
   const compiled = raw
     .replaceAll('{{AGENT_COMMON}}', agentCommonRaw)
     .replaceAll('{{WORKER_BASE}}', workerBaseRaw)
+    .replaceAll('{{THINKING_SHARED}}', thinkingSharedRaw)
 
   const render = ((vars?: Record<string, string>) => {
     if (!vars) return compiled

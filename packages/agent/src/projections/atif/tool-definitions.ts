@@ -9,8 +9,9 @@
  */
 
 import { JSONSchema } from 'effect'
-import { getToolkitForRole } from '../../tools/toolkits'
+import { getEffectiveToolkit } from '../../tools/toolkits'
 import type { RoleId } from '../../agents/role-validation'
+import type { ConfigState } from '../../ambient/config-ambient'
 
 function toToolJsonSchema(node: unknown): unknown {
   if (node === null || node === undefined) return node
@@ -34,8 +35,8 @@ function schemaToJsonSchema(schema: any): Record<string, unknown> {
   return toToolJsonSchema(JSONSchema.make(schema)) as Record<string, unknown>
 }
 
-export function toolDefinitionsFromToolkit(roleId: RoleId): readonly Record<string, unknown>[] {
-  const toolkit = getToolkitForRole(roleId)
+export function toolDefinitionsFromToolkit(roleId: RoleId, configState: ConfigState): readonly Record<string, unknown>[] {
+  const toolkit = getEffectiveToolkit(roleId, configState)
   const defs: Record<string, unknown>[] = []
 
   for (const [key, entry] of Object.entries(toolkit.entries)) {
