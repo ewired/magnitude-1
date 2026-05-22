@@ -14,6 +14,46 @@ import { groupClusters, type MergedItem } from '../types/timeline'
 import { FileViewerPanel } from './file-viewer-panel'
 import { SelectedFileProvider } from '../hooks/use-file-viewer'
 
+function renderForkItems(
+  mergedItems: MergedItem[],
+  mode: 'default' | 'transcript',
+  isStreaming: boolean,
+  messages: DisplayMessage[],
+  scrollboxWidth: number,
+  onForkExpand: ((forkId: string) => void) | undefined,
+  openFile: (path: string, section?: string) => void,
+  onErrorAction: ((actionId: ActionId) => void) | undefined,
+): React.ReactNode {
+  return mergedItems.map((item, idx) => {
+    if (item.kind === 'cluster') {
+      const nextIsCluster = idx + 1 < mergedItems.length && mergedItems[idx + 1]?.kind === 'cluster'
+      return (
+        <box key={item.id} style={{ paddingLeft: 1, marginBottom: nextIsCluster ? 0 : 1 }}>
+          <ClusterSummaryRow
+            cluster={item.cluster}
+            steps={item.steps}
+            width={scrollboxWidth - 2}
+            mode={mode}
+          />
+        </box>
+      )
+    }
+    const msg = item.message
+    const isStreamingMsg = isStreaming && msg === messages[messages.length - 1] && msg.type === 'assistant_message'
+    return (
+      <MessageView
+        key={msg.id}
+        message={msg}
+        isStreaming={isStreamingMsg}
+        onForkExpand={onForkExpand}
+        onFileClick={openFile}
+        onErrorAction={onErrorAction}
+        mode={mode}
+      />
+    )
+  })
+}
+
 interface ForkDetailOverlayProps {
   forkId: string
   forkName: string
@@ -115,16 +155,25 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
   const messages = display?.messages ?? EMPTY_MESSAGES
   const isStreaming = display?.status === 'streaming'
 
-  // Apply clustering to merge consecutive same-cluster tools (e.g. fileRead → read cluster)
-  const mergedItems: MergedItem[] = useMemo(() => {
+  const defaultMergedItems: MergedItem[] = useMemo(() => {
     const timelineItems = messages.map(msg => ({
       kind: 'chat' as const,
       id: msg.id,
       timestamp: msg.timestamp,
       message: msg,
     }))
-    return groupClusters(timelineItems, displayMode)
-  }, [messages, displayMode])
+    return groupClusters(timelineItems, 'default')
+  }, [messages])
+
+  const transcriptMergedItems: MergedItem[] = useMemo(() => {
+    const timelineItems = messages.map(msg => ({
+      kind: 'chat' as const,
+      id: msg.id,
+      timestamp: msg.timestamp,
+      message: msg,
+    }))
+    return groupClusters(timelineItems, 'transcript')
+  }, [messages])
 
   const {
     selectedFile,
@@ -219,39 +268,19 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
               },
             }}
           >
-            {mergedItems.length === 0 ? (
+            {messages.length === 0 ? (
               <box style={{ paddingLeft: 1 }}>
                 <text style={{ fg: theme.muted }}>No activity yet.</text>
               </box>
             ) : (
-              mergedItems.map((item, idx) => {
-                if (item.kind === 'cluster') {
-                  const nextIsCluster = idx + 1 < mergedItems.length && mergedItems[idx + 1]?.kind === 'cluster'
-                  return (
-                    <box key={item.id} style={{ paddingLeft: 1, marginBottom: nextIsCluster ? 0 : 1 }}>
-                      <ClusterSummaryRow
-                        cluster={item.cluster}
-                        steps={item.steps}
-                        width={(scrollboxWidth.width ?? 80) - 2}
-                        mode={displayMode}
-                      />
-                    </box>
-                  )
-                }
-                const msg = item.message
-                const isStreamingMsg = isStreaming && msg === messages[messages.length - 1] && msg.type === 'assistant_message'
-                return (
-                  <MessageView
-                    key={msg.id}
-                    message={msg}
-                    isStreaming={isStreamingMsg}
-                    onForkExpand={onForkExpand}
-                    onFileClick={openFile}
-                    onErrorAction={onErrorAction}
-                    mode={displayMode}
-                  />
-                )
-              })
+              <>
+                <box style={{ flexDirection: 'column', visible: displayMode === 'default' }}>
+                  {renderForkItems(defaultMergedItems, 'default', isStreaming, messages, scrollboxWidth.width ?? 80, onForkExpand, openFile, onErrorAction)}
+                </box>
+                <box style={{ flexDirection: 'column', visible: displayMode === 'transcript' }}>
+                  {renderForkItems(transcriptMergedItems, 'transcript', isStreaming, messages, scrollboxWidth.width ?? 80, onForkExpand, openFile, onErrorAction)}
+                </box>
+              </>
             )}
           </scrollbox>
 

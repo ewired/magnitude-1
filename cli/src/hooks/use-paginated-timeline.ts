@@ -3,7 +3,7 @@ import type { DisplayMessage } from '@magnitudedev/agent'
 import type { BashResult } from '../utils/bash-executor'
 import type { TimelineItem } from '../types/timeline'
 
-const TIMELINE_BATCH_SIZE = 20
+const TIMELINE_BATCH_SIZE = 300
 
 interface UsePaginatedTimelineReturn {
   visibleItems: readonly TimelineItem[]

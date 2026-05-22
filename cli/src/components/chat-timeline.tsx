@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import type { InterruptedMessage, ActionId } from '@magnitudedev/agent'
-import { groupClusters, type TimelineItem } from '../types/timeline'
+import { groupClusters, type TimelineItem, type MergedItem } from '../types/timeline'
 import { MessageView } from './message-view'
 import { ClusterSummaryRow } from './tool-cluster'
 import { ErrorBoundary } from './error-boundary'
@@ -21,25 +21,20 @@ interface ChatTimelineProps {
   onErrorAction: (actionId: ActionId) => void
 }
 
-export const ChatTimeline = memo(function ChatTimeline({
-  items,
-  displayMode,
-  isStreaming,
-  streamingMessageId,
-  lastInterruptedMessage,
-  interruptedMessageId,
-  chatColumnWidth,
-  themeErrorColor,
-  themeMutedColor,
-  onFileClick,
-  onForkExpand,
-  onErrorAction,
-}: ChatTimelineProps) {
-  const mergedItems = useMemo(() => {
-    const sorted = [...items].sort((a, b) => a.timestamp - b.timestamp)
-    return groupClusters(sorted, displayMode)
-  }, [items, displayMode])
-
+function renderMergedItems(
+  mergedItems: MergedItem[],
+  mode: 'default' | 'transcript',
+  isStreaming: boolean,
+  streamingMessageId: string | null,
+  lastInterruptedMessage: InterruptedMessage | null,
+  interruptedMessageId: string | null,
+  chatColumnWidth: number,
+  themeErrorColor: string,
+  themeMutedColor: string,
+  onFileClick: (path: string, section?: string) => void,
+  onForkExpand: (forkId: string) => void,
+  onErrorAction: (actionId: ActionId) => void,
+): React.ReactNode {
   return mergedItems.map((merged, idx) => {
     const nextIsCluster = idx + 1 < mergedItems.length && mergedItems[idx + 1]?.kind === 'cluster'
 
@@ -63,7 +58,7 @@ export const ChatTimeline = memo(function ChatTimeline({
               isStreaming={isStreamingMsg}
               isInterrupted={isInterrupted}
               nextMessageInterrupted={nextMsgInterrupted}
-              mode={displayMode}
+              mode={mode}
               onFileClick={onFileClick}
               onForkExpand={onForkExpand}
               onErrorAction={onErrorAction}
@@ -83,7 +78,7 @@ export const ChatTimeline = memo(function ChatTimeline({
                 cluster={merged.cluster}
                 steps={merged.steps}
                 width={chatColumnWidth - 2}
-                mode={displayMode}
+                mode={mode}
               />
             </box>
           </ErrorBoundary>
@@ -103,4 +98,66 @@ export const ChatTimeline = memo(function ChatTimeline({
         )
     }
   })
+}
+
+export const ChatTimeline = memo(function ChatTimeline({
+  items,
+  displayMode,
+  isStreaming,
+  streamingMessageId,
+  lastInterruptedMessage,
+  interruptedMessageId,
+  chatColumnWidth,
+  themeErrorColor,
+  themeMutedColor,
+  onFileClick,
+  onForkExpand,
+  onErrorAction,
+}: ChatTimelineProps) {
+  const defaultMergedItems = useMemo(() => {
+    const sorted = [...items].sort((a, b) => a.timestamp - b.timestamp)
+    return groupClusters(sorted, 'default')
+  }, [items])
+
+  const transcriptMergedItems = useMemo(() => {
+    const sorted = [...items].sort((a, b) => a.timestamp - b.timestamp)
+    return groupClusters(sorted, 'transcript')
+  }, [items])
+
+  return (
+    <>
+      <box style={{ flexDirection: 'column', visible: displayMode === 'default' }}>
+        {renderMergedItems(
+          defaultMergedItems,
+          'default',
+          isStreaming,
+          streamingMessageId,
+          lastInterruptedMessage,
+          interruptedMessageId,
+          chatColumnWidth,
+          themeErrorColor,
+          themeMutedColor,
+          onFileClick,
+          onForkExpand,
+          onErrorAction,
+        )}
+      </box>
+      <box style={{ flexDirection: 'column', visible: displayMode === 'transcript' }}>
+        {renderMergedItems(
+          transcriptMergedItems,
+          'transcript',
+          isStreaming,
+          streamingMessageId,
+          lastInterruptedMessage,
+          interruptedMessageId,
+          chatColumnWidth,
+          themeErrorColor,
+          themeMutedColor,
+          onFileClick,
+          onForkExpand,
+          onErrorAction,
+        )}
+      </box>
+    </>
+  )
 })
