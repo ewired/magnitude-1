@@ -56,7 +56,7 @@ export const shellDisplay = createToolDisplay<ShellState>({
         <text>
           <span style={{ fg: theme.muted }}>{'$ '}</span>
           <span style={{ fg: isStreaming ? theme.muted : theme.foreground }}>
-            {shortenCommandPreview(command, MAX_COMMAND_DISPLAY_LEN)}
+            {mode === 'transcript' ? command : shortenCommandPreview(command, MAX_COMMAND_DISPLAY_LEN)}
           </span>
           {isStreaming && <span style={{ fg: theme.muted }}>{'▍'}</span>}
           {isExecuting && (
