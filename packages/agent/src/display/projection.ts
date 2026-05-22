@@ -245,8 +245,19 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         return fork
       }
 
-      // Don't do anything special — just mark streaming as done.
-      // No turn block to create.
+      // Drop whitespace-only assistant messages — they serve no visual purpose
+      // and would otherwise break tool clustering and create ghost spacing.
+      if (fork.streamingMessageId) {
+        const msg = fork.messages.find(m => m.id === fork.streamingMessageId)
+        if (msg && msg.type === 'assistant_message' && !msg.content.trim()) {
+          return {
+            ...fork,
+            messages: fork.messages.filter(m => m.id !== fork.streamingMessageId),
+            streamingMessageId: null,
+          }
+        }
+      }
+
       return {
         ...fork,
         streamingMessageId: null
