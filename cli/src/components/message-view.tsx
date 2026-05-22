@@ -141,6 +141,8 @@ export const MessageView = memo(function MessageView({
     }
   })()
 
+  if (content === null) return null
+
   if (isUserType) {
     return content
   }

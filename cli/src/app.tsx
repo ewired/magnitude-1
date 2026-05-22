@@ -1305,9 +1305,11 @@ function AppInner({
       )}
       {(() => {
         const sorted = [...visibleItems].sort((a, b) => a.timestamp - b.timestamp)
-        const mergedItems = groupClusters(sorted)
+        const mergedItems = groupClusters(sorted, displayMode)
 
         return mergedItems.map((merged, idx) => {
+          // No bottom margin when the next item is also a cluster (tight grouping)
+          const nextIsCluster = idx + 1 < mergedItems.length && mergedItems[idx + 1]?.kind === 'cluster'
           switch (merged.kind) {
             case 'chat': {
               const msg = merged.message
@@ -1339,14 +1341,14 @@ function AppInner({
               )
             }
             case 'cluster': {
-              // Tool cluster summary row
+              // Tool cluster summary row — no bottom margin when next item is also a cluster
               return (
                 <ErrorBoundary key={merged.id} fallback={(err) => (
                   <box style={{ paddingLeft: 1 }}>
                     <text style={{ fg: theme.error }}>[Render error: {err.message}]</text>
                   </box>
                 )}>
-                  <box style={{ paddingLeft: 1, marginBottom: 1 }}>
+                  <box style={{ paddingLeft: 1, marginBottom: nextIsCluster ? 0 : 1 }}>
                     <ClusterSummaryRow
                       cluster={merged.cluster}
                       steps={merged.steps}

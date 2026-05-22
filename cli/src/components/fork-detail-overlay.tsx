@@ -123,8 +123,8 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
       timestamp: msg.timestamp,
       message: msg,
     }))
-    return groupClusters(timelineItems)
-  }, [messages])
+    return groupClusters(timelineItems, displayMode)
+  }, [messages, displayMode])
 
   const {
     selectedFile,
@@ -224,10 +224,11 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
                 <text style={{ fg: theme.muted }}>No activity yet.</text>
               </box>
             ) : (
-              mergedItems.map((item) => {
+              mergedItems.map((item, idx) => {
                 if (item.kind === 'cluster') {
+                  const nextIsCluster = idx + 1 < mergedItems.length && mergedItems[idx + 1]?.kind === 'cluster'
                   return (
-                    <box key={item.id} style={{ paddingLeft: 1, marginBottom: 1 }}>
+                    <box key={item.id} style={{ paddingLeft: 1, marginBottom: nextIsCluster ? 0 : 1 }}>
                       <ClusterSummaryRow
                         cluster={item.cluster}
                         steps={item.steps}
