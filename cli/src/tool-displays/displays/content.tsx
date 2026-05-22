@@ -35,7 +35,7 @@ export const contentDisplay = createToolDisplay<ContentState>({
           <box style={{ flexDirection: 'row' }}>
             <text>
               <span style={{ fg: theme.info }}>{'✎ '}</span>
-              <span style={{ fg: theme.foreground }}>{'Write '}</span>
+              <span style={{ fg: theme.foreground }}>{'Wrote '}</span>
             </text>
             <Button
               onClick={() => { if (path) onFileClick?.(path) }}
@@ -74,13 +74,13 @@ export const contentDisplay = createToolDisplay<ContentState>({
               <span style={{ fg: isError ? theme.error : theme.info }}>{isError ? '✗ ' : '✎ '}</span>
               {isError ? (
                 <>
-                  <span style={{ fg: theme.foreground }}>{'Write '}</span>
+                  <span style={{ fg: theme.foreground }}>{'Wrote '}</span>
                   <span style={{ fg: theme.muted }}>{String(path ?? '...')}</span>
                   <span style={{ fg: theme.error }}>{' · Error'}</span>
                 </>
               ) : (
                 <>
-                  <span style={{ fg: theme.foreground }}>{'Write '}</span>
+                  <span style={{ fg: theme.foreground }}>{'Writing '}</span>
                   <span style={{ fg: theme.muted }}>{String(path ?? '...')}</span>
                   <ShimmerText text="..." interval={SHIMMER_INTERVAL_MS} primaryColor={theme.secondary} />
                 </>
