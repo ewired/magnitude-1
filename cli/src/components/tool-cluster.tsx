@@ -90,7 +90,7 @@ export const ToolStepView = memo(function ToolStepView({
 // ClusterSummaryRow — consolidated line for groupable tools
 // =============================================================================
 
-export function ClusterSummaryRow({ cluster, steps, width, mode }: { cluster: string; steps: ToolMessage[]; width: number; mode: 'default' | 'transcript' }) {
+export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, steps, width, mode }: { cluster: string; steps: ToolMessage[]; width: number; mode: 'default' | 'transcript' }) {
   const theme = useTheme()
 
   switch (cluster) {
@@ -292,4 +292,4 @@ export function ClusterSummaryRow({ cluster, steps, width, mode }: { cluster: st
     default:
       return null
   }
-}
+})

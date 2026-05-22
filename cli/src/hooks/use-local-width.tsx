@@ -22,7 +22,8 @@ export function useLocalWidth() {
     const w = ref.current?.width
     if (typeof w === 'number' && w > 0) {
       // Subtract 1 as safety buffer for rounding in layout engine
-      setWidth(w - 1)
+      const nextWidth = w - 1
+      setWidth(prev => prev === nextWidth ? prev : nextWidth)
     }
   }, [])
 
