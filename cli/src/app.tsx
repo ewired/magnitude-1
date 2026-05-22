@@ -1,33 +1,23 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Effect, Layer, Cause } from 'effect'
-
 import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, computeChainStats, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId, type InterruptedMessage, type ChainStats } from '@magnitudedev/agent'
 import { matchKeyToChord } from './utils/chord'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
 import { JsonChatPersistence, loadSessionMeta } from './persistence'
-
-import { MessageView } from './components/message-view'
-import { ErrorBoundary } from './components/error-boundary'
-import { ClusterSummaryRow } from './components/tool-cluster'
-
+import { ChatTimeline } from './components/chat-timeline'
 import { WorkingTimer } from './components/working-timer'
 import { PendingCommunicationsPanel } from './components/pending-communications-panel'
 import { LoadPreviousButton } from './components/chat-controls'
-
-
 import { usePaginatedTimeline } from './hooks/use-paginated-timeline'
-import { groupClusters, type MergedItem } from './types/timeline'
 
 import { useTheme } from './hooks/use-theme'
 import { SelectedFileProvider } from './hooks/use-file-viewer'
-
 import { BOX_CHARS } from './utils/ui-constants'
 import { parseMentionsFromPrompt } from './utils/strings'
 import { formatTokensCompact } from './utils/format-tokens'
 import { hasConversationActivity } from './utils/start-state'
-
 import { AnimatedLogo } from './components/animated-logo'
 import { RecentChatsWidget } from './components/recent-chats-widget'
 import { SessionLoadingView } from './components/session-loading-view'
@@ -36,21 +26,12 @@ import { INIT_PROMPT } from './commands/init-prompt'
 import { registerSkillCommands, type SlashCommandDefinition } from './commands/slash-commands'
 import { useSelectionAutoCopy } from './utils/clipboard'
 import { useRecentChatsNavigation } from './hooks/use-recent-chats-navigation'
-
 import { AppOverlays } from './components/app-overlays'
 import { AutopilotIndicator } from './components/autopilot-indicator'
 import { AutopilotPreviewMessage } from './components/autopilot-preview-message'
-
 import { getRecentChats, type RecentChat } from './data/recent-chats'
 import { logger, initLogger, subscribeToLogs, clearSessionLog, getSessionLogPath, type LogEntry } from '@magnitudedev/logger'
-
-
-
 import { executeBashCommand, type BashResult } from './utils/bash-executor'
-
-
-import { BashOutput } from './components/bash-output'
-
 
 import { FileViewerPanel } from './components/file-viewer-panel'
 import type { Attachment } from '@magnitudedev/agent'
@@ -58,12 +39,8 @@ import { DebugPanel } from './components/debug-panel'
 import { ChatController } from './components/chat/chat-controller'
 import { useTasks } from './hooks/use-tasks'
 import { useLocalWidth } from './hooks/use-local-width'
-
-
 import { TextAttributes, type KeyEvent } from '@opentui/core'
-
 import { createId } from '@magnitudedev/generate-id'
-
 import { useStorage } from './providers/storage-provider'
 import { useFilePanel } from './hooks/use-file-panel'
 import { useLazyClient } from './hooks/use-lazy-client'
@@ -166,14 +143,13 @@ function AppInner({
   const [agentStatusState, setAgentStatusState] = useState<AgentStatusState | null>(null)
   const [expandedForkStack, setExpandedForkStack] = useState<string[]>([])
   const expandedForkId = expandedForkStack.length > 0 ? expandedForkStack[expandedForkStack.length - 1] : null
-  const pushForkOverlay = (forkId: string) => setExpandedForkStack(s => [...s, forkId])
+  const pushForkOverlay = useCallback((forkId: string) => setExpandedForkStack(s => [...s, forkId]), [])
   const popForkOverlay = () => {
     setExpandedForkStack(s => s.slice(0, -1))
   }
 
   const [forkDisplay, setForkDisplay] = useState<DisplayState | null>(null)
   const [forkTokenEstimate, setForkTokenEstimate] = useState(0)
-
   const [forkIsCompacting, setForkIsCompacting] = useState(false)
 
   const [systemMessages, setSystemMessages] = useState<Array<{ id: string; text: string; timestamp: number }>>([])
@@ -195,7 +171,6 @@ function AppInner({
   const [restoredQueuedInputText, setRestoredQueuedInputText] = useState<string | null>(null)
   const [tokenEstimate, setTokenEstimate] = useState(0)
   const [isCompacting, setIsCompacting] = useState(false)
-  // turnStartTimeRef removed — timer now driven by chainStartTime from DisplayProjection
   const hasAnimatedRef = useRef(skipAnimation)
 
   // ── Autopilot state (TUI-only countdown) ──────────────────────────────
@@ -241,10 +216,7 @@ function AppInner({
       - footerSafetyBuffer,
   )
 
-
-
   const [recentChatsSelectedIndex, setRecentChatsSelectedIndex] = useState(0)
-
   const [recentChats, setRecentChats] = useState<RecentChat[] | null>(null)
 
   const refreshRecentChats = useCallback(() => {
@@ -256,8 +228,6 @@ function AppInner({
     if (debugMode) logger.info('Debug mode enabled - press Ctrl+X to toggle debug panel')
     refreshRecentChats()
   }, [debugMode, refreshRecentChats])
-
-
 
   useEffect(() => {
     if (!auth.loaded || !auth.key) return
@@ -713,10 +683,6 @@ function AppInner({
 
     return unsubscribe
   }, [client, debugMode, debugPanelVisible])
-
-
-
-
 
   const activeDisplay = selectedForkId ? forkDisplay : display
 
@@ -1303,77 +1269,20 @@ function AppInner({
       {hasMore && (
         <LoadPreviousButton hiddenCount={hiddenCount} onLoadMore={loadMore} />
       )}
-      {(() => {
-        const sorted = [...visibleItems].sort((a, b) => a.timestamp - b.timestamp)
-        const mergedItems = groupClusters(sorted, displayMode)
-
-        return mergedItems.map((merged, idx) => {
-          // No bottom margin when the next item is also a cluster (tight grouping)
-          const nextIsCluster = idx + 1 < mergedItems.length && mergedItems[idx + 1]?.kind === 'cluster'
-          switch (merged.kind) {
-            case 'chat': {
-              const msg = merged.message
-              // Skip the last interrupted message — it renders in the WorkingTimer slot instead
-              if (msg.type === 'interrupted' && lastInterruptedMessage && msg.id === lastInterruptedMessage.id) return null
-              const isStreamingMsg = display.status === 'streaming'
-                && display.streamingMessageId === msg.id
-              const isInterrupted = interruptedMessageIdRef.current === msg.id
-              // Check if the next message is also interrupted (for margin logic)
-              const nextMerged = idx + 1 < mergedItems.length ? mergedItems[idx + 1] : null
-              const nextMsgInterrupted = nextMerged?.kind === 'chat' && nextMerged.message.type === 'interrupted'
-              return (
-                <ErrorBoundary key={msg.id} fallback={(err) => (
-                  <box style={{ paddingLeft: 1 }}>
-                    <text style={{ fg: theme.error }}>[Render error: {err.message}]</text>
-                  </box>
-                )}>
-                  <MessageView
-                    message={msg}
-                    isStreaming={isStreamingMsg}
-                    isInterrupted={isInterrupted}
-                    nextMessageInterrupted={nextMsgInterrupted}
-                    mode={displayMode}
-                    onFileClick={openFile}
-                    onForkExpand={pushForkOverlay}
-                    onErrorAction={dispatchErrorAction}
-                  />
-                </ErrorBoundary>
-              )
-            }
-            case 'cluster': {
-              // Tool cluster summary row — no bottom margin when next item is also a cluster
-              return (
-                <ErrorBoundary key={merged.id} fallback={(err) => (
-                  <box style={{ paddingLeft: 1 }}>
-                    <text style={{ fg: theme.error }}>[Render error: {err.message}]</text>
-                  </box>
-                )}>
-                  <box style={{ paddingLeft: 1, marginBottom: nextIsCluster ? 0 : 1 }}>
-                    <ClusterSummaryRow
-                      cluster={merged.cluster}
-                      steps={merged.steps}
-                      width={chatColumnWidth - 2}
-                      mode={displayMode}
-                    />
-                  </box>
-                </ErrorBoundary>
-              )
-            }
-            case 'bash':
-              return (
-                <box key={merged.id} style={{ paddingLeft: 1 }}>
-                  <BashOutput result={merged.result} />
-                </box>
-              )
-            case 'system':
-              return (
-                <box key={merged.id} style={{ paddingLeft: 1, marginBottom: 1 }}>
-                  <text style={{ fg: theme.muted }}>{merged.text}</text>
-                </box>
-              )
-          }
-        })
-      })()}
+      <ChatTimeline
+        items={visibleItems}
+        displayMode={displayMode}
+        isStreaming={display?.status === 'streaming'}
+        streamingMessageId={display?.streamingMessageId ?? null}
+        lastInterruptedMessage={lastInterruptedMessage}
+        interruptedMessageId={interruptedMessageIdRef.current}
+        chatColumnWidth={chatColumnWidth}
+        themeErrorColor={theme.error}
+        themeMutedColor={theme.muted}
+        onFileClick={openFile}
+        onForkExpand={pushForkOverlay}
+        onErrorAction={dispatchErrorAction}
+      />
       {selectedForkId !== null && (
         <PendingCommunicationsPanel
           messages={activeDisplay?.pendingInboundCommunications ?? []}
