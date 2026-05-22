@@ -12,6 +12,7 @@ import { BOX_CHARS } from '../utils/ui-constants'
 type AgentClient = Awaited<ReturnType<typeof createCodingAgentClient>>
 
 export type AppOverlaysProps = {
+  displayMode: 'default' | 'transcript'
   settingsVisible: boolean
   onSettingsClose: () => void
   auth: MagnitudeAuthState
@@ -46,6 +47,7 @@ export type AppOverlaysProps = {
 }
 
 export function AppOverlays({
+  displayMode,
   settingsVisible,
   onSettingsClose,
   auth,
@@ -96,6 +98,7 @@ export function AppOverlays({
           forkId={expandedForkId}
           forkName={agent?.name ?? 'Agent'}
           forkRole={agent?.role ?? 'agent'}
+          displayMode={displayMode}
           onClose={popForkOverlay}
           onForkExpand={pushForkOverlay}
           onErrorAction={onErrorAction}

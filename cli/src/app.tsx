@@ -1213,6 +1213,7 @@ function AppInner({
 
   const overlayContent = (
     <AppOverlays
+      displayMode={displayMode}
       settingsVisible={settingsOpen}
       onSettingsClose={onSettingsClose}
       auth={auth}

@@ -50,11 +50,27 @@ beforeEach(async () => {
     }),
   }))
 
+  mock.module('../hooks/use-local-width', () => ({
+    useLocalWidth: () => ({
+      ref: { current: null },
+      onSizeChange: () => {},
+      width: 80,
+    }),
+  }))
+
   mock.module('./message-view', () => ({
     MessageView: ({ message, onFileClick }: { message: { id: string }, onFileClick?: (path: string, section?: string) => void }) => {
       if (message.id === 'm1') onFileClick?.('overlay.md', 'L1-L2')
       return <text>[message:{message.id}]</text>
     },
+  }))
+
+  mock.module('./tool-cluster', () => ({
+    ClusterSummaryRow: ({ cluster }: { cluster: string }) => <text>[cluster:{cluster}]</text>,
+  }))
+
+  mock.module('../types/timeline', () => ({
+    groupClusters: (items: any[]) => items.map((item: any) => ({ ...item, kind: 'chat' })),
   }))
 
   mock.module('./file-viewer-panel', () => ({
@@ -88,6 +104,7 @@ function propsWithDisplay(display: DisplayState) {
     forkId: 'fork-1',
     forkName: 'Fork One',
     forkRole: 'builder',
+    displayMode: 'default' as const,
     onClose: noop,
     onForkExpand: noop,
     modelSummary: { role: 'role', model: 'model' },
@@ -217,7 +234,11 @@ test('provides overlay-local selected file context from overlay file panel state
 test('overlay source has no message-update-driven imperative scroll-to-bottom effect', async () => {
   const source = await Bun.file(new URL('./fork-detail-overlay.tsx', import.meta.url)).text()
 
-  expect(source).not.toContain('}, [messages])')
+  // No useEffect should depend on [messages] — useMemo is fine for pure data transforms
+  const useEffectDeps = [...source.matchAll(/useEffect\([^}]+\},\s*\[([^\]]+)\]\)/gs)].map(m => m[1])
+  for (const deps of useEffectDeps) {
+    expect(deps).not.toContain('messages')
+  }
   expect(source).not.toContain('}, [display?.messages])')
   expect(source.match(/scrollTo\(Number\.MAX_SAFE_INTEGER\)/g)?.length ?? 0).toBe(1)
 })

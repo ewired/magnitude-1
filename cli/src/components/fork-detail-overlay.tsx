@@ -1,12 +1,15 @@
-import { memo, useState, useEffect, useCallback, useRef } from 'react'
+import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { TextAttributes, type KeyEvent } from '@opentui/core'
 import { useKeyboard } from '@opentui/react'
 import type { CompactionState, DisplayState, DisplayMessage, TurnState, ActionId } from '@magnitudedev/agent'
 import { useTheme } from '../hooks/use-theme'
 import { useFilePanel } from '../hooks/use-file-panel'
+import { useLocalWidth } from '../hooks/use-local-width'
 import { Button } from './button'
 import { MessageView } from './message-view'
+import { ClusterSummaryRow } from './tool-cluster'
 import { ContextUsageBar } from './context-usage-bar'
+import { groupClusters, type MergedItem } from '../types/timeline'
 
 import { FileViewerPanel } from './file-viewer-panel'
 import { SelectedFileProvider } from '../hooks/use-file-viewer'
@@ -15,6 +18,7 @@ interface ForkDetailOverlayProps {
   forkId: string
   forkName: string
   forkRole: string
+  displayMode: 'default' | 'transcript'
   onClose: () => void
   onForkExpand?: (forkId: string) => void
   onErrorAction?: (actionId: ActionId) => void
@@ -48,6 +52,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
   forkId,
   forkName,
   forkRole,
+  displayMode,
 
   onClose,
   onForkExpand,
@@ -69,6 +74,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
   const [isCompacting, setIsCompacting] = useState(false)
 
   const scrollboxRef = useRef<any>(null)
+  const scrollboxWidth = useLocalWidth()
 
   useKeyboard(useCallback((key: KeyEvent) => {
     if (key.name === 'escape') {
@@ -108,6 +114,17 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
 
   const messages = display?.messages ?? EMPTY_MESSAGES
   const isStreaming = display?.status === 'streaming'
+
+  // Apply clustering to merge consecutive same-cluster tools (e.g. fileRead → read cluster)
+  const mergedItems: MergedItem[] = useMemo(() => {
+    const timelineItems = messages.map(msg => ({
+      kind: 'chat' as const,
+      id: msg.id,
+      timestamp: msg.timestamp,
+      message: msg,
+    }))
+    return groupClusters(timelineItems)
+  }, [messages])
 
   const {
     selectedFile,
@@ -171,7 +188,11 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
         <box style={{ flexDirection: 'row', flexGrow: 1, paddingLeft: 1, paddingRight: 1, gap: 1 }}>
           {/* Message list */}
           <scrollbox
-            ref={scrollboxRef}
+            ref={(el: any) => {
+              scrollboxRef.current = el
+              scrollboxWidth.ref.current = el
+            }}
+            onSizeChange={scrollboxWidth.onSizeChange}
             stickyScroll
             stickyStart="bottom"
             scrollX={false}
@@ -198,12 +219,25 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
               },
             }}
           >
-            {messages.length === 0 ? (
+            {mergedItems.length === 0 ? (
               <box style={{ paddingLeft: 1 }}>
                 <text style={{ fg: theme.muted }}>No activity yet.</text>
               </box>
             ) : (
-              messages.map((msg: DisplayMessage) => {
+              mergedItems.map((item) => {
+                if (item.kind === 'cluster') {
+                  return (
+                    <box key={item.id} style={{ paddingLeft: 1, marginBottom: 1 }}>
+                      <ClusterSummaryRow
+                        cluster={item.cluster}
+                        steps={item.steps}
+                        width={(scrollboxWidth.width ?? 80) - 2}
+                        mode={displayMode}
+                      />
+                    </box>
+                  )
+                }
+                const msg = item.message
                 const isStreamingMsg = isStreaming && msg === messages[messages.length - 1] && msg.type === 'assistant_message'
                 return (
                   <MessageView
@@ -213,6 +247,7 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
                     onForkExpand={onForkExpand}
                     onFileClick={openFile}
                     onErrorAction={onErrorAction}
+                    mode={displayMode}
                   />
                 )
               })
@@ -236,6 +271,12 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
 
       <box style={{ flexShrink: 0, paddingTop: 1, paddingLeft: 2, paddingRight: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
         <box style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {displayMode === 'transcript' && (
+            <>
+              <text style={{ fg: theme.info }}>Transcript Mode</text>
+              <text style={{ fg: theme.muted }}>{' · '}</text>
+            </>
+          )}
           <text>
             <span fg={theme.muted}>{modelSummary?.role ?? '—'}</span>
             <span fg={theme.muted}> {'\u00b7'} </span>
