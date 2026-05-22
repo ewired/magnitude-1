@@ -42,24 +42,25 @@ const systemPromptTokenCache = new Map<string, number>()
 
 /**
  * Estimate the token count of the full system prompt for a given role.
- * Cached per roleId — system prompts are stable across turns.
+ * Cached per role+toolkit composition — system prompts are stable across turns.
  */
 export function estimateSystemPromptTokens(
   roleId: RoleId,
   skills: Map<string, Skill>,
   configState: ConfigState,
 ): number {
-  const cached = systemPromptTokenCache.get(roleId)
+  const toolkit = getEffectiveToolkit(roleId, configState)
+  const cacheKey = `${roleId}:[${[...toolkit.keys].sort().join(',')}]`
+  const cached = systemPromptTokenCache.get(cacheKey)
   if (cached !== undefined) return cached
 
   const agentDef = getAgentDefinition(roleId)
-  const toolkit = getEffectiveToolkit(roleId, configState)
   const toolDefs = toolkit.keys.map(key => toolkit.entries[key].tool.definition)
   const toolDocs = toolDefs.length > 0 ? renderToolDocs(toolDefs) : ''
   const prompt = buildSystemPrompt({ roleDef: agentDef, skills, lenses: [], toolDocs })
 
   const tokens = estimateText(prompt)
-  systemPromptTokenCache.set(roleId, tokens)
+  systemPromptTokenCache.set(cacheKey, tokens)
   return tokens
 }
 

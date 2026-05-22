@@ -13,6 +13,7 @@ export { globalTools } from './globals'
 
 export { shellTool } from './shell'
 export { fsTools } from './fs'
+export { queryImageTool } from './query-image'
 
 export { webFetchTool } from './web-fetch-tool'
 export { webSearchTool } from './web-search'

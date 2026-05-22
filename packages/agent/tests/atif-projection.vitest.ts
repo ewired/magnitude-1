@@ -17,10 +17,15 @@ import { AtifProjection } from '../src/projections/atif/projection'
 import { AgentRoutingProjection } from '../src/projections/agent-routing'
 import { AgentStatusProjection } from '../src/projections/agent-status'
 import { TurnProjection } from '../src/projections/turn'
-import { ConfigAmbient } from '../src/ambient/config-ambient'
+import { ConfigAmbient, buildConfigState } from '../src/ambient/config-ambient'
 import { AtifAmbient, type AtifConfig } from '../src/ambient/atif-ambient'
 import type { AtifForkState } from '../src/projections/atif'
 import { serializeAtif } from '../src/projections/atif/serialize'
+
+const mockConfigState = buildConfigState(null, {
+  softCapRatio: 0.9,
+  softCapMaxTokens: 200_000,
+})
 
 const ts = (n: number) => 1_700_100_000_000 + n
 
@@ -498,7 +503,7 @@ describe('AtifProjection', () => {
       ['agent-scout-1', scoutFork],
     ])
 
-    const trajectory = serializeAtif(forks, { sessionId: 'test-session' })
+    const trajectory = serializeAtif(forks, { sessionId: 'test-session', configState: mockConfigState })
 
     // Validate ATIF v1.7 structure
     expect(trajectory.schema_version).toBe('ATIF-v1.7')
@@ -839,7 +844,7 @@ describe('AtifProjection', () => {
       },
     ] as AppEvent[], true)
 
-    const trajectory = serializeAtif(new Map([[null, rootFork]]), { sessionId: 'session-test-001' })
+    const trajectory = serializeAtif(new Map([[null, rootFork]]), { sessionId: 'session-test-001', configState: mockConfigState })
 
     // === ATIF v1.7 Structural Validation ===
 

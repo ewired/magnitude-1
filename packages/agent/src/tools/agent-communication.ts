@@ -18,7 +18,7 @@ const MessageWorkerOutput = Schema.Struct({
 
 export const messageWorkerTool = defineHarnessTool({
   definition: {
-    name: 'messageWorker',
+    name: 'message_worker',
     description: 'Send a message to another agent worker.',
     inputSchema: Schema.Struct({
       agentId: Schema.String.annotations({ description: 'Agent ID of the worker to message' }),

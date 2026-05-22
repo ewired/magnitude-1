@@ -12,12 +12,18 @@ import type {
   AtifAgent,
 } from './types'
 import { toolDefinitionsFromToolkit } from './tool-definitions'
+import type { ConfigState } from '../../ambient/config-ambient'
 
 // =============================================================================
 // Helpers
 // =============================================================================
 
-function forkToTrajectory(fork: AtifForkState, trajectoryId: string, sessionId?: string): AtifTrajectory {
+function forkToTrajectory(
+  fork: AtifForkState,
+  trajectoryId: string,
+  sessionId: string | undefined,
+  configState: ConfigState,
+): AtifTrajectory {
   const metrics = fork.tokenAccumulator
   const finalMetrics: AtifFinalMetrics | undefined = fork.steps.length > 0
       ? {
@@ -33,7 +39,7 @@ function forkToTrajectory(fork: AtifForkState, trajectoryId: string, sessionId?:
     name: fork.agentName,
     version: '1.0.0',
     ...(fork.modelId ? { model_name: fork.modelId } : {}),
-    ...(fork.agentRole ? { tool_definitions: toolDefinitionsFromToolkit(fork.agentRole) } : {}),
+    ...(fork.agentRole ? { tool_definitions: toolDefinitionsFromToolkit(fork.agentRole, configState) } : {}),
   }
 
   return {
@@ -57,6 +63,8 @@ export interface SerializeOptions {
   sessionId?: string
   /** Optional root-level notes */
   notes?: string
+  /** Config state for vision-aware toolkit resolution */
+  configState: ConfigState
 }
 
 /**
@@ -67,7 +75,7 @@ export interface SerializeOptions {
  */
 export function serializeAtif(
   forks: ReadonlyMap<string | null, AtifForkState>,
-  options: SerializeOptions = {}
+  options: SerializeOptions,
 ): AtifTrajectory {
   const rootFork = forks.get(null)
   if (!rootFork) {
@@ -79,7 +87,7 @@ export function serializeAtif(
   for (const [forkId, fork] of forks.entries()) {
     if (forkId === null) continue
     // Use the forkId (agentId) as the trajectory_id for workers
-    const traj = forkToTrajectory(fork, forkId, options.sessionId)
+    const traj = forkToTrajectory(fork, forkId, options.sessionId, options.configState)
     subagentTrajectories.push(traj)
   }
 
@@ -101,7 +109,7 @@ export function serializeAtif(
     version: '1.0.0',
     ...(rootFork.modelId ? { model_name: rootFork.modelId } : {}),
     tool_definitions: options.toolDefinitions
-      ?? (rootFork.agentRole ? toolDefinitionsFromToolkit(rootFork.agentRole) : undefined),
+      ?? (rootFork.agentRole ? toolDefinitionsFromToolkit(rootFork.agentRole, options.configState) : undefined),
   }
 
   return {

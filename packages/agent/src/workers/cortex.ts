@@ -28,7 +28,7 @@ import { MAX_RETRIES, TERMINAL_RETRY_EXHAUSTED_MESSAGE } from '../util/retry-bac
 
 import { AgentModelResolver } from '../model/model-resolver'
 import { getAgentDefinition, getForkInfo } from '../agents/registry'
-import { getToolkitForRole } from '../tools/toolkits'
+import { getEffectiveToolkit } from '../tools/toolkits'
 import { createHarnessAdapter } from '../execution/harness-adapter'
 import { buildSystemPrompt } from '../prompts/system-prompt-builder'
 import { windowToPrompt, createAgentFormatter } from '../prompts/window-to-prompt'
@@ -53,6 +53,7 @@ import { ImageDescriptionServiceTag } from '../util/describe-image'
 
 import { buildStandardHooks } from '../execution/harness-hooks'
 import { TurnContextTag } from '../engine/turn-context'
+import { ConfigAmbient } from '../ambient/config-ambient'
 
 const { ForkContext } = Fork
 
@@ -123,7 +124,9 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // ──────────────────────────────────────────────────────────────────────
         // 4. Get toolkit and fork layer
         // ──────────────────────────────────────────────────────────────────────
-        const toolkit = getToolkitForRole(roleId)
+        const ambientService = yield* AmbientServiceTag
+        const configState = ambientService.getValue(ConfigAmbient)
+        const toolkit = getEffectiveToolkit(roleId, configState)
         const forkLayer = execManager.getForkLayer(forkId)
         if (!forkLayer) {
           logger.error({ forkId, turnId }, '[Cortex] Fork layer not initialized — aborting turn')
@@ -145,7 +148,6 @@ export const Cortex = Worker.defineForked<AppEvent>()({
         // ──────────────────────────────────────────────────────────────────────
         // 5. Build system prompt
         // ──────────────────────────────────────────────────────────────────────
-        const ambientService = yield* AmbientServiceTag
         const skills = ambientService.getValue(SkillsAmbient)
 
         const scratchpadPath = sessionCtx.context?.scratchpadPath ?? process.cwd()

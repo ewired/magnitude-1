@@ -20,6 +20,7 @@ import type { AppEvent } from '../events'
 import { AtifProjection } from '../projections/atif/projection'
 import { serializeAtif } from '../projections/atif/serialize'
 import { AtifAmbient } from '../ambient/atif-ambient'
+import { ConfigAmbient } from '../ambient/config-ambient'
 
 export const AtifWriter = Worker.define<AppEvent>()({
   name: 'AtifWriter',
@@ -33,7 +34,8 @@ export const AtifWriter = Worker.define<AppEvent>()({
 
         const atifInstance = yield* AtifProjection.Tag
         const atifState = yield* SubscriptionRef.get(atifInstance.state)
-        const trajectory = serializeAtif(atifState.forks)
+        const configState = ambientService.getValue(ConfigAmbient)
+        const trajectory = serializeAtif(atifState.forks, { configState })
 
         // Atomic write: tmp file + rename
         const filePath = config.filePath
