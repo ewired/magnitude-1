@@ -8,6 +8,7 @@ import { shortenCommandPreview } from '../../utils/strings';
 const SHIMMER_INTERVAL_MS = 160;
 const MAX_COMMAND_DISPLAY_LEN = 80;
 const PREVIEW_LINE_CAP = 3;
+const TRANSCRIPT_LINE_CAP = 1000;
 
 export const shellDisplay = createToolDisplay<ShellState>({
   render: ({ state, mode }) => {
@@ -39,16 +40,31 @@ export const shellDisplay = createToolDisplay<ShellState>({
       : outputText.split('\n');
 
     const nonEmptyLines = allLines.filter(l => l.length > 0);
-    const previewLimit = mode === 'transcript' ? Infinity : PREVIEW_LINE_CAP;
-    const showPreview = mode === 'default' && nonEmptyLines.length > previewLimit * 2 + 1;
-    const truncatedCount = nonEmptyLines.length - previewLimit * 2;
-    const displayedLines = showPreview
-      ? [
-          ...nonEmptyLines.slice(0, previewLimit),
-          `… ${truncatedCount} lines collapsed`,
-          ...nonEmptyLines.slice(-previewLimit),
-        ]
-      : nonEmptyLines;
+
+    // Build the text to display based on mode
+    let outputDisplayText: string;
+    if (mode === 'default') {
+      const showPreview = nonEmptyLines.length > PREVIEW_LINE_CAP * 2 + 1;
+      const truncatedCount = nonEmptyLines.length - PREVIEW_LINE_CAP * 2;
+      const displayedLines = showPreview
+        ? [
+            ...nonEmptyLines.slice(0, PREVIEW_LINE_CAP),
+            `… ${truncatedCount} lines collapsed`,
+            ...nonEmptyLines.slice(-PREVIEW_LINE_CAP),
+          ]
+        : nonEmptyLines;
+      outputDisplayText = displayedLines.join('\n');
+    } else {
+      // Transcript mode: show up to TRANSCRIPT_LINE_CAP lines
+      if (nonEmptyLines.length > TRANSCRIPT_LINE_CAP) {
+        const head = nonEmptyLines.slice(0, TRANSCRIPT_LINE_CAP / 2);
+        const tail = nonEmptyLines.slice(-TRANSCRIPT_LINE_CAP / 2);
+        const truncatedCount = nonEmptyLines.length - TRANSCRIPT_LINE_CAP;
+        outputDisplayText = [...head, `… ${truncatedCount} lines collapsed`, ...tail].join('\n');
+      } else {
+        outputDisplayText = nonEmptyLines.join('\n');
+      }
+    }
 
     return (
       <box style={{ flexDirection: 'column' }}>
@@ -79,20 +95,11 @@ export const shellDisplay = createToolDisplay<ShellState>({
           {isInterrupted && <span style={{ fg: theme.muted }}>{' · Interrupted'}</span>}
         </text>
 
-        {/* Output block */}
+        {/* Output block — single <text> node with newlines instead of one node per line */}
         {(isExecuting || isCompleted) && (outputText || errorText) && (
-          <box style={{ flexDirection: 'column', paddingLeft: 2 }}>
-            {displayedLines.map((line, i) => {
-              // Determine if this line is from stderr (errorText) or stdout
-              const errorLineCount = errorText ? errorText.split('\n').length : 0;
-              const isErrorLine = errorText && i < errorLineCount && !line.startsWith('…');
-              return (
-                <text key={i} style={{ fg: isErrorLine ? theme.error : theme.muted }}>
-                  {line}
-                </text>
-              );
-            })}
-          </box>
+          <text style={{ fg: isFailed ? theme.error : theme.muted, paddingLeft: 2 }}>
+            {outputDisplayText}
+          </text>
         )}
 
         {/* Tool error message */}

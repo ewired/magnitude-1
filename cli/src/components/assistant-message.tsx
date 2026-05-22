@@ -1,4 +1,4 @@
-import React, { memo } from 'react'
+import React, { memo, useMemo } from 'react'
 import { useStreamingReveal } from '../hooks/use-streaming-reveal'
 import { useTheme } from '../hooks/use-theme'
 import { buildMarkdownColorPalette } from '../utils/theme'
@@ -20,7 +20,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   onFileClick,
 }: AssistantMessageProps) {
   const theme = useTheme()
-  const markdownPalette = buildMarkdownColorPalette(theme)
+  const markdownPalette = useMemo(() => buildMarkdownColorPalette(theme), [theme])
   const { displayedContent, showCursor } = useStreamingReveal(content, isStreaming, isInterrupted)
   const box = useLocalWidth()
   const contentWidth = box.width ?? 79

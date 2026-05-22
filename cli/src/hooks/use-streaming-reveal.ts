@@ -10,13 +10,20 @@ export function useStreamingReveal(
     if (!isStreaming) return content.length
     return Math.max(0, Math.min(initialDisplayedLength ?? 0, content.length))
   })
+  // Ref mirrors state so the interval can read current value without re-subscribing
+  const displayedLengthRef = useRef(displayedLength)
   const isLinearDrainRef = useRef(!isStreaming)
   const previousContentRef = useRef(content)
   const previousIsStreamingRef = useRef(isStreaming)
 
+  // Keep ref in sync with state
+  displayedLengthRef.current = displayedLength
+
+  // Handle content/streaming transitions — runs only when content or isStreaming changes
   useEffect(() => {
     const previousContent = previousContentRef.current
     const previousIsStreaming = previousIsStreamingRef.current
+    const currentLength = displayedLengthRef.current
 
     if (!previousIsStreaming && isStreaming) {
       // Fresh stream start — initialize to requested prefix for reveal effect
@@ -33,13 +40,13 @@ export function useStreamingReveal(
       // Content changed non-monotonically outside streaming (e.g. a new edit session on the same artifact)
       // Snap to the full content immediately instead of revealing from stale state.
       setDisplayedLength(content.length)
-    } else if (!isStreaming && content.length < displayedLength) {
+    } else if (!isStreaming && content.length < currentLength) {
       setDisplayedLength(content.length)
     }
 
     previousContentRef.current = content
     previousIsStreamingRef.current = isStreaming
-  }, [content, isStreaming, displayedLength, initialDisplayedLength])
+  }, [content, isStreaming, initialDisplayedLength])
 
   useEffect(() => {
     if (isStreaming) {
@@ -53,8 +60,10 @@ export function useStreamingReveal(
     if (isInterrupted) setDisplayedLength(content.length)
   }, [isInterrupted, content.length])
 
+  // The reveal interval — depends only on content.length and isStreaming.
+  // Reads displayedLength via ref so it doesn't re-subscribe on every tick.
   useEffect(() => {
-    if (!isStreaming && displayedLength >= content.length) return
+    if (!isStreaming && displayedLengthRef.current >= content.length) return
 
     const interval = setInterval(() => {
       setDisplayedLength((prev) => {
@@ -72,7 +81,7 @@ export function useStreamingReveal(
     }, 33)
 
     return () => clearInterval(interval)
-  }, [content.length, displayedLength, isStreaming])
+  }, [content.length, isStreaming])
 
   const safeDisplayedLength = Math.min(displayedLength, content.length)
   const displayedContent = content.slice(0, safeDisplayedLength)
