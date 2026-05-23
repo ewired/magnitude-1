@@ -7,7 +7,7 @@ import { ShimmerText } from '../../components/shimmer-text';
 import { DiffHunk } from '../../components/diff-hunk';
 import { useTheme } from '../../hooks/use-theme';
 import { useStreamingReveal } from '../../hooks/use-streaming-reveal';
-import { green } from '../../utils/theme';
+import { green, violet } from '../../utils/theme';
 
 const SHIMMER_INTERVAL_MS = 160;
 
@@ -28,6 +28,84 @@ export const contentDisplay = createToolDisplay<ContentState>({
       () => displayedContent.split('\n').filter((_, i, arr) => i < arr.length - 1 || arr[i] !== ''),
       [displayedContent],
     );
+
+    // Scratchpad writes: minimal single-line display, no diff hunk
+    // Must be after all hooks to avoid React hooks rule violation
+    if (state.isScratchpad) {
+      const displayPath = state.scratchpadDisplayPath ?? state.path ?? '...'
+
+      if (isDone) {
+        return (
+          <box style={{ flexDirection: 'row' }}>
+            <text>
+              <span style={{ fg: violet[300] }}>{'✎ '}</span>
+              <span style={{ fg: theme.foreground }}>{'Wrote to scratchpad'}</span>
+              <span style={{ fg: theme.muted }}>{' · '}</span>
+            </text>
+            <Button
+              onClick={() => { if (path) onFileClick?.(path) }}
+              onMouseOver={() => setIsHovered(true)}
+              onMouseOut={() => setIsHovered(false)}
+            >
+              <text>
+                <span style={{ fg: isHovered ? theme.link : theme.primary }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
+              </text>
+            </Button>
+            <text>
+              <span style={{ fg: theme.muted }}>{` · ${state.lineCount} lines`}</span>
+            </text>
+          </box>
+        )
+      }
+
+      if (isError) {
+        return (
+          <box style={{ flexDirection: 'row' }}>
+            <text>
+              <span style={{ fg: theme.error }}>{'✗ '}</span>
+              <span style={{ fg: theme.foreground }}>{'Writing to scratchpad'}</span>
+              <span style={{ fg: theme.muted }}>{' · '}</span>
+            </text>
+            <Button
+              onClick={() => { if (path) onFileClick?.(path) }}
+              onMouseOver={() => setIsHovered(true)}
+              onMouseOut={() => setIsHovered(false)}
+            >
+              <text>
+                <span style={{ fg: isHovered ? theme.link : theme.muted }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
+              </text>
+            </Button>
+            <text>
+              <span style={{ fg: theme.error }}>{' · Error'}</span>
+            </text>
+          </box>
+        )
+      }
+
+      // Streaming / executing
+      return (
+        <box style={{ flexDirection: 'row' }}>
+          <text>
+            <span style={{ fg: violet[300] }}>{'✎ '}</span>
+            <span style={{ fg: theme.foreground }}>{'Writing to scratchpad'}</span>
+              <span style={{ fg: theme.muted }}>{' · '}</span>
+          </text>
+          <Button
+            onClick={() => { if (path) onFileClick?.(path) }}
+            onMouseOver={() => setIsHovered(true)}
+            onMouseOut={() => setIsHovered(false)}
+          >
+            <text>
+              <span style={{ fg: isHovered ? theme.link : theme.muted }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
+            </text>
+          </Button>
+          <text>
+            <span style={{ fg: theme.muted }}>{` · ${state.lineCount} lines`}</span>
+            <ShimmerText text="..." interval={SHIMMER_INTERVAL_MS} primaryColor={theme.secondary} />
+          </text>
+        </box>
+      )
+    }
 
     if (isDone) {
       return (
@@ -101,6 +179,10 @@ export const contentDisplay = createToolDisplay<ContentState>({
     );
   },
   summary: (state) => {
+    if (state.isScratchpad) {
+      const displayPath = state.scratchpadDisplayPath ?? state.path ?? 'file';
+      return `Write scratchpad: ${String(displayPath)}`;
+    }
     const path = state.path || 'file';
     return `Write ${String(path)}`;
   },

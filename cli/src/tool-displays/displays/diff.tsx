@@ -7,7 +7,7 @@ import { ShimmerText } from '../../components/shimmer-text';
 import { DiffHunk } from '../../components/diff-hunk';
 import { useStreamingReveal } from '../../hooks/use-streaming-reveal';
 import { useTheme } from '../../hooks/use-theme';
-import { green, red } from '../../utils/theme';
+import { green, red, violet } from '../../utils/theme';
 
 const SHIMMER_INTERVAL_MS = 160;
 
@@ -35,6 +35,87 @@ export const diffDisplay = createToolDisplay<DiffState>({
 
     const streamingDiff = state.diffs[0];
     const showStreamingDiff = isStreaming && !!streamingDiff;
+
+    // Scratchpad edits: minimal single-line display, no diff hunk
+    if (state.isScratchpad) {
+      const displayPath = state.scratchpadDisplayPath ?? state.path ?? '...'
+
+      if (isDone) {
+        return (
+          <box style={{ flexDirection: 'row' }}>
+            <text>
+              <span style={{ fg: violet[300] }}>{'✎ '}</span>
+              <span style={{ fg: theme.foreground }}>{'Edited file in scratchpad'}</span>
+              <span style={{ fg: theme.muted }}>{' · '}</span>
+            </text>
+            <Button
+              onClick={() => { if (path) onFileClick?.(path) }}
+              onMouseOver={() => setIsHovered(true)}
+              onMouseOut={() => setIsHovered(false)}
+            >
+              <text>
+                <span style={{ fg: isHovered ? theme.link : theme.primary }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
+              </text>
+            </Button>
+            {state.diffs.length > 0 && (
+              <text>
+                <span style={{ fg: theme.muted }}>{' ·'}</span>
+                <span style={{ fg: green[500] }} attributes={TextAttributes.DIM}>{` +${totals.added}`}</span>
+                <span style={{ fg: theme.secondary }} attributes={TextAttributes.DIM}>{'/'}</span>
+                <span style={{ fg: red[400] }} attributes={TextAttributes.DIM}>{`-${totals.removed}`}</span>
+              </text>
+            )}
+          </box>
+        )
+      }
+
+      if (isError) {
+        return (
+          <box style={{ flexDirection: 'row' }}>
+            <text>
+              <span style={{ fg: theme.error }}>{'✗ '}</span>
+              <span style={{ fg: theme.foreground }}>{'Editing file in scratchpad'}</span>
+              <span style={{ fg: theme.muted }}>{' · '}</span>
+            </text>
+            <Button
+              onClick={() => { if (path) onFileClick?.(path) }}
+              onMouseOver={() => setIsHovered(true)}
+              onMouseOut={() => setIsHovered(false)}
+            >
+              <text>
+                <span style={{ fg: isHovered ? theme.link : theme.muted }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
+              </text>
+            </Button>
+            <text>
+              <span style={{ fg: theme.error }}>{' · Error'}</span>
+            </text>
+          </box>
+        )
+      }
+
+      // Streaming / executing
+      return (
+        <box style={{ flexDirection: 'row' }}>
+          <text>
+            <span style={{ fg: violet[300] }}>{'✎ '}</span>
+            <span style={{ fg: theme.foreground }}>{'Editing file in scratchpad'}</span>
+              <span style={{ fg: theme.muted }}>{' · '}</span>
+          </text>
+          <Button
+            onClick={() => { if (path) onFileClick?.(path) }}
+            onMouseOver={() => setIsHovered(true)}
+            onMouseOut={() => setIsHovered(false)}
+          >
+            <text>
+              <span style={{ fg: isHovered ? theme.link : theme.muted }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
+            </text>
+          </Button>
+          <text>
+            <ShimmerText text="..." interval={SHIMMER_INTERVAL_MS} primaryColor={theme.secondary} />
+          </text>
+        </box>
+      )
+    }
 
     if (isDone) {
       return (
@@ -120,6 +201,10 @@ export const diffDisplay = createToolDisplay<DiffState>({
     );
   },
   summary: (state) => {
+    if (state.isScratchpad) {
+      const displayPath = state.scratchpadDisplayPath ?? state.path ?? 'file';
+      return `Edit scratchpad: ${String(displayPath)}`;
+    }
     const path = state.path || 'file';
     return `Edit ${String(path)}`;
   },

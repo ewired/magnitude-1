@@ -11,6 +11,23 @@ export interface FileEditState extends BaseState {
   baseContent: string | null
   diffs: EditDiff[]
   errorMessage?: string
+  isScratchpad: boolean
+  scratchpadDisplayPath?: string
+}
+
+/** Detect $M/ or ${M}/ prefix and extract display path */
+function detectScratchpad(path: string): { isScratchpad: boolean; scratchpadDisplayPath?: string } {
+  const s = path.replace(/^\.\/+/, '').replace(/^\.\.\/+/, '')
+  if (s.startsWith('$M/')) {
+    return { isScratchpad: true, scratchpadDisplayPath: s.slice('$M/'.length) || undefined }
+  }
+  if (s.startsWith('${M}/')) {
+    return { isScratchpad: true, scratchpadDisplayPath: s.slice('${M}/'.length) || undefined }
+  }
+  if (s === '$M' || s === '${M}') {
+    return { isScratchpad: true, scratchpadDisplayPath: undefined }
+  }
+  return { isScratchpad: false }
 }
 
 const initial: Omit<FileEditState, 'phase'> = {
@@ -21,6 +38,8 @@ const initial: Omit<FileEditState, 'phase'> = {
   streamingTarget: null,
   baseContent: null,
   diffs: [],
+  isScratchpad: false,
+  scratchpadDisplayPath: undefined,
 }
 
 const CONTEXT_LINES = 3
@@ -67,7 +86,9 @@ export function applyProvisionalDiffs(state: FileEditState): FileEditState {
 
 function applyFieldUpdate(state: FileEditState, field: string, text: string): FileEditState {
   if (field === 'path') {
-    return applyProvisionalDiffs({ ...state, phase: 'streaming', path: (state.path ?? '') + text })
+    const path = (state.path ?? '') + text
+    const { isScratchpad, scratchpadDisplayPath } = detectScratchpad(path)
+    return applyProvisionalDiffs({ ...state, phase: 'streaming', path, isScratchpad, scratchpadDisplayPath })
   }
   if (field === 'old') {
     return applyProvisionalDiffs({
@@ -92,10 +113,13 @@ function applyReadyInputUpdate(
   state: FileEditState,
   input: { path: string; old: string; new: string; replaceAll?: boolean },
 ): FileEditState {
+  const { isScratchpad, scratchpadDisplayPath } = input.path ? detectScratchpad(input.path) : { isScratchpad: state.isScratchpad, scratchpadDisplayPath: state.scratchpadDisplayPath }
   return applyProvisionalDiffs({
     ...state,
     phase: 'streaming',
     path: input.path,
+    isScratchpad,
+    scratchpadDisplayPath,
     oldText: input.old,
     newText: input.new,
     replaceAll: input.replaceAll ?? false,
