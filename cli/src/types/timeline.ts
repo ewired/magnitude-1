@@ -47,6 +47,14 @@ const DEFAULT_INVISIBLE_TYPES: ReadonlySet<string> = new Set([
 ])
 
 /**
+ * Tool keys that are invisible in default mode.
+ * They are dropped from the timeline entirely (no ghost space), but visible in transcript mode.
+ */
+const DEFAULT_INVISIBLE_TOOL_KEYS: ReadonlySet<string> = new Set([
+  'spawnWorker',
+])
+
+/**
  * Message types that are always invisible regardless of mode.
  * These never render anything in MessageView.
  */
@@ -59,6 +67,7 @@ const ALWAYS_INVISIBLE_TYPES: ReadonlySet<string> = new Set([
 function isInvisibleInMode(message: DisplayMessage, mode: 'default' | 'transcript'): boolean {
   if (ALWAYS_INVISIBLE_TYPES.has(message.type)) return true
   if (mode === 'default' && DEFAULT_INVISIBLE_TYPES.has(message.type)) return true
+  if (mode === 'default' && message.type === 'tool' && DEFAULT_INVISIBLE_TOOL_KEYS.has(message.toolKey)) return true
   return false
 }
 

@@ -1,6 +1,7 @@
 import type { ToolKey } from '@magnitudedev/agent'
 import type { BaseState } from '@magnitudedev/harness'
 import type { CommonToolProps, ToolDisplay } from './types'
+import { createToolDisplay } from './types'
 import { shellDisplay } from './displays/shell'
 import { diffDisplay } from './displays/diff'
 import { contentDisplay } from './displays/content'
@@ -10,8 +11,40 @@ import { webSearchDisplay } from './displays/web-search'
 import { webFetchDisplay } from './displays/web-fetch'
 import { skillDisplay } from './displays/skill'
 import { defaultDisplay } from './displays/default'
-import { spawnWorkerDisplay } from './displays/spawn-worker'
 import { reassignWorkerDisplay } from './displays/reassign-worker'
+
+import { useTheme } from '../hooks/use-theme'
+import { violet } from '../utils/theme'
+
+/** Spawn worker display — invisible in default mode (shown as badge in WorkingTimer), renders in transcript mode */
+const spawnWorkerDisplay = createToolDisplay<BaseState>({
+  render: ({ state, mode }) => {
+    if (mode === 'default') return null
+    const theme = useTheme()
+    const s = state as any
+    const isCompleted = s.phase === 'completed'
+    const isStreaming = s.phase === 'streaming' || s.phase === 'executing'
+    const isError = s.phase === 'error' || s.phase === 'rejected' || s.phase === 'interrupted'
+    const wordCount = s.message?.trim() ? s.message.trim().split(/\s+/).length : 0
+    return (
+      <text>
+        <span style={{ fg: violet[300] }}>{'▶ '}</span>
+        <span style={{ fg: theme.muted }}>{isCompleted ? 'Started worker ' : 'Starting worker '}</span>
+        {s.agentId && <span style={{ fg: theme.foreground }}>{s.agentId}</span>}
+        {isStreaming && wordCount > 0 && (
+          <span style={{ fg: theme.muted }}>{` · ${wordCount} ${wordCount === 1 ? 'word' : 'words'}`}</span>
+        )}
+        {isError && <span style={{ fg: theme.error }}>{' · Error'}</span>}
+      </text>
+    )
+  },
+  summary: (state) => {
+    const s = state as any
+    const id = s.agentId ? ` ${s.agentId}` : ''
+    if (s.phase === 'completed') return `Started worker${id}`
+    return `Starting worker${id}`
+  },
+})
 
 /**
  * Wraps a typed ToolDisplay to accept BaseState.

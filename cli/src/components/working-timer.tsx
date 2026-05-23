@@ -9,6 +9,8 @@ const THINKING_PULSE_COLORS = [
   slate[400], slate[300], slate[200],
 ] as const
 
+const BRAILLE_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const
+
 interface WorkingTimerProps {
   chainStartTime: number | null
   chainStatus: 'active' | 'completed' | null
@@ -16,6 +18,7 @@ interface WorkingTimerProps {
   chainStats: ChainStats | null
   interruptedMessage?: InterruptedMessage | null
   isThinking?: boolean
+  isWorkerStarting?: boolean
 }
 
 function formatElapsed(totalSeconds: number): string {
@@ -65,7 +68,7 @@ function buildSummaryLine(stats: ChainStats, durationSeconds: number): string {
     parts.push(`${stats.webSearchCount} web search${stats.webSearchCount === 1 ? '' : 'es'}`)
   }
 
-  return parts.join(' \u00b7 ')
+  return parts.join(' · ')
 }
 
 export const WorkingTimer = memo(function WorkingTimer({
@@ -75,10 +78,12 @@ export const WorkingTimer = memo(function WorkingTimer({
   chainStats,
   interruptedMessage,
   isThinking,
+  isWorkerStarting,
 }: WorkingTimerProps) {
   const theme = useTheme()
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [pulseIndex, setPulseIndex] = useState(0)
+  const [brailleIndex, setBrailleIndex] = useState(0)
 
   useEffect(() => {
     if (chainStatus !== 'active' || !chainStartTime) {
@@ -110,6 +115,17 @@ export const WorkingTimer = memo(function WorkingTimer({
     return () => clearInterval(interval)
   }, [isThinking, chainStatus])
 
+  useEffect(() => {
+    if (!isWorkerStarting || chainStatus !== 'active') {
+      setBrailleIndex(0)
+      return
+    }
+    const interval = setInterval(() => {
+      setBrailleIndex(i => (i + 1) % BRAILLE_FRAMES.length)
+    }, 80)
+    return () => clearInterval(interval)
+  }, [isWorkerStarting, chainStatus])
+
   // Active: show running timer
   if (chainStatus === 'active' && chainStartTime) {
     return (
@@ -118,9 +134,16 @@ export const WorkingTimer = memo(function WorkingTimer({
           Working... {formatElapsed(elapsedSeconds)}
           {isThinking && (
             <>
-              {' \u00b7 '}
+              {' · '}
               <span style={{ fg: THINKING_PULSE_COLORS[pulseIndex] }}>{'◎'}</span>
               {' Thinking'}
+            </>
+          )}
+          {isWorkerStarting && (
+            <>
+              {' · '}
+              <span style={{ fg: theme.muted }}>{BRAILLE_FRAMES[brailleIndex]}</span>
+              {' Starting worker'}
             </>
           )}
         </text>

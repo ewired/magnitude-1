@@ -1104,6 +1104,21 @@ function AppInner({
     return false
   }, [activeDisplay, display])
 
+  // Detect if a worker is being started (spawnWorker tool not yet completed)
+  const isWorkerStarting = useMemo(() => {
+    const displayState = activeDisplay ?? display
+    if (displayState?.status !== 'streaming') return false
+    const messages = displayState?.messages ?? []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i]
+      if (msg.type === 'tool' && msg.toolKey === 'spawnWorker') {
+        const phase = (msg.state as any)?.phase
+        return phase === 'streaming' || phase === 'executing'
+      }
+    }
+    return false
+  }, [activeDisplay, display])
+
   // Scroll-tracking for sticky header
   const scrollboxRef = useRef<any>(null)
 
@@ -1345,6 +1360,7 @@ function AppInner({
             chainStats={chainStats}
             interruptedMessage={lastInterruptedMessage}
             isThinking={isThinking}
+            isWorkerStarting={isWorkerStarting}
           />
           <ChatController
             isBlockingOverlayActive={isBlockingOverlayActive}
