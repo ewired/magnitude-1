@@ -1,7 +1,13 @@
 import { memo, useEffect, useState } from 'react'
 import type { InterruptedMessage, ChainStats } from '@magnitudedev/agent'
 import { useTheme } from '../hooks/use-theme'
+import { slate } from '../utils/palette'
 import { red } from '../utils/theme'
+
+const THINKING_PULSE_COLORS = [
+  slate[100], slate[200], slate[300], slate[400], slate[500],
+  slate[400], slate[300], slate[200],
+] as const
 
 interface WorkingTimerProps {
   chainStartTime: number | null
@@ -9,6 +15,7 @@ interface WorkingTimerProps {
   chainEndTime: number | null
   chainStats: ChainStats | null
   interruptedMessage?: InterruptedMessage | null
+  isThinking?: boolean
 }
 
 function formatElapsed(totalSeconds: number): string {
@@ -67,9 +74,11 @@ export const WorkingTimer = memo(function WorkingTimer({
   chainEndTime,
   chainStats,
   interruptedMessage,
+  isThinking,
 }: WorkingTimerProps) {
   const theme = useTheme()
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [pulseIndex, setPulseIndex] = useState(0)
 
   useEffect(() => {
     if (chainStatus !== 'active' || !chainStartTime) {
@@ -90,12 +99,30 @@ export const WorkingTimer = memo(function WorkingTimer({
     return () => clearInterval(interval)
   }, [chainStatus, chainStartTime])
 
+  useEffect(() => {
+    if (!isThinking || chainStatus !== 'active') {
+      setPulseIndex(0)
+      return
+    }
+    const interval = setInterval(() => {
+      setPulseIndex(i => (i + 1) % THINKING_PULSE_COLORS.length)
+    }, 200)
+    return () => clearInterval(interval)
+  }, [isThinking, chainStatus])
+
   // Active: show running timer
   if (chainStatus === 'active' && chainStartTime) {
     return (
       <box style={{ flexShrink: 0, paddingLeft: 2, paddingTop: 0, paddingBottom: 0 }}>
         <text style={{ fg: theme.muted }}>
           Working... {formatElapsed(elapsedSeconds)}
+          {isThinking && (
+            <>
+              {' \u00b7 '}
+              <span style={{ fg: THINKING_PULSE_COLORS[pulseIndex] }}>{'◎'}</span>
+              {' Thinking'}
+            </>
+          )}
         </text>
       </box>
     )

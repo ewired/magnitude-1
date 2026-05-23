@@ -1091,6 +1091,19 @@ function AppInner({
     return last.type === 'interrupted' ? last : null
   }, [activeDisplay, display])
 
+  // Detect if the agent is actively thinking (last non-queued message is a thinking block)
+  const isThinking = useMemo(() => {
+    const displayState = activeDisplay ?? display
+    if (displayState?.status !== 'streaming') return false
+    const messages = displayState?.messages ?? []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].type !== 'queued_user_message') {
+        return messages[i].type === 'thinking'
+      }
+    }
+    return false
+  }, [activeDisplay, display])
+
   // Scroll-tracking for sticky header
   const scrollboxRef = useRef<any>(null)
 
@@ -1331,6 +1344,7 @@ function AppInner({
             chainEndTime={display?.chainEndTime ?? null}
             chainStats={chainStats}
             interruptedMessage={lastInterruptedMessage}
+            isThinking={isThinking}
           />
           <ChatController
             isBlockingOverlayActive={isBlockingOverlayActive}
