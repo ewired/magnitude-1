@@ -16,6 +16,8 @@ import { reassignWorkerDisplay } from './displays/reassign-worker'
 import { useTheme } from '../hooks/use-theme'
 import { violet } from '../utils/theme'
 
+const MESSAGE_LINE_CAP = 300
+
 /** Spawn worker display — invisible in default mode (shown as badge in WorkingTimer), renders in transcript mode */
 const spawnWorkerDisplay = createToolDisplay<BaseState>({
   render: ({ state, mode }) => {
@@ -26,16 +28,34 @@ const spawnWorkerDisplay = createToolDisplay<BaseState>({
     const isStreaming = s.phase === 'streaming' || s.phase === 'executing'
     const isError = s.phase === 'error' || s.phase === 'rejected' || s.phase === 'interrupted'
     const wordCount = s.message?.trim() ? s.message.trim().split(/\s+/).length : 0
+
+    const message = s.message ?? ''
+    const messageLines = message.split('\n')
+    const isTruncated = messageLines.length > MESSAGE_LINE_CAP
+    const visibleLines = isTruncated ? messageLines.slice(0, MESSAGE_LINE_CAP) : messageLines
+    const truncatedCount = messageLines.length - MESSAGE_LINE_CAP
+
     return (
-      <text>
-        <span style={{ fg: violet[300] }}>{'▶ '}</span>
-        <span style={{ fg: theme.muted }}>{isCompleted ? 'Started worker ' : 'Starting worker '}</span>
-        {s.agentId && <span style={{ fg: theme.foreground }}>{s.agentId}</span>}
-        {isStreaming && wordCount > 0 && (
-          <span style={{ fg: theme.muted }}>{` · ${wordCount} ${wordCount === 1 ? 'word' : 'words'}`}</span>
+      <box style={{ flexDirection: 'column' }}>
+        <text>
+          <span style={{ fg: violet[300] }}>{'▶ '}</span>
+          <span style={{ fg: theme.muted }}>{isCompleted ? 'Started worker ' : 'Starting worker '}</span>
+          {s.agentId && <span style={{ fg: theme.foreground }}>{s.agentId}</span>}
+          {isStreaming && wordCount > 0 && (
+            <span style={{ fg: theme.muted }}>{` · ${wordCount} ${wordCount === 1 ? 'word' : 'words'}`}</span>
+          )}
+          {isError && <span style={{ fg: theme.error }}>{' · Error'}</span>}
+        </text>
+        {message && (
+          <box style={{ borderStyle: 'single', border: ['left'], borderColor: theme.muted, paddingLeft: 1 }}>
+            <text style={{ fg: theme.muted }}>
+              {isTruncated
+                ? [...visibleLines, `…${truncatedCount} lines hidden. Output capped at ${MESSAGE_LINE_CAP} lines`].join('\n')
+                : visibleLines.join('\n')}
+            </text>
+          </box>
         )}
-        {isError && <span style={{ fg: theme.error }}>{' · Error'}</span>}
-      </text>
+      </box>
     )
   },
   summary: (state) => {

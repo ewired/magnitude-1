@@ -57,10 +57,8 @@ export const shellDisplay = createToolDisplay<ShellState>({
     } else {
       // Transcript mode: show up to TRANSCRIPT_LINE_CAP lines
       if (nonEmptyLines.length > TRANSCRIPT_LINE_CAP) {
-        const head = nonEmptyLines.slice(0, TRANSCRIPT_LINE_CAP / 2);
-        const tail = nonEmptyLines.slice(-TRANSCRIPT_LINE_CAP / 2);
         const truncatedCount = nonEmptyLines.length - TRANSCRIPT_LINE_CAP;
-        outputDisplayText = [...head, `… ${truncatedCount} lines collapsed`, ...tail].join('\n');
+        outputDisplayText = [...nonEmptyLines.slice(0, TRANSCRIPT_LINE_CAP), `…${truncatedCount} lines hidden. Output capped at ${TRANSCRIPT_LINE_CAP} lines`].join('\n');
       } else {
         outputDisplayText = nonEmptyLines.join('\n');
       }
