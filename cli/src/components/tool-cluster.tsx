@@ -21,7 +21,7 @@ export function fitItems(items: string[], maxWidth: number): { shown: string[]; 
     const item = items[i]
     const itemWidth = stringWidth(item)
     const sepWidth = shown.length > 0 ? 2 : 0
-    const suffixWidth = i < items.length - 1 ? stringWidth(` +${items.length - i - 1} more`) : 0
+    const suffixWidth = i < items.length - 1 ? stringWidth(`${shown.length > 0 ? ', ' : ''}+${items.length - i - 1} more`) : 0
     const available = maxWidth - used - sepWidth - suffixWidth
 
     if (available < MIN_ITEM_WIDTH) break
@@ -151,7 +151,7 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
 
       if (mode === 'default') {
         const displayStrings = items.map(i => i.display)
-        const detailWidth = width - prefixWidth - 2
+        const detailWidth = width - prefixWidth - 3 // ' (' + ')'
         const { shown, remaining } = detailWidth > 0 ? fitItems(displayStrings, detailWidth) : { shown: [], remaining: displayStrings.length }
         const shownItems = items.slice(0, shown.length)
         return (
@@ -244,7 +244,7 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       const patterns = steps.map(s => (s.state as any)?.pattern ?? (s.state as any)?.query).filter(Boolean) as string[]
       const label = `${totalMatches} match${totalMatches !== 1 ? 'es' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`
       const labelWidth = stringWidth('/ ') + stringWidth(label)
-      const detailWidth = width - labelWidth - 2
+      const detailWidth = width - labelWidth - stringWidth(` (pattern: )`) // ' (' + 'pattern: ' + ')'
       const quotedPatterns = patterns.map(p => `"${p}"`)
       const { shown, remaining } = detailWidth > 0 ? fitItems(quotedPatterns, detailWidth) : { shown: [], remaining: patterns.length }
       const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
@@ -256,7 +256,7 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       const count = steps.length
       const label = `${count} web search${count !== 1 ? 'es' : ''}, ${totalSources} total source${totalSources !== 1 ? 's' : ''}`
       const labelWidth = stringWidth('[⌕] ') + stringWidth(label)
-      const detailWidth = width - labelWidth - 2
+      const detailWidth = width - labelWidth - 3 // ' (' + ')'
       const quotedQueries = queries.map(q => `"${q}"`)
       const { shown, remaining } = detailWidth > 0 ? fitItems(quotedQueries, detailWidth) : { shown: [], remaining: queries.length }
       const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
@@ -266,7 +266,7 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       const urls = steps.map(s => (s.state as any)?.url).filter(Boolean) as string[]
       const label = `Fetched ${urls.length} URL${urls.length > 1 ? 's' : ''}`
       const labelWidth = stringWidth('[↓] ') + stringWidth(label)
-      const detailWidth = width - labelWidth - 2
+      const detailWidth = width - labelWidth - 3 // ' (' + ')'
       const { shown, remaining } = detailWidth > 0 ? fitItems(urls, detailWidth) : { shown: [], remaining: urls.length }
       const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
       return <text><span style={{ fg: theme.info }}>{'[↓] '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
@@ -275,7 +275,7 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       const paths = steps.map(s => (s.state as any)?.path).filter(Boolean) as string[]
       const label = `Listed files`
       const labelWidth = stringWidth('◫ ') + stringWidth(label)
-      const detailWidth = width - labelWidth - 2
+      const detailWidth = width - labelWidth - 3 // ' (' + ')'
       const { shown, remaining } = detailWidth > 0 ? fitItems(paths, detailWidth) : { shown: [], remaining: paths.length }
       const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
       return <text><span style={{ fg: theme.info }}>{'◫ '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
@@ -284,7 +284,7 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       const paths = steps.map(s => (s.state as any)?.path).filter(Boolean) as string[]
       const label = `Viewed ${steps.length} file${steps.length > 1 ? 's' : ''}`
       const labelWidth = stringWidth('⚲ ') + stringWidth(label)
-      const detailWidth = width - labelWidth - 2
+      const detailWidth = width - labelWidth - 3 // ' (' + ')'
       const { shown, remaining } = detailWidth > 0 ? fitItems(paths, detailWidth) : { shown: [], remaining: paths.length }
       const detail = shown.join(', ') + (remaining > 0 ? `${shown.length > 0 ? ', ' : ''}+${remaining} more` : '')
       return <text><span style={{ fg: theme.info }}>{'⚲ '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>

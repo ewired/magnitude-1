@@ -44,30 +44,6 @@ function buildSummaryLine(stats: ChainStats, durationSeconds: number): string {
     parts.push(`${stats.workersStarted} worker${stats.workersStarted === 1 ? '' : 's'} started`)
   }
 
-  if (stats.editCount > 0) {
-    parts.push(`${stats.editCount} edit${stats.editCount === 1 ? '' : 's'}`)
-  }
-
-  if (stats.writeCount > 0) {
-    parts.push(`${stats.writeCount} write${stats.writeCount === 1 ? '' : 's'}`)
-  }
-
-  if (stats.shellCount > 0) {
-    parts.push(`${stats.shellCount} command${stats.shellCount === 1 ? '' : 's'}`)
-  }
-
-  if (stats.readCount > 0) {
-    parts.push(`${stats.readCount} read${stats.readCount === 1 ? '' : 's'}`)
-  }
-
-  if (stats.searchCount > 0) {
-    parts.push(`${stats.searchCount} search${stats.searchCount === 1 ? '' : 'es'}`)
-  }
-
-  if (stats.webSearchCount > 0) {
-    parts.push(`${stats.webSearchCount} web search${stats.webSearchCount === 1 ? '' : 'es'}`)
-  }
-
   return parts.join(' · ')
 }
 
@@ -84,6 +60,7 @@ export const WorkingTimer = memo(function WorkingTimer({
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [pulseIndex, setPulseIndex] = useState(0)
   const [brailleIndex, setBrailleIndex] = useState(0)
+  const [dotPulseIndex, setDotPulseIndex] = useState(0)
 
   useEffect(() => {
     if (chainStatus !== 'active' || !chainStartTime) {
@@ -116,6 +93,17 @@ export const WorkingTimer = memo(function WorkingTimer({
   }, [isThinking, chainStatus])
 
   useEffect(() => {
+    if (chainStatus !== 'active') {
+      setDotPulseIndex(0)
+      return
+    }
+    const interval = setInterval(() => {
+      setDotPulseIndex(i => (i + 1) % THINKING_PULSE_COLORS.length)
+    }, 300)
+    return () => clearInterval(interval)
+  }, [chainStatus])
+
+  useEffect(() => {
     if (!isWorkerStarting || chainStatus !== 'active') {
       setBrailleIndex(0)
       return
@@ -131,7 +119,8 @@ export const WorkingTimer = memo(function WorkingTimer({
     return (
       <box style={{ flexShrink: 0, paddingLeft: 2, paddingTop: 0, paddingBottom: 0 }}>
         <text style={{ fg: theme.muted }}>
-          Working... {formatElapsed(elapsedSeconds)}
+          <span style={{ fg: THINKING_PULSE_COLORS[dotPulseIndex] }}>{'●'}</span>
+          {` Working... ${formatElapsed(elapsedSeconds)}`}
           {isThinking && (
             <>
               {' · '}
@@ -174,6 +163,8 @@ export const WorkingTimer = memo(function WorkingTimer({
     return (
       <box style={{ flexShrink: 0, paddingLeft: 2, paddingTop: 0, paddingBottom: 0 }}>
         <text style={{ fg: theme.muted }}>
+          <span style={{ fg: slate[600] }}>{'●'}</span>
+          {' '}
           {buildSummaryLine(chainStats, durationSeconds)}
         </text>
       </box>
