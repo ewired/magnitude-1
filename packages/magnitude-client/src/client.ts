@@ -2,7 +2,7 @@ import { Context, Effect, Duration } from "effect"
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
 import { Auth, type AuthApplicator } from "@magnitudedev/ai"
-import { CLIENT_PLATFORM, CLIENT_SHELL, HEADER_PLATFORM, HEADER_SHELL, HEADER_SESSION_ID } from "./client-headers"
+import { CLIENT_PLATFORM, CLIENT_SHELL, HEADER_PLATFORM, HEADER_SHELL, HEADER_SESSION_ID, HEADER_USE_DEDICATED } from "./client-headers"
 import { isEnvFlagOn } from "./env"
 import type { BalanceResponse, RoleId, UsagePeriod } from "./contract"
 import { createModelCatalog, type ModelCatalog } from "./catalog"
@@ -34,6 +34,7 @@ export interface MagnitudeClientConfig {
   readonly apiKey?: string
   readonly endpoint?: string
   readonly sessionId?: string
+  readonly dedicatedProvider?: string
 }
 
 const DEFAULT_ENDPOINT = "https://app.magnitude.dev/api/v1"
@@ -79,6 +80,8 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
   )
   const endpoint = config?.endpoint ?? (useLocal ? LOCAL_ENDPOINT : DEFAULT_ENDPOINT)
   const sessionId = config?.sessionId ?? null
+
+  const dedicatedProvider = config?.dedicatedProvider || process.env.MAGNITUDE_USE_DEDICATED || undefined
   const auth = Auth.bearer(apiKey)
 
   // Compose auth with client headers so every request includes platform/shell/sessionId
@@ -87,6 +90,7 @@ export function createMagnitudeClient(config?: MagnitudeClientConfig): Magnitude
     headers.set(HEADER_PLATFORM, CLIENT_PLATFORM)
     headers.set(HEADER_SHELL, CLIENT_SHELL)
     if (sessionId) headers.set(HEADER_SESSION_ID, sessionId)
+    if (dedicatedProvider) headers.set(HEADER_USE_DEDICATED, dedicatedProvider)
   }
 
   const catalog = createModelCatalog({ endpoint, auth: authWithHeaders })
