@@ -274,12 +274,15 @@ export const ForkDetailOverlay = memo(function ForkDetailOverlay({
               </box>
             ) : (
               <>
-                <box style={{ flexDirection: 'column', visible: displayMode === 'default' }}>
-                  {renderForkItems(defaultMergedItems, 'default', isStreaming, messages, scrollboxWidth.width ?? 80, onForkExpand, openFile, onErrorAction)}
-                </box>
-                <box style={{ flexDirection: 'column', visible: displayMode === 'transcript' }}>
-                  {renderForkItems(transcriptMergedItems, 'transcript', isStreaming, messages, scrollboxWidth.width ?? 80, onForkExpand, openFile, onErrorAction)}
-                </box>
+                {displayMode === 'default' ? (
+                  <box style={{ flexDirection: 'column' }}>
+                    {renderForkItems(defaultMergedItems, 'default', isStreaming, messages, scrollboxWidth.width ?? 80, onForkExpand, openFile, onErrorAction)}
+                  </box>
+                ) : (
+                  <box style={{ flexDirection: 'column' }}>
+                    {renderForkItems(transcriptMergedItems, 'transcript', isStreaming, messages, scrollboxWidth.width ?? 80, onForkExpand, openFile, onErrorAction)}
+                  </box>
+                )}
               </>
             )}
           </scrollbox>

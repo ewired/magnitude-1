@@ -126,38 +126,41 @@ export const ChatTimeline = memo(function ChatTimeline({
 
   return (
     <>
-      <box style={{ flexDirection: 'column', visible: displayMode === 'default' }}>
-        {renderMergedItems(
-          defaultMergedItems,
-          'default',
-          isStreaming,
-          streamingMessageId,
-          lastInterruptedMessage,
-          interruptedMessageId,
-          chatColumnWidth,
-          themeErrorColor,
-          themeMutedColor,
-          onFileClick,
-          onForkExpand,
-          onErrorAction,
-        )}
-      </box>
-      <box style={{ flexDirection: 'column', visible: displayMode === 'transcript' }}>
-        {renderMergedItems(
-          transcriptMergedItems,
-          'transcript',
-          isStreaming,
-          streamingMessageId,
-          lastInterruptedMessage,
-          interruptedMessageId,
-          chatColumnWidth,
-          themeErrorColor,
-          themeMutedColor,
-          onFileClick,
-          onForkExpand,
-          onErrorAction,
-        )}
-      </box>
+      {displayMode === 'default' ? (
+        <box style={{ flexDirection: 'column' }}>
+          {renderMergedItems(
+            defaultMergedItems,
+            'default',
+            isStreaming,
+            streamingMessageId,
+            lastInterruptedMessage,
+            interruptedMessageId,
+            chatColumnWidth,
+            themeErrorColor,
+            themeMutedColor,
+            onFileClick,
+            onForkExpand,
+            onErrorAction,
+          )}
+        </box>
+      ) : (
+        <box style={{ flexDirection: 'column' }}>
+          {renderMergedItems(
+            transcriptMergedItems,
+            'transcript',
+            isStreaming,
+            streamingMessageId,
+            lastInterruptedMessage,
+            interruptedMessageId,
+            chatColumnWidth,
+            themeErrorColor,
+            themeMutedColor,
+            onFileClick,
+            onForkExpand,
+            onErrorAction,
+          )}
+        </box>
+      )}
     </>
   )
 })

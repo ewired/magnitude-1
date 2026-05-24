@@ -95,9 +95,17 @@ export const shellDisplay = createToolDisplay<ShellState>({
 
         {/* Output block — single <text> node with newlines instead of one node per line */}
         {(isExecuting || isCompleted) && (outputText || errorText) && (
-          <text style={{ fg: isFailed ? theme.error : theme.muted, paddingLeft: 2 }}>
-            {outputDisplayText}
-          </text>
+          mode === 'transcript' ? (
+            <box style={{ borderStyle: 'single', border: ['left'], borderColor: theme.muted, paddingLeft: 1 }}>
+              <text style={{ fg: isFailed ? theme.error : theme.muted }}>
+                {outputDisplayText}
+              </text>
+            </box>
+          ) : (
+            <text style={{ fg: isFailed ? theme.error : theme.muted, paddingLeft: 2 }}>
+              {outputDisplayText}
+            </text>
+          )
         )}
 
         {/* Tool error message */}
