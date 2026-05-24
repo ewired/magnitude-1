@@ -190,7 +190,7 @@ export const diffDisplay = createToolDisplay<DiffState>({
                 contextBefore={streamingDiff.contextBefore}
                 removedLines={streamingDiff.removedLines}
                 addedLines={isStreamingNew ? revealedNewText.split('\n') : streamingDiff.addedLines}
-                contextAfter={streamingDiff.contextAfter}
+                contextAfter={isStreaming ? [] : streamingDiff.contextAfter}
                 streamingCursor={isStreamingNew}
                 startLine={streamingDiff.startLine}
               />
