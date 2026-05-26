@@ -33,6 +33,7 @@ import { ConversationProjection } from './projections/conversation'
 import { UserPresenceProjection } from './projections/user-presence'
 import { OutboundMessagesProjection } from './projections/outbound-messages'
 import { UserMessageResolutionProjection } from './projections/user-message-resolution'
+import { ChatTitleProjection } from './projections/chat-title'
 import { AtifProjection } from './projections/atif/projection'
 
 
@@ -51,7 +52,8 @@ import { CompactionWorker } from './compaction/worker'
 import { isRoleId, type RoleId } from './agents/role-validation'
 import { UserPresenceWorker } from './workers/user-presence-worker'
 import { FileMentionResolver } from './workers/file-mention-resolver'
-import { SessionTitleWorker } from './workers/session-title-worker'
+import { ChatTitleServiceLive } from './workers/chat-title-service'
+import { ChatTitleWorker } from './workers/chat-title-worker'
 import { AtifWriter } from './workers/atif-writer'
 import { FsLive } from './services/fs'
 
@@ -115,6 +117,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
     UserPresenceProjection,
     AutopilotStateProjection,
     AtifProjection,
+    ChatTitleProjection,
   ],
 
   workers: [
@@ -129,7 +132,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
     FileMentionResolver,
 
     UserPresenceWorker,
-    SessionTitleWorker,
+    ChatTitleWorker,
     AtifWriter,
   ],
 
@@ -140,7 +143,8 @@ export const CodingAgent = Agent.define<AppEvent>()({
       taskCreated: TaskGraphProjection.signals.taskCreated,
       taskCompleted: TaskGraphProjection.signals.taskCompleted,
       taskCancelled: TaskGraphProjection.signals.taskCancelled,
-      taskStatusChanged: TaskGraphProjection.signals.taskStatusChanged
+      taskStatusChanged: TaskGraphProjection.signals.taskStatusChanged,
+      chatTitleGenerated: ChatTitleProjection.signals.chatTitleGenerated,
     },
     state: {
       display: DisplayProjection,
@@ -154,6 +158,7 @@ export const CodingAgent = Agent.define<AppEvent>()({
       taskWorker: TaskWorkerProjection,
       autopilotState: AutopilotStateProjection,
       atif: AtifProjection,
+      chatTitle: ChatTitleProjection,
     }
   }
 })
@@ -244,6 +249,10 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     ImageDescriptionServiceLive,
     Layer.mergeAll(agentModelResolverLayer, FetchHttpClient.layer),
   )
+  const chatTitleServiceLayer = Layer.provide(
+    ChatTitleServiceLive,
+    Layer.mergeAll(agentModelResolverLayer, FetchHttpClient.layer, options.persistence),
+  )
 
   // Enable tracing in debug mode
   const traceSessionId = options.sessionId ?? new Date().toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, 'Z')
@@ -270,6 +279,7 @@ export async function createCodingAgentClient(options: CreateClientOptions) {
     agentModelResolverLayer,
     magnitudeClientLayer,
     imageDescriptionServiceLayer,
+    chatTitleServiceLayer,
 
     FetchHttpClient.layer,
     FsLive,

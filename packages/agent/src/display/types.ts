@@ -169,16 +169,6 @@ export interface AgentCommunicationMessage {
   readonly status?: 'streaming' | 'completed'
 }
 
-  readonly id: string
-  readonly toolCallId: string
-  readonly toolKey: ToolKey
-  readonly input: unknown
-  readonly reason: string
-  readonly status: 'pending' | 'approved' | 'rejected'
-  readonly timestamp: number
-  readonly display?: ToolDisplay
-}
-
 export type DisplayMessage =
   | UserMessageDisplay
   | QueuedUserMessageDisplay

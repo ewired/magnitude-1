@@ -29,16 +29,6 @@ export interface TaskGraphState {
   readonly rootTaskIds: readonly string[]
 }
 
-export function getPrimaryRootTask(state: TaskGraphState): TaskRecord | null {
-  const rootTaskId = state.rootTaskIds[0]
-  if (!rootTaskId) return null
-  return state.tasks.get(rootTaskId) ?? null
-}
-
-export function getSessionTitleFromTaskGraph(state: TaskGraphState): string | null {
-  return getPrimaryRootTask(state)?.title ?? null
-}
-
 export interface TaskCreatedSignal {
   readonly taskId: string
   readonly parentId: string | null

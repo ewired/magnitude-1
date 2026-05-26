@@ -669,6 +669,13 @@ export interface ImageDescriptionsResolved {
   }[]
 }
 
+export interface ChatTitleGenerated {
+  readonly type: 'chat_title_generated'
+  readonly forkId: null
+  readonly title: string
+  readonly timestamp: number
+}
+
 export type AppEvent =
   | SessionInitialized
   | UserMessage
@@ -713,3 +720,4 @@ export type AppEvent =
   | SubagentIdleClosed
   | UserReturnConfirmed
   | SkillActivated
+  | ChatTitleGenerated

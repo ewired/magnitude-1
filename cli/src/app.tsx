@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Effect, Layer, Cause } from 'effect'
-import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, getSessionTitleFromTaskGraph, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, computeChainStats, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId, type InterruptedMessage, type ChainStats } from '@magnitudedev/agent'
+import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, computeChainStats, DEFAULT_CHAT_NAME, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId, type InterruptedMessage, type ChainStats } from '@magnitudedev/agent'
 import { matchKeyToChord } from './utils/chord'
 import { loadSkills } from '@magnitudedev/skills'
 import { textParts } from '@magnitudedev/agent'
@@ -329,7 +329,7 @@ function AppInner({
       c = client
       setLazyClient(client, resolvedScratchpadPath)
       onClientReady?.(client)
-      renderer.setTerminalTitle("Magnitude")
+      renderer.setTerminalTitle(DEFAULT_CHAT_NAME)
 
       // Log all events to event log file + collect for debug panel
       client.onEvent((event) => {
@@ -373,23 +373,22 @@ function AppInner({
         }
       })
 
+      // Subscribe to chat title changes — push-based, no polling
+      client.on.chatTitleGenerated(({ title }) => {
+        if (mounted) {
+          renderer.setTerminalTitle(title)
+        }
+      })
+
       // Initial autopilot toggle if --autopilot flag was passed
       if (autopilot) {
         client.send({ type: 'autopilot_toggled', forkId: null, enabled: true })
       }
-
-
-      client.state.taskGraph.subscribe((state) => {
-        if (!mounted) return
-        const title = getSessionTitleFromTaskGraph(state)
-        if (!title) return
-        logger.info({ title }, 'Session title derived from task graph')
-        renderer.setTerminalTitle(title)
-      })
     }
 
     if (sessionSelection === null) {
       // NEW SESSION: defer client creation, show empty UI immediately
+      renderer.setTerminalTitle(DEFAULT_CHAT_NAME)
       setDisplay({
         status: 'idle',
         messages: [],

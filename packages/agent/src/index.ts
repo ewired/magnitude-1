@@ -53,6 +53,7 @@ export type {
   ToolRejected,
 
   SkillActivated,
+  ChatTitleGenerated,
 
   Attachment,
   ImageAttachment,
@@ -153,8 +154,11 @@ export type { OutboundMessagesState, OutboundMessageCompletedSignal } from './pr
 export { SessionContextProjection } from './projections/session-context'
 export type { SessionContextState } from './projections/session-context'
 
+export { ChatTitleProjection } from './projections/chat-title'
+export type { ChatTitleState, ChatTitleGeneratedSignal } from './projections/chat-title'
 
-export { TaskGraphProjection, getPrimaryRootTask, getSessionTitleFromTaskGraph, canTransition, isTaskStatus } from './projections/task-graph'
+
+export { TaskGraphProjection, canTransition, isTaskStatus } from './projections/task-graph'
 export type { TaskGraphState, TaskRecord, TaskStatus, TaskWorkerInfo } from './projections/task-graph'
 
 // Line-edit types
@@ -205,7 +209,9 @@ export { LifecycleCoordinator } from './workers/lifecycle-coordinator'
 export { Autopilot } from './workers/autopilot'
 export type { AutopilotState } from './projections/autopilot-state'
 
-export { SessionTitleWorker } from './workers/session-title-worker'
+export { ChatTitleServiceTag, ChatTitleServiceLive, extractTextFromParts } from './workers/chat-title-service'
+export type { ChatTitleService } from './workers/chat-title-service'
+export { ChatTitleWorker } from './workers/chat-title-worker'
 
 // Persistence
 export { ChatPersistence, PersistenceError } from './persistence/chat-persistence-service'

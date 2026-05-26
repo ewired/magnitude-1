@@ -41,6 +41,7 @@ export interface AgentModelResolverService {
   readonly resolve: (roleId: RoleId, agentId?: string) => Effect.Effect<AgentBoundModel, never, AmbientService>
   readonly resolveAutopilot: () => Effect.Effect<AgentBoundModel, Error, HttpClient.HttpClient>
   readonly resolveImage: () => Effect.Effect<AgentBoundModel, Error, HttpClient.HttpClient>
+  readonly resolveTitle: () => Effect.Effect<AgentBoundModel, Error, HttpClient.HttpClient>
 }
 
 export class AgentModelResolver extends Context.Tag('AgentModelResolver')<
@@ -102,6 +103,19 @@ export const AgentModelResolverLive = () =>
               model: withAgentId(model, 'image-desc'),
               modelSource: { type: 'utility', modelId: 'util/image' },
               modelId: 'util/image',
+              profile,
+            }
+          }),
+
+        resolveTitle: () =>
+          Effect.gen(function* () {
+            const info = yield* client.catalog.get('util/title')
+            const profile = toModelProfile(info)
+            const model = client.model('util/title')
+            return {
+              model: withAgentId(model, 'title-gen'),
+              modelSource: { type: 'utility', modelId: 'util/title' },
+              modelId: 'util/title',
               profile,
             }
           }),

@@ -8,8 +8,8 @@ import {
   createCodingAgentClient,
   collectSessionContext,
   ChatPersistence,
-  getSessionTitleFromTaskGraph,
   textParts,
+  DEFAULT_CHAT_NAME,
   type AppEvent,
   type DisplayState,
   type AgentStatusState,
@@ -89,7 +89,6 @@ const DEFAULT_TURN_STATE: ForkTurnState = {
   connectionRetryCount: 0,
 }
 
-const DEFAULT_SESSION_TITLE = 'New Chat'
 
 export class SessionNotFoundError extends Error {
   constructor(id: string) {
@@ -147,7 +146,7 @@ export class SessionManager {
     const record: SessionRecord = {
       id,
       createdAt,
-      title: DEFAULT_SESSION_TITLE,
+      title: DEFAULT_CHAT_NAME,
       cwd: sessionContext.cwd,
       client,
       status: 'idle',
@@ -182,8 +181,9 @@ export class SessionManager {
       this.pushSessionEvent(record, 'turn_state', state)
     }))
 
-    record.unsubscribers.push(client.state.taskGraph.subscribe((state) => {
-      record.title = getSessionTitleFromTaskGraph(state) ?? DEFAULT_SESSION_TITLE
+    // Subscribe to chat title changes — push-based via ChatTitleProjection
+    record.unsubscribers.push(client.on.chatTitleGenerated(({ title }) => {
+      record.title = title
     }))
 
     this.sessions.set(id, record)
