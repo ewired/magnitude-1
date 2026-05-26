@@ -4,9 +4,22 @@ import { useTheme } from '../hooks/use-theme'
 import { slate } from '../utils/palette'
 import { red } from '../utils/theme'
 
-const THINKING_PULSE_COLORS = [
+const WORKING_PULSE_COLORS = [
   slate[100], slate[200], slate[300], slate[400], slate[500],
   slate[400], slate[300], slate[200],
+] as const
+
+// Smooth pulse: 400 → 300 → 400 with computed intermediates
+// slate[400]=#94a3b8  slate[300]=#cbd5e1
+const THINKING_PULSE_COLORS = [
+  slate[400],      // 0%   #94a3b8
+  '#a2b0c3',       // 25%
+  '#b0bccd',       // 50%
+  '#bdc9d7',       // 75%
+  slate[300],      // 100% #cbd5e1 (peak)
+  '#bdc9d7',       // 75%
+  '#b0bccd',       // 50%
+  '#a2b0c3',       // 25%
 ] as const
 
 const BRAILLE_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const
@@ -52,7 +65,7 @@ export const WorkingTimer = memo(function WorkingTimer({
 }: WorkingTimerProps) {
   const theme = useTheme()
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const [pulseIndex, setPulseIndex] = useState(0)
+  const [thinkingPulseIndex, setThinkingPulseIndex] = useState(0)
   const [brailleIndex, setBrailleIndex] = useState(0)
   const [dotPulseIndex, setDotPulseIndex] = useState(0)
 
@@ -77,12 +90,12 @@ export const WorkingTimer = memo(function WorkingTimer({
 
   useEffect(() => {
     if (!isThinking || chainStatus !== 'active') {
-      setPulseIndex(0)
+      setThinkingPulseIndex(0)
       return
     }
     const interval = setInterval(() => {
-      setPulseIndex(i => (i + 1) % THINKING_PULSE_COLORS.length)
-    }, 200)
+      setThinkingPulseIndex(i => (i + 1) % THINKING_PULSE_COLORS.length)
+    }, 250)
     return () => clearInterval(interval)
   }, [isThinking, chainStatus])
 
@@ -92,7 +105,7 @@ export const WorkingTimer = memo(function WorkingTimer({
       return
     }
     const interval = setInterval(() => {
-      setDotPulseIndex(i => (i + 1) % THINKING_PULSE_COLORS.length)
+      setDotPulseIndex(i => (i + 1) % WORKING_PULSE_COLORS.length)
     }, 300)
     return () => clearInterval(interval)
   }, [chainStatus])
@@ -113,7 +126,7 @@ export const WorkingTimer = memo(function WorkingTimer({
     return (
       <box style={{ flexShrink: 0, paddingLeft: 2, paddingTop: 0, paddingBottom: 0 }}>
         <text style={{ fg: theme.muted }}>
-          <span style={{ fg: THINKING_PULSE_COLORS[dotPulseIndex] }}>{'●'}</span>
+          <span style={{ fg: WORKING_PULSE_COLORS[dotPulseIndex] }}>{'●'}</span>
           {` Working... ${formatElapsed(elapsedSeconds)}`}
           {activeWorkerCount != null && activeWorkerCount > 0 && (
             <>
@@ -131,8 +144,9 @@ export const WorkingTimer = memo(function WorkingTimer({
           {isThinking && (
             <>
               {' · '}
-              <span style={{ fg: THINKING_PULSE_COLORS[pulseIndex] }}>{'◎'}</span>
-              {' Thinking'}
+              <span style={{ fg: THINKING_PULSE_COLORS[thinkingPulseIndex] }}>
+                {'Thinking'}
+              </span>
             </>
           )}
         </text>
