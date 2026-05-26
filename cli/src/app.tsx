@@ -715,8 +715,15 @@ function AppInner({
     return { role: labelForRole(role), model: modelNameForRole(role) }
   }, [selectedForkId, agentStatusState, roleProfiles])
 
-  // Vision support — assume true since Magnitude handles model capabilities server-side
-  const activeModelSupportsVision = true
+  const activeModelSupportsVision = useMemo(() => {
+    if (!selectedForkId || !agentStatusState) {
+      return roleProfiles?.leader?.capabilities?.vision ?? false
+    }
+    const agentId = agentStatusState.agentByForkId.get(selectedForkId)
+    const agent = agentId ? agentStatusState.agents.get(agentId) : undefined
+    const role = agent?.role ?? 'leader'
+    return roleProfiles?.[role]?.capabilities?.vision ?? false
+  }, [selectedForkId, agentStatusState, roleProfiles])
 
   const forkRole = useMemo(() => {
     if (!expandedForkId || !agentStatusState) return null

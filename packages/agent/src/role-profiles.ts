@@ -7,6 +7,7 @@ export interface RoleProfile {
   readonly contextWindow: number
   readonly modelId: string
   readonly modelDisplayName: string
+  readonly capabilities: { vision: boolean; grammar: boolean }
 }
 
 export async function fetchRoleProfiles(
@@ -25,6 +26,7 @@ export async function fetchRoleProfiles(
           contextWindow: m.contextWindow,
           modelId: m.id,
           modelDisplayName: m.displayName,
+          capabilities: { vision: m.capabilities.vision, grammar: m.capabilities.grammar },
         }
       }
     }
@@ -54,6 +56,7 @@ export async function fetchPublicRoleProfiles(
             contextWindow: m.contextWindow,
             modelId: m.id,
             modelDisplayName: m.displayName,
+            capabilities: { vision: m.capabilities.vision, grammar: m.capabilities.grammar },
           }
         }
       }
