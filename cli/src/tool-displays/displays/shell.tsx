@@ -132,12 +132,12 @@ export const shellDisplay = createToolDisplay<ShellState>({
         {(isExecuting || isCompleted) && (outputText || errorText) && (
           mode === 'transcript' ? (
             <box style={{ borderStyle: 'single', border: ['left'], borderColor: theme.muted, paddingLeft: 1 }}>
-              <text style={{ fg: isFailed ? theme.error : theme.muted }}>
+              <text style={{ fg: isFailed ? theme.error : theme.muted, wrapMode: 'none' }}>
                 {outputDisplayText}
               </text>
             </box>
           ) : (
-            <text style={{ fg: isFailed ? theme.error : theme.muted, paddingLeft: 2 }}>
+            <text style={{ fg: isFailed ? theme.error : theme.muted, paddingLeft: 2, wrapMode: 'none' }}>
               {outputDisplayText}
             </text>
           )
