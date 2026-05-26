@@ -44,6 +44,7 @@ const DEFAULT_INVISIBLE_TYPES: ReadonlySet<string> = new Set([
   'thinking',
   'status_indicator',
   'worker_resumed',
+  'agent_communication',
 ])
 
 /**
