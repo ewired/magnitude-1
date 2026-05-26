@@ -338,45 +338,73 @@ export function addObservationToStep(
 // Turn outcome → finalize step with metrics
 // =============================================================================
 
+/**
+ * Whether a turn outcome indicates the LLM call failed without producing
+ * any output (e.g., connection failure, unexpected transport error).
+ * These steps record that an LLM call was attempted but no inference
+ * completed, so llm_call_count is set to 0 and metrics/reasoning are
+ * omitted since no tokens were processed.
+ *
+ * NOTE: ATIF has no standard mechanism for recording LLM call errors.
+ * Using llm_call_count=0 is a pragmatic choice — it correctly signals
+ * that no LLM inference occurred on this step, and allows consumers to
+ * distinguish these from real behavioral turns (llm_call_count > 0).
+ * Error details are carried in extra.error.
+ */
+function isFailedLlmCall(outcome: TurnOutcome): boolean {
+  return outcome._tag === 'ConnectionFailure' || outcome._tag === 'UnexpectedError'
+}
+
 export function finalizeAgentStep(
   partial: PartialAtifStep,
   event: TurnOutcomeEvent
 ): AtifStep {
   const extra = getExtraFromOutcome(event.outcome)
 
-  const metrics: AtifMetrics | undefined =
-    event.inputTokens != null || event.outputTokens != null
-      ? {
-          ...(event.inputTokens != null ? { prompt_tokens: event.inputTokens } : {}),
-          ...(event.outputTokens != null ? { completion_tokens: event.outputTokens } : {}),
-          ...(event.cacheReadTokens != null ? { cached_tokens: event.cacheReadTokens } : {}),
-        }
-      : undefined
+  // Failed LLM calls (connection failure, transport error) with no output
+  // get llm_call_count=0 and omit metrics/reasoning since no inference completed.
+  const isNoLlm = isFailedLlmCall(event.outcome) &&
+    partial.message.trim().length === 0 &&
+    partial.tool_calls.length === 0 &&
+    partial.observation_results.length === 0
 
-  // Provider-specific metrics in metrics.extra
-  const providerMetrics: Record<string, unknown> = {}
-  if (event.cacheWriteTokens != null) {
-    providerMetrics.cache_creation_input_tokens = event.cacheWriteTokens
-  }
-  if (event.providerId) {
-    providerMetrics.provider_id = event.providerId
-  }
-  // Use modelId from turn_outcome to populate model_name on the step if not already set
-  if (event.modelId) {
-    providerMetrics.model_id = event.modelId
-  }
-  const finalMetrics: AtifMetrics | undefined =
-    metrics || Object.keys(providerMetrics).length > 0 || event.cost != null
-      ? {
-          ...(metrics ?? {}),
-          ...(Object.keys(providerMetrics).length > 0 ? { extra: providerMetrics } : {}),
-          // cost_usd is a top-level ATIF metrics field (not in extra)
-          ...(event.cost != null ? { cost_usd: event.cost } : {}),
-        }
-      : undefined
+  const llmCallCount = isNoLlm ? 0 : partial.llm_call_count
 
   // Use modelId from turn_outcome if model_name wasn't set at turn_started
   const modelName = partial.model_name ?? event.modelId ?? null
+
+  // Only compute metrics when an LLM inference actually occurred
+  let finalMetrics: AtifMetrics | undefined
+  if (!isNoLlm) {
+    const metrics: AtifMetrics | undefined =
+      event.inputTokens != null || event.outputTokens != null
+        ? {
+            ...(event.inputTokens != null ? { prompt_tokens: event.inputTokens } : {}),
+            ...(event.outputTokens != null ? { completion_tokens: event.outputTokens } : {}),
+            ...(event.cacheReadTokens != null ? { cached_tokens: event.cacheReadTokens } : {}),
+          }
+        : undefined
+
+    const providerMetrics: Record<string, unknown> = {}
+    if (event.cacheWriteTokens != null) {
+      providerMetrics.cache_creation_input_tokens = event.cacheWriteTokens
+    }
+    if (event.providerId) {
+      providerMetrics.provider_id = event.providerId
+    }
+    if (event.modelId) {
+      providerMetrics.model_id = event.modelId
+    }
+
+    finalMetrics =
+      metrics || Object.keys(providerMetrics).length > 0 || event.cost != null
+        ? {
+            ...(metrics ?? {}),
+            ...(Object.keys(providerMetrics).length > 0 ? { extra: providerMetrics } : {}),
+            ...(event.cost != null ? { cost_usd: event.cost } : {}),
+          }
+        : undefined
+  }
 
   const step: AtifStep = {
     step_id: partial.step_id,
@@ -384,7 +412,8 @@ export function finalizeAgentStep(
     source: 'agent',
     ...(modelName ? { model_name: modelName } : {}),
     message: partial.message.trim() || '',
-    ...(partial.reasoning_content.trim()
+    // reasoning_content omitted when no LLM inference completed
+    ...(!isNoLlm && partial.reasoning_content.trim()
       ? { reasoning_content: partial.reasoning_content.trim() }
       : {}),
     ...(partial.tool_calls.length > 0
@@ -398,7 +427,7 @@ export function finalizeAgentStep(
         }
       : {}),
     ...(finalMetrics ? { metrics: finalMetrics } : {}),
-    llm_call_count: partial.llm_call_count,
+    llm_call_count: llmCallCount,
     ...(extra ? { extra } : {}),
   }
 

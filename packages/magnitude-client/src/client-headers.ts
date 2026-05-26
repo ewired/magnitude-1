@@ -20,3 +20,4 @@ export const CLIENT_SHELL = detectShell()
 export const HEADER_PLATFORM = 'x-magnitude-platform'
 export const HEADER_SHELL = 'x-magnitude-shell'
 export const HEADER_SESSION_ID = 'x-magnitude-session-id'
+export const HEADER_USE_DEDICATED = 'x-magnitude-use-dedicated'

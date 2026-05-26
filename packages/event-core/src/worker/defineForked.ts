@@ -129,7 +129,7 @@ function makeWorkerReadFn<TEvent extends BaseEvent>(
   forkId: string | null
 ): WorkerReadFn<TEvent> {
   const impl = ((
-    projection: ProjectionResult<any, unknown, any, any> | ForkedProjectionResult<any, unknown, any, any>,
+    projection: ProjectionResult<any, unknown, any, any, any> | ForkedProjectionResult<any, unknown, any, any, any>,
     overrideForkId?: string | null
   ) => {
     const targetForkId = overrideForkId !== undefined ? overrideForkId : forkId
@@ -146,7 +146,7 @@ function makeWorkerReadFn<TEvent extends BaseEvent>(
     }
   }) as WorkerReadFn<TEvent>
 
-  impl.allForks = ((<TForkState>(projection: ForkedProjectionResult<any, TForkState, any, any>) =>
+  impl.allForks = ((<TForkState>(projection: ForkedProjectionResult<any, TForkState, any, any, any>) =>
     Effect.flatMap(
       projection.Tag,
       (instance: ForkedProjectionInstance<TForkState>) => instance.getAllForks()

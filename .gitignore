@@ -11,3 +11,4 @@ release-artifacts
 /jobs
 packages/agent/tmp
 *.tsbuildinfo
+notes
