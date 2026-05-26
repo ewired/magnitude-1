@@ -12,7 +12,6 @@ import { renderToolStep } from '../tool-displays/render'
 export function fitItems(items: string[], maxWidth: number): { shown: string[]; remaining: number } {
   if (items.length === 0) return { shown: [], remaining: 0 }
 
-  const MIN_ITEM_WIDTH = 4
   const shown: string[] = []
   let used = 0
   let i = 0
@@ -21,41 +20,21 @@ export function fitItems(items: string[], maxWidth: number): { shown: string[]; 
     const item = items[i]
     const itemWidth = stringWidth(item)
     const sepWidth = shown.length > 0 ? 2 : 0
-    const suffixWidth = i < items.length - 1 ? stringWidth(`${shown.length > 0 ? ', ' : ''}+${items.length - i - 1} more`) : 0
+    // Always include ', ' before suffix — by render time, shown.length > 0
+    const suffixWidth = i < items.length - 1 ? stringWidth(`, +${items.length - i - 1} more`) : 0
     const available = maxWidth - used - sepWidth - suffixWidth
-
-    if (available < MIN_ITEM_WIDTH) break
 
     if (itemWidth <= available) {
       shown.push(item)
       used += sepWidth + itemWidth
       i++
     } else {
-      const truncated = truncateToWidth(item, available)
-      shown.push(truncated)
-      used += sepWidth + stringWidth(truncated)
-      i++
+      // Item doesn't fit fully — stop here, put this and the rest behind "+N more"
+      break
     }
   }
 
   return { shown, remaining: items.length - i }
-}
-
-export function truncateToWidth(s: string, maxWidth: number): string {
-  const w = stringWidth(s)
-  if (w <= maxWidth) return s
-  if (maxWidth <= 1) return '…'
-  let lo = 0
-  let hi = s.length
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2)
-    if (stringWidth(s.slice(0, mid) + '…') <= maxWidth) {
-      lo = mid
-    } else {
-      hi = mid - 1
-    }
-  }
-  return s.slice(0, lo) + '…'
 }
 
 // =============================================================================

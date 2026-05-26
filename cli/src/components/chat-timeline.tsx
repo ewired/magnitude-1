@@ -77,7 +77,7 @@ function renderMergedItems(
               <ClusterSummaryRow
                 cluster={merged.cluster}
                 steps={merged.steps}
-                width={chatColumnWidth - 2}
+                width={chatColumnWidth - 4}
                 mode={mode}
               />
             </box>
