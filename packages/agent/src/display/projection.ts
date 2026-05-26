@@ -500,6 +500,18 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         }
       }
 
+      const finalizedMessages = finalizeOpenToolMessagesAsInterrupted(
+        withChain.messages,
+        (_toolKey, currentState, stepId) => {
+          if (!stepId) return currentState
+          if (currentState && typeof currentState === 'object' && 'phase' in currentState) {
+            return { ...currentState, phase: 'interrupted' as const }
+          }
+          return currentState
+        }
+      )
+      withChain = { ...withChain, messages: finalizedMessages }
+
       if (event.outcome._tag === 'Completed') {
         return {
           ...withChain,
