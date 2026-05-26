@@ -4,93 +4,52 @@ import { createToolDisplay } from '../types';
 import { ShimmerText } from '../../components/shimmer-text';
 import { useTheme } from '../../hooks/use-theme';
 import { useTerminalWidth } from '../../hooks/use-terminal-width';
-import { shortenCommandPreview, wrapTextToVisualLines } from '../../utils/strings';
+import { shortenCommandPreview, truncateToDisplayWidth } from '../../utils/strings';
 
 const SHIMMER_INTERVAL_MS = 160;
 const MAX_COMMAND_DISPLAY_LEN = 80;
 const PREVIEW_LINE_CAP = 3;
 const TRANSCRIPT_LINE_CAP = 1000;
 
-function countVisualLines(line: string, width: number): number {
-  if (line.length === 0) return 1;
-  return wrapTextToVisualLines(line, width).length;
-}
-
 function buildShellPreview(
   lines: string[],
   availableWidth: number,
-  maxVisualLines: number,
+  maxLines: number,
 ): { text: string; truncatedCount: number } {
   if (lines.length === 0) {
     return { text: '', truncatedCount: 0 };
   }
 
-  const counts = lines.map((l) => countVisualLines(l, availableWidth));
-  const totalVisual = counts.reduce((a, b) => a + b, 0);
+  const truncated = lines.map((l) =>
+    l.length <= availableWidth ? l : truncateToDisplayWidth(l, availableWidth),
+  );
 
-  if (totalVisual <= maxVisualLines) {
-    return { text: lines.join('\n'), truncatedCount: 0 };
+  if (truncated.length <= maxLines) {
+    return { text: truncated.join('\n'), truncatedCount: 0 };
   }
 
-  // Need truncation. Indicator costs 1 visual line.
-  let budget = maxVisualLines - 1;
-
-  // Greedy prefix
-  let prefixCount = 0;
-  let prefixVisual = 0;
+  const budget = maxLines - 1; // indicator costs 1 line
   const prefixBudget = Math.ceil(budget / 2);
-  while (
-    prefixCount < lines.length &&
-    prefixVisual + counts[prefixCount] <= prefixBudget
-  ) {
-    prefixVisual += counts[prefixCount];
-    prefixCount++;
-  }
-  budget -= prefixVisual;
+  const suffixBudget = budget - prefixBudget;
 
-  // Greedy suffix from the remaining lines
-  let suffixCount = 0;
-  let suffixVisual = 0;
-  while (
-    suffixCount < lines.length - prefixCount &&
-    suffixVisual + counts[lines.length - 1 - suffixCount] <= budget
-  ) {
-    suffixVisual += counts[lines.length - 1 - suffixCount];
-    suffixCount++;
-  }
+  const prefix = truncated.slice(0, prefixBudget);
+  const suffix = truncated.slice(-suffixBudget);
+  const collapsedCount = truncated.length - prefixBudget - suffixBudget;
 
-  // Edge case: single logical line exceeds the whole budget
-  if (prefixCount === 0 && suffixCount === 0 && lines.length > 0) {
-    const wrapped = wrapTextToVisualLines(lines[0], availableWidth);
-    const visibleWrapped = wrapped.slice(0, budget);
-    const remainingWrapped = wrapped.length - visibleWrapped.length;
-    const remainingLogical = lines.length - 1;
-    const totalCollapsedLogical =
-      remainingLogical + (remainingWrapped > 0 ? 1 : 0);
-    return {
-      text:
-        visibleWrapped.join('\n') +
-        (totalCollapsedLogical > 0
-          ? `\n… ${totalCollapsedLogical} lines collapsed`
-          : ''),
-      truncatedCount: totalCollapsedLogical,
-    };
-  }
-
-  const truncatedCount = lines.length - prefixCount - suffixCount;
   const displayed = [
-    ...lines.slice(0, prefixCount),
-    `… ${truncatedCount} lines collapsed`,
-    ...lines.slice(-suffixCount),
+    ...prefix,
+    `… ${collapsedCount} lines collapsed`,
+    ...suffix,
   ];
-  return { text: displayed.join('\n'), truncatedCount };
+  return { text: displayed.join('\n'), truncatedCount: collapsedCount };
 }
 
 export const shellDisplay = createToolDisplay<ShellState>({
   render: ({ state, mode }) => {
     const theme = useTheme();
     const terminalWidth = useTerminalWidth();
-    const availableWidth = Math.max(10, terminalWidth - 2); // paddingLeft: 2
+    // paddingLeft: 2 on output text + paddingLeft: 1 in MessageView + 1 for scrollbar
+    const availableWidth = Math.max(10, terminalWidth - 4);
     const command = state.command || '';
 
     const isStreaming = state.phase === 'streaming';
@@ -129,12 +88,14 @@ export const shellDisplay = createToolDisplay<ShellState>({
       );
       outputDisplayText = text;
     } else {
-      // Transcript mode: show up to TRANSCRIPT_LINE_CAP lines
-      if (nonEmptyLines.length > TRANSCRIPT_LINE_CAP) {
-        const truncatedCount = nonEmptyLines.length - TRANSCRIPT_LINE_CAP;
-        outputDisplayText = [...nonEmptyLines.slice(0, TRANSCRIPT_LINE_CAP), `…${truncatedCount} lines hidden. Output capped at ${TRANSCRIPT_LINE_CAP} lines`].join('\n');
+      const hTruncated = nonEmptyLines.map((l) =>
+        l.length <= availableWidth ? l : truncateToDisplayWidth(l, availableWidth),
+      )
+      if (hTruncated.length > TRANSCRIPT_LINE_CAP) {
+        const truncatedCount = hTruncated.length - TRANSCRIPT_LINE_CAP;
+        outputDisplayText = [...hTruncated.slice(0, TRANSCRIPT_LINE_CAP), `…${truncatedCount} lines hidden. Output capped at ${TRANSCRIPT_LINE_CAP} lines`].join('\n');
       } else {
-        outputDisplayText = nonEmptyLines.join('\n');
+        outputDisplayText = hTruncated.join('\n');
       }
     }
 
@@ -167,7 +128,7 @@ export const shellDisplay = createToolDisplay<ShellState>({
           {isInterrupted && <span style={{ fg: theme.muted }}>{' · Interrupted'}</span>}
         </text>
 
-        {/* Output block — single <text> node with newlines instead of one node per line */}
+        {/* Output block */}
         {(isExecuting || isCompleted) && (outputText || errorText) && (
           mode === 'transcript' ? (
             <box style={{ borderStyle: 'single', border: ['left'], borderColor: theme.muted, paddingLeft: 1 }}>
