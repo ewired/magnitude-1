@@ -2,7 +2,7 @@ import type { DisplayMessage, DisplayState, ErrorDisplayMessage } from '../types
 import { createId } from '../../util/id'
 import { present, type ErrorCta } from '../../errors'
 import type { TurnOutcome } from '../../events'
-import type { ToolState } from '../../models/index'
+import type { ToolState, SpawnWorkerState } from '../../models/index'
 
 export const generateId = () => createId()
 
@@ -58,6 +58,28 @@ export function moveMessageToEndBeforeQueue<T extends DisplayMessage>(
   const updated = updater ? updater(target) : target
   const remaining = [...messages.slice(0, index), ...messages.slice(index + 1)]
   return insertBeforeQueuedMessages(remaining, updated)
+}
+
+export function deriveIsThinking(messages: readonly DisplayMessage[], status: DisplayState['status']): boolean {
+  if (status !== 'streaming') return false
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].type !== 'queued_user_message') {
+      return messages[i].type === 'thinking'
+    }
+  }
+  return false
+}
+
+export function deriveIsWorkerStarting(messages: readonly DisplayMessage[], status: DisplayState['status']): boolean {
+  if (status !== 'streaming') return false
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.type === 'tool' && msg.toolKey === 'spawnWorker') {
+      const phase = (msg.state as SpawnWorkerState | undefined)?.phase
+      return phase === 'streaming' || phase === 'executing'
+    }
+  }
+  return false
 }
 
 export function toPreview(text: string): string {

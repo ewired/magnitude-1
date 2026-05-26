@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import stringWidth from 'string-width'
-import type { ToolMessage } from '@magnitudedev/agent'
+import type { FileReadState, FileSearchState, FileTreeState, FileViewState, ToolMessage, WebFetchState, WebSearchState } from '@magnitudedev/agent'
 import { useTheme } from '../hooks/use-theme'
 import { slate } from '../utils/palette'
 import { renderToolStep } from '../tool-displays/render'
@@ -75,17 +75,17 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
   switch (cluster) {
     case 'read': {
       const anyInProgress = steps.some(s => {
-        const phase = (s.state as any)?.phase
+        const phase = (s.state as FileReadState | undefined)?.phase
         return phase === 'streaming' || phase === 'executing'
       })
-      const anyError = steps.some(s => (s.state as any)?.phase === 'error')
+      const anyError = steps.some(s => (s.state as FileReadState | undefined)?.phase === 'error')
       const verb = anyInProgress ? 'Reading' : 'Read'
       const icon = anyError ? '✗ ' : '→ '
       const iconColor = anyError ? theme.error : theme.info
 
       const items: { display: string; path: string; rangeSuffix?: string; isError?: boolean }[] = []
       for (const s of steps) {
-        const state = s.state as any
+        const state = s.state as FileReadState | undefined
         const path = state?.path
         if (!path) continue
         const phase = state?.phase
@@ -218,9 +218,9 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       )
     }
     case 'search': {
-      const totalMatches = steps.reduce((sum, s) => sum + ((s.state as any)?.matchCount ?? 0), 0)
-      const uniqueFiles = new Set(steps.flatMap(s => ((s.state as any)?.matches ?? []) as any[]).map((m: any) => m?.file)).size
-      const patterns = steps.map(s => (s.state as any)?.pattern ?? (s.state as any)?.query).filter(Boolean) as string[]
+      const totalMatches = steps.reduce((sum, s) => sum + ((s.state as FileSearchState | undefined)?.matchCount ?? 0), 0)
+      const uniqueFiles = new Set(steps.flatMap(s => ((s.state as FileSearchState | undefined)?.matches ?? [])).map(m => m?.file)).size
+      const patterns = steps.map(s => (s.state as FileSearchState | undefined)?.pattern).filter(Boolean) as string[]
       const label = `${totalMatches} match${totalMatches !== 1 ? 'es' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`
       const labelWidth = stringWidth('/ ') + stringWidth(label)
       const detailWidth = width - labelWidth - stringWidth(` (pattern: )`) // ' (' + 'pattern: ' + ')'
@@ -230,8 +230,8 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       return <text><span style={{ fg: theme.info }}>{'/ '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (pattern: ${detail})`}</span>}</text>
     }
     case 'web_search': {
-      const totalSources = steps.reduce((sum, s) => sum + ((s.state as any)?.sources?.length ?? 0), 0)
-      const queries = steps.map(s => (s.state as any)?.query).filter(Boolean) as string[]
+      const totalSources = steps.reduce((sum, s) => sum + ((s.state as WebSearchState | undefined)?.sources?.length ?? 0), 0)
+      const queries = steps.map(s => (s.state as WebSearchState | undefined)?.query).filter(Boolean) as string[]
       const count = steps.length
       const label = `${count} web search${count !== 1 ? 'es' : ''}, ${totalSources} total source${totalSources !== 1 ? 's' : ''}`
       const labelWidth = stringWidth('[⌕] ') + stringWidth(label)
@@ -242,7 +242,7 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       return <text><span style={{ fg: theme.info }}>{'[⌕] '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
     }
     case 'web_fetch': {
-      const urls = steps.map(s => (s.state as any)?.url).filter(Boolean) as string[]
+      const urls = steps.map(s => (s.state as WebFetchState | undefined)?.url).filter(Boolean) as string[]
       const label = `Fetched ${urls.length} URL${urls.length > 1 ? 's' : ''}`
       const labelWidth = stringWidth('[↓] ') + stringWidth(label)
       const detailWidth = width - labelWidth - 3 // ' (' + ')'
@@ -251,7 +251,7 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       return <text><span style={{ fg: theme.info }}>{'[↓] '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
     }
     case 'tree': {
-      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean) as string[]
+      const paths = steps.map(s => (s.state as FileTreeState | undefined)?.path).filter(Boolean) as string[]
       const label = `Listed files`
       const labelWidth = stringWidth('◫ ') + stringWidth(label)
       const detailWidth = width - labelWidth - 3 // ' (' + ')'
@@ -260,7 +260,7 @@ export const ClusterSummaryRow = memo(function ClusterSummaryRow({ cluster, step
       return <text><span style={{ fg: theme.info }}>{'◫ '}</span><span style={{ fg: theme.foreground }}>{label}</span>{detail && <span style={{ fg: theme.muted }}>{` (${detail})`}</span>}</text>
     }
     case 'view': {
-      const paths = steps.map(s => (s.state as any)?.path).filter(Boolean) as string[]
+      const paths = steps.map(s => (s.state as FileViewState | undefined)?.path).filter(Boolean) as string[]
       const label = `Viewed ${steps.length} file${steps.length > 1 ? 's' : ''}`
       const labelWidth = stringWidth('⚲ ') + stringWidth(label)
       const detailWidth = width - labelWidth - 3 // ' (' + ')'

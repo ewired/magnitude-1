@@ -41,6 +41,7 @@ import {
   PendingInboundCommunicationDisplay,
   AgentCommunicationMessage,
 } from './types'
+import { SpawnWorkerState } from '../models/index'
 
 import {
   generateId,
@@ -51,6 +52,8 @@ import {
   moveMessageToEndBeforeQueue,
   toPreview,
   updateMessageById,
+  deriveIsThinking,
+  deriveIsWorkerStarting,
 } from './helpers/messages'
 import type { ToolKey } from '../tools/toolkits'
 
@@ -68,6 +71,15 @@ import { finalizeOpenToolMessagesAsInterrupted } from './helpers/interrupt'
 
 import { EMPTY_TOOL_COUNTS } from './constants'
 
+
+function recomputeDerivedFlags(fork: DisplayState): DisplayState {
+  const messages = fork.messages
+  return {
+    ...fork,
+    isThinking: deriveIsThinking(messages, fork.status),
+    isWorkerStarting: deriveIsWorkerStarting(messages, fork.status),
+  }
+}
 
 function anyAgentsWorking(agentState: AgentStatusState): boolean {
   for (const agent of agentState.agents.values()) {
@@ -119,6 +131,8 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
     chainStartTime: null,
     chainStatus: null,
     chainEndTime: null,
+    isThinking: false,
+    isWorkerStarting: false,
   },
 
   signals: {
@@ -174,7 +188,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       // Start chain if not already active
       const chainStarting = stateWithMessages.chainStatus !== 'active'
-      return {
+      return recomputeDerivedFlags({
         ...stateWithMessages,
         currentTurnId: event.turnId,
         status: 'streaming' as const,
@@ -185,7 +199,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           chainStatus: 'active' as const,
           chainEndTime: null,
         } : {}),
-      }
+      })
     },
 
     message_start: ({ event, fork }) => {
@@ -212,11 +226,11 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       const messages = insertBeforeQueuedMessages(flushedMessages, assistantMessage)
 
-      return {
+      return recomputeDerivedFlags({
         ...fork,
         streamingMessageId: msgId,
         messages
-      }
+      })
     },
 
     message_chunk: ({ event, fork }) => {
@@ -250,18 +264,18 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       if (fork.streamingMessageId) {
         const msg = fork.messages.find(m => m.id === fork.streamingMessageId)
         if (msg && msg.type === 'assistant_message' && !msg.content.trim()) {
-          return {
+          return recomputeDerivedFlags({
             ...fork,
             messages: fork.messages.filter(m => m.id !== fork.streamingMessageId),
             streamingMessageId: null,
-          }
+          })
         }
       }
 
-      return {
+      return recomputeDerivedFlags({
         ...fork,
         streamingMessageId: null
-      }
+      })
     },
 
     thinking_chunk: ({ event, fork }) => {
@@ -282,7 +296,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           // Remove the empty thinking message entirely
           heldBuffers.delete(lastMsg.id)
           const newMessages = fork.messages.filter(m => m.id !== lastMsg.id)
-          return { ...fork, messages: newMessages }
+          return recomputeDerivedFlags({ ...fork, messages: newMessages })
         }
 
         if (contentToAppend === '') {
@@ -292,7 +306,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
         const newMessages = [...fork.messages]
         newMessages[lastIdx] = { ...lastMsg, content: lastMsg.content + contentToAppend }
-        return { ...fork, messages: newMessages }
+        return recomputeDerivedFlags({ ...fork, messages: newMessages })
       }
 
       // Create new thinking message
@@ -318,10 +332,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           content: '',
           timestamp: event.timestamp,
         }
-        return {
+        return recomputeDerivedFlags({
           ...fork,
           messages: insertBeforeQueuedMessages(fork.messages, thinkingMsg)
-        }
+        })
       }
 
       const thinkingMsg: ThinkingMessage = {
@@ -330,10 +344,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         content: contentToAppend,
         timestamp: event.timestamp,
       }
-      return {
+      return recomputeDerivedFlags({
         ...fork,
         messages: insertBeforeQueuedMessages(fork.messages, thinkingMsg)
-      }
+      })
     },
 
     tool_event: ({ event, fork, read, emit }) => {
@@ -367,16 +381,16 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             resultFilePath: null,
             timestamp: event.timestamp,
           }
-          return {
+          return recomputeDerivedFlags({
             ...fork,
             messages: insertBeforeQueuedMessages(flushedMessages, toolMsg)
-          }
+          })
         }
 
         case 'ToolInputReady': {
           if (fork.currentTurnId !== event.turnId) return fork
 
-          return {
+          return recomputeDerivedFlags({
             ...fork,
             messages: updateMessageById<ToolMessage>(
               fork.messages,
@@ -386,7 +400,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
                 state: getVisualState(toolStateFork, event.toolCallId) ?? msg.state,
               })
             )
-          }
+          })
         }
 
         case 'ToolExecutionEnded': {
@@ -400,7 +414,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             return fork
           }
 
-          return {
+          return recomputeDerivedFlags({
             ...fork,
             messages: updateMessageById<ToolMessage>(
               fork.messages,
@@ -410,7 +424,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
                 state: getVisualState(toolStateFork, event.toolCallId) ?? msg.state,
               })
             )
-          }
+          })
         }
 
         default: {
@@ -419,14 +433,14 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           const vs = getVisualState(toolStateFork, event.toolCallId)
           if (!vs) return fork
 
-          return {
+          return recomputeDerivedFlags({
             ...fork,
             messages: updateMessageById<ToolMessage>(
               fork.messages,
               event.toolCallId,
               (msg) => ({ ...msg, state: vs })
             )
-          }
+          })
         }
       }
     },
@@ -439,13 +453,13 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       if (event.outcome._tag === 'Completed' && outcomeWillChainContinue(event.outcome)) {
         // Turn will chain-continue (has tool calls and no yield target) —
         // keep state open for the next turn to reuse.
-        return {
+        return recomputeDerivedFlags({
           ...fork,
           currentTurnId: null,
           status: 'idle' as const,
           streamingMessageId: null,
           showButton: 'send' as const,
-        }
+        })
       }
 
       if (event.outcome._tag === 'ConnectionFailure') {
@@ -458,10 +472,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           style: 'dim' as const,
           timestamp: event.timestamp,
         }
-        return {
+        return recomputeDerivedFlags({
           ...fork,
           messages: insertBeforeQueuedMessages(flushedMessages, statusMsg),
-        }
+        })
       }
 
       if (event.outcome._tag === 'Overthinking') {
@@ -476,14 +490,14 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         }
         const withIndicator = insertBeforeQueuedMessages(flushedMessages, statusMsg)
         const cleanedMessages = removeEmptyThinkingMessages(withIndicator)
-        return {
+        return recomputeDerivedFlags({
           ...fork,
           messages: cleanedMessages,
           currentTurnId: null,
           status: 'idle' as const,
           streamingMessageId: null,
           showButton: 'send' as const,
-        }
+        })
       }
 
       // Flush thinking and remove empty thinking messages
@@ -513,20 +527,20 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       withChain = { ...withChain, messages: finalizedMessages }
 
       if (event.outcome._tag === 'Completed') {
-        return {
+        return recomputeDerivedFlags({
           ...withChain,
           currentTurnId: null,
           status: 'idle' as const,
           streamingMessageId: null,
           showButton: 'send' as const,
-        }
+        })
       }
 
       if (event.outcome._tag === 'Cancelled') {
         const alreadyInterrupted = withChain.messages.some(
           (message) => message.type === 'interrupted' && message.timestamp === event.timestamp,
         )
-        return {
+        return recomputeDerivedFlags({
           ...withChain,
           messages: alreadyInterrupted
             ? withChain.messages
@@ -543,32 +557,32 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           status: 'idle' as const,
           streamingMessageId: null,
           showButton: 'send' as const,
-        }
+        })
       }
 
       if (
         event.outcome._tag === 'ParseFailure'
         || event.outcome._tag === 'ContextWindowExceeded'
       ) {
-        return {
+        return recomputeDerivedFlags({
           ...withChain,
           currentTurnId: null,
           status: 'idle' as const,
           streamingMessageId: null,
           showButton: 'send' as const,
-        }
+        })
       }
 
       const errorMessage = toErrorDisplayMessage(event.outcome, event.timestamp)
 
-      return {
+      return recomputeDerivedFlags({
         ...withChain,
         messages: errorMessage ? [...withChain.messages, errorMessage] : withChain.messages,
         currentTurnId: null,
         status: 'idle' as const,
         streamingMessageId: null,
         showButton: 'send' as const
-      }
+      })
     },
 
     compaction_failed: ({ event, fork }) => {
@@ -582,10 +596,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         cta: event.presentation.cta,
       }
 
-      return {
+      return recomputeDerivedFlags({
         ...fork,
         messages: [...fork.messages, errorMsg],
-      }
+      })
     },
 
     interrupt: ({ event, fork, emit, read }) => {
@@ -625,7 +639,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         m => m.type !== 'queued_user_message'
       )
 
-      return {
+      return recomputeDerivedFlags({
         ...closedState,
         currentTurnId: null,
         status: 'idle' as const,
@@ -641,7 +655,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
             ...(event.allKilled ? { allKilled: true } : {}),
           }
         ]
-      }
+      })
     },
 
     agent_created: ({ event, fork }) => {
@@ -665,10 +679,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         timestamp: event.timestamp,
         status: 'completed',
       }
-      return {
+      return recomputeDerivedFlags({
         ...fork,
         messages: insertBeforeQueuedMessages(flushedMessages, commMsg)
-      }
+      })
     },
 
     agent_killed: ({ fork }) => fork,
@@ -695,7 +709,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       return {
         ...state,
-        forks: new Map(state.forks).set(value.forkId, {
+        forks: new Map(state.forks).set(value.forkId, recomputeDerivedFlags({
           ...workingFork,
           messages: [
             ...workingFork.messages,
@@ -715,7 +729,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
                 })),
             },
           ]
-        }),
+        })),
       }
     }),
 
@@ -740,10 +754,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         timestamp: value.timestamp
       }
 
-      const nextParentState: DisplayState = {
+      const nextParentState: DisplayState = recomputeDerivedFlags({
         ...parentState,
         messages: insertBeforeQueuedMessages(parentState.messages, msg)
-      }
+      })
 
       return {
         ...state,
@@ -775,7 +789,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       return {
         ...state,
-        forks: new Map(state.forks).set(agent.parentForkId, { ...parentState, messages: newMessages })
+        forks: new Map(state.forks).set(agent.parentForkId, recomputeDerivedFlags({ ...parentState, messages: newMessages }))
       }
     }),
 
@@ -802,7 +816,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         accumulatedActiveMs: cumulativeTotalTimeMs,
       }
 
-      let nextParentState: DisplayState = { ...parentState, messages: newMessages }
+      let nextParentState: DisplayState = recomputeDerivedFlags({ ...parentState, messages: newMessages })
 
       if (parentForkId === null && value.reason !== 'interrupt') {
         const finishedMsg: WorkerFinishedMessage = {
@@ -815,10 +829,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           resumed: (msg.resumeCount ?? 0) > 0,
           timestamp: value.timestamp,
         }
-        nextParentState = {
+        nextParentState = recomputeDerivedFlags({
           ...nextParentState,
           messages: insertBeforeQueuedMessages(nextParentState.messages, finishedMsg),
-        }
+        })
       }
 
       return {
@@ -872,10 +886,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         timestamp: value.timestamp
       }
 
-      let nextParentState: DisplayState = {
+      let nextParentState: DisplayState = recomputeDerivedFlags({
         ...parentState,
         messages: insertBeforeQueuedMessages(parentState.messages, resumedBlock)
-      }
+      })
 
       if (parentForkId === null) {
         const step: WorkerResumedMessage = {
@@ -886,10 +900,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
           title: message.name,
           timestamp: value.timestamp,
         }
-        nextParentState = {
+        nextParentState = recomputeDerivedFlags({
           ...nextParentState,
           messages: insertBeforeQueuedMessages(nextParentState.messages, step),
-        }
+        })
       }
 
       return {
@@ -913,10 +927,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         timestamp: value.timestamp,
       }
 
-      const nextParentState: DisplayState = {
+      const nextParentState: DisplayState = recomputeDerivedFlags({
         ...parentState,
         messages: insertBeforeQueuedMessages(messages, step),
-      }
+      })
 
       return {
         ...state,
@@ -939,10 +953,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         timestamp: value.timestamp,
       }
 
-      const nextParentState: DisplayState = {
+      const nextParentState: DisplayState = recomputeDerivedFlags({
         ...parentState,
         messages: insertBeforeQueuedMessages(messages, step),
-      }
+      })
 
       return {
         ...state,
@@ -957,7 +971,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
       const messages = parentState.messages.filter((m) => !(m.type === 'fork_activity' && m.forkId === value.forkId))
       return {
         ...state,
-        forks: new Map(state.forks).set(value.parentForkId, { ...parentState, messages }),
+        forks: new Map(state.forks).set(value.parentForkId, recomputeDerivedFlags({ ...parentState, messages })),
       }
     }),
 
@@ -985,7 +999,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       return {
         ...state,
-        forks: new Map(state.forks).set(value.targetForkId, nextFork)
+        forks: new Map(state.forks).set(value.targetForkId, recomputeDerivedFlags(nextFork))
       }
     }),
 
@@ -1013,7 +1027,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       return {
         ...state,
-        forks: new Map(state.forks).set(value.targetForkId, nextFork)
+        forks: new Map(state.forks).set(value.targetForkId, recomputeDerivedFlags(nextFork))
       }
     }),
 
@@ -1026,7 +1040,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
         ...state,
         forks: new Map(state.forks).set(
           value.targetForkId,
-          finalizeCommunicationStreamInFork(displayFork, value.streamId)
+          recomputeDerivedFlags(finalizeCommunicationStreamInFork(displayFork, value.streamId))
         )
       }
     }),
@@ -1047,10 +1061,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       return {
         ...state,
-        forks: new Map(state.forks).set(value.targetForkId, {
+        forks: new Map(state.forks).set(value.targetForkId, recomputeDerivedFlags({
           ...displayFork,
           pendingInboundCommunications: pending,
-        })
+        }))
       }
     }),
 
@@ -1070,10 +1084,10 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       return {
         ...state,
-        forks: new Map(state.forks).set(value.targetForkId, {
+        forks: new Map(state.forks).set(value.targetForkId, recomputeDerivedFlags({
           ...displayFork,
           pendingInboundCommunications: pending,
-        })
+        }))
       }
     }),
 
@@ -1115,7 +1129,7 @@ export const DisplayProjection = Projection.defineForked<AppEvent, DisplayState>
 
       return {
         ...state,
-        forks: new Map(state.forks).set(value.forkId, nextFork)
+        forks: new Map(state.forks).set(value.forkId, recomputeDerivedFlags(nextFork))
       }
     }),
 

@@ -200,4 +200,6 @@ export interface DisplayState {
   readonly chainStartTime: number | null
   readonly chainStatus: 'active' | 'completed' | null  // null = no active chain
   readonly chainEndTime: number | null
+  readonly isThinking: boolean
+  readonly isWorkerStarting: boolean
 }

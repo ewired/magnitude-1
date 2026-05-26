@@ -186,6 +186,7 @@ export type {
   FileEditState,
   FileSearchState,
   FileTreeState,
+  FileViewState,
   ShellState,
   WebSearchState,
   WebFetchState,

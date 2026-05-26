@@ -404,6 +404,8 @@ function AppInner({
         chainStartTime: null,
         chainStatus: null,
         chainEndTime: null,
+        isThinking: false,
+        isWorkerStarting: false,
       })
       setClientFactory(async () => {
         const client = await createClient()
@@ -1105,33 +1107,8 @@ function AppInner({
     return last.type === 'interrupted' ? last : null
   }, [activeDisplay, display])
 
-  // Detect if the agent is actively thinking (last non-queued message is a thinking block)
-  const isThinking = useMemo(() => {
-    const displayState = activeDisplay ?? display
-    if (displayState?.status !== 'streaming') return false
-    const messages = displayState?.messages ?? []
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].type !== 'queued_user_message') {
-        return messages[i].type === 'thinking'
-      }
-    }
-    return false
-  }, [activeDisplay, display])
-
-  // Detect if a worker is being started (spawnWorker tool not yet completed)
-  const isWorkerStarting = useMemo(() => {
-    const displayState = activeDisplay ?? display
-    if (displayState?.status !== 'streaming') return false
-    const messages = displayState?.messages ?? []
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i]
-      if (msg.type === 'tool' && msg.toolKey === 'spawnWorker') {
-        const phase = (msg.state as any)?.phase
-        return phase === 'streaming' || phase === 'executing'
-      }
-    }
-    return false
-  }, [activeDisplay, display])
+  const isThinking = (activeDisplay ?? display)?.isThinking ?? false
+  const isWorkerStarting = (activeDisplay ?? display)?.isWorkerStarting ?? false
 
   // Scroll-tracking for sticky header
   const scrollboxRef = useRef<any>(null)
