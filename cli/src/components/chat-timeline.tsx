@@ -48,51 +48,55 @@ function renderMergedItems(
         const nextMerged = idx + 1 < mergedItems.length ? mergedItems[idx + 1] : null
         const nextMsgInterrupted = nextMerged?.kind === 'chat' && nextMerged.message.type === 'interrupted'
         return (
-          <ErrorBoundary key={msg.id} fallback={(err) => (
-            <box style={{ paddingLeft: 1 }}>
-              <text style={{ fg: themeErrorColor }}>[Render error: {err.message}]</text>
-            </box>
-          )}>
-            <MessageView
-              message={msg}
-              isStreaming={isStreamingMsg}
-              isInterrupted={isInterrupted}
-              nextMessageInterrupted={nextMsgInterrupted}
-              mode={mode}
-              onFileClick={onFileClick}
-              onForkExpand={onForkExpand}
-              onErrorAction={onErrorAction}
-            />
-          </ErrorBoundary>
+          <box key={msg.id} id={msg.id} style={{ flexDirection: 'column' }}>
+            <ErrorBoundary fallback={(err) => (
+              <box style={{ paddingLeft: 1 }}>
+                <text style={{ fg: themeErrorColor }}>[Render error: {err.message}]</text>
+              </box>
+            )}>
+              <MessageView
+                message={msg}
+                isStreaming={isStreamingMsg}
+                isInterrupted={isInterrupted}
+                nextMessageInterrupted={nextMsgInterrupted}
+                mode={mode}
+                onFileClick={onFileClick}
+                onForkExpand={onForkExpand}
+                onErrorAction={onErrorAction}
+              />
+            </ErrorBoundary>
+          </box>
         )
       }
       case 'cluster': {
         return (
-          <ErrorBoundary key={merged.id} fallback={(err) => (
-            <box style={{ paddingLeft: 1 }}>
-              <text style={{ fg: themeErrorColor }}>[Render error: {err.message}]</text>
-            </box>
-          )}>
-            <box style={{ paddingLeft: 1, marginBottom: nextIsCluster ? 0 : 1 }}>
-              <ClusterSummaryRow
-                cluster={merged.cluster}
-                steps={merged.steps}
-                width={chatColumnWidth - 4}
-                mode={mode}
-              />
-            </box>
-          </ErrorBoundary>
+          <box key={merged.id} id={merged.id} style={{ flexDirection: 'column' }}>
+            <ErrorBoundary fallback={(err) => (
+              <box style={{ paddingLeft: 1 }}>
+                <text style={{ fg: themeErrorColor }}>[Render error: {err.message}]</text>
+              </box>
+            )}>
+              <box style={{ paddingLeft: 1, marginBottom: nextIsCluster ? 0 : 1 }}>
+                <ClusterSummaryRow
+                  cluster={merged.cluster}
+                  steps={merged.steps}
+                  width={chatColumnWidth - 4}
+                  mode={mode}
+                />
+              </box>
+            </ErrorBoundary>
+          </box>
         )
       }
       case 'bash':
         return (
-          <box key={merged.id} style={{ paddingLeft: 1 }}>
+          <box key={merged.id} id={merged.id} style={{ paddingLeft: 1 }}>
             <BashOutput result={merged.result} />
           </box>
         )
       case 'system':
         return (
-          <box key={merged.id} style={{ paddingLeft: 1, marginBottom: 1 }}>
+          <box key={merged.id} id={merged.id} style={{ paddingLeft: 1, marginBottom: 1 }}>
             <text style={{ fg: themeMutedColor }}>{merged.text}</text>
           </box>
         )

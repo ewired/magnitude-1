@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { useKeyboard, useRenderer } from '@opentui/react'
 import { Effect, Layer, Cause } from 'effect'
 import { createCodingAgentClient, ChatPersistence, ImageDescriptionServiceTag, fetchRoleProfiles, classifyUnknownError, present, publishInitialTask, computeChainStats, DEFAULT_CHAT_NAME, type DisplayState, type AgentStatusState, type AppEvent, type ErrorDisplayMessage, type CompactionState, type TurnState, type DebugSnapshot, type RoleProfile, type ActionId, type InterruptedMessage, type ChainStats } from '@magnitudedev/agent'
@@ -48,6 +48,9 @@ import { useMagnitudeAuth } from './hooks/use-magnitude-auth'
 import { MagnitudeLoginScreen } from './components/magnitude-login-screen'
 import { WindowsWarningScreen } from './components/windows-warning-screen'
 import { createRoles, ROLE_IDS, type RoleId } from '@magnitudedev/roles'
+import { captureScrollAnchor, restoreScrollToAnchor } from './utils/scroll-helpers'
+import { useSafeTimeout } from './hooks/use-safe-timeout'
+import { appendFileSync } from 'fs'
 
 export const getSelectedForkContentVersion = (
   selectedForkId: string | null,
@@ -172,6 +175,7 @@ function AppInner({
   const [tokenEstimate, setTokenEstimate] = useState(0)
   const [isCompacting, setIsCompacting] = useState(false)
   const hasAnimatedRef = useRef(skipAnimation)
+  const pendingScrollAnchorRef = useRef<{ id: string; offsetRatio: number } | null>(null)
 
   // ── Autopilot state (TUI-only countdown) ──────────────────────────────
   const [autopilotEnabled, setAutopilotEnabled] = useState(false)
@@ -1022,6 +1026,17 @@ function AppInner({
 
         if (isCtrlT) {
           key.preventDefault()
+
+          const sb = scrollboxRef.current
+          if (sb) {
+            const anchor = captureScrollAnchor(sb)
+            if (anchor?.id) {
+              pendingScrollAnchorRef.current = anchor as { id: string; offsetRatio: number }
+              // Hide content during transition to prevent flash at wrong position
+              if (sb.content) sb.content.opacity = 0
+            }
+          }
+
           setDisplayMode(prev => prev === 'default' ? 'transcript' : 'default')
         }
       },
@@ -1124,6 +1139,29 @@ function AppInner({
   const lastStreamingMessageIdRef = useRef<string | null>(null)
   const interruptedMessageIdRef = useRef<string | null>(null)
 
+  // ── Scroll preservation on display mode toggle ───────────────────────
+  const safeTimeout = useSafeTimeout()
+
+  useEffect(() => {
+    const anchor = pendingScrollAnchorRef.current
+    if (!anchor) return
+    pendingScrollAnchorRef.current = null
+
+    const sb = scrollboxRef.current
+    if (!sb) return
+
+    // Wait for OpenTUI layout to stabilize, then restore position
+    // Content is hidden (opacity=0) during this wait to prevent flash
+    const t1 = safeTimeout.set(() => {
+      restoreScrollToAnchor(sb, anchor)
+      // Reveal content after position is correct
+      if (sb.content) sb.content.opacity = 1
+    }, 0)
+
+    return () => {
+      safeTimeout.clear(t1)
+    }
+  }, [displayMode, safeTimeout])
 
   const snapChatToBottom = useCallback(() => {
     const scrollbox = scrollboxRef.current
