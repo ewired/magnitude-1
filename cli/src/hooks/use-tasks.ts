@@ -184,8 +184,17 @@ function reconcileDisplayState(
   }
 }
 
-export function useTasks({ client }: UseTasksArgs): TaskListItem[] {
+function countActiveWorkers(state: TaskWorkerState): number {
+  let count = 0
+  for (const snapshot of state.snapshots.values()) {
+    if (snapshot.workerState.status === 'working') count++
+  }
+  return count
+}
+
+export function useTasks({ client }: UseTasksArgs): { items: TaskListItem[]; activeWorkerCount: number } {
   const [displayState, setDisplayState] = useState<TaskListDisplayState>(EMPTY_DISPLAY_STATE)
+  const [activeWorkerCount, setActiveWorkerCount] = useState(0)
   const latestTaskWorkerStateRef = useRef<TaskWorkerState>(EMPTY_TASK_WORKER_STATE)
   const latestDisplayStateRef = useRef<TaskListDisplayState>(EMPTY_DISPLAY_STATE)
 
@@ -194,11 +203,13 @@ export function useTasks({ client }: UseTasksArgs): TaskListItem[] {
       latestTaskWorkerStateRef.current = EMPTY_TASK_WORKER_STATE
       latestDisplayStateRef.current = EMPTY_DISPLAY_STATE
       setDisplayState(EMPTY_DISPLAY_STATE)
+      setActiveWorkerCount(0)
       return
     }
 
     return client.state.taskWorker.subscribe((state) => {
       latestTaskWorkerStateRef.current = state
+      setActiveWorkerCount(countActiveWorkers(state))
       setDisplayState((previousDisplayState) => {
         const nextDisplayState = reconcileDisplayState(state, previousDisplayState, Date.now())
         latestDisplayStateRef.current = nextDisplayState
@@ -226,5 +237,5 @@ export function useTasks({ client }: UseTasksArgs): TaskListItem[] {
     return () => globalThis.clearTimeout(timeout)
   }, [displayState.nextGhostExpiryAt])
 
-  return displayState.items
+  return { items: displayState.items, activeWorkerCount }
 }

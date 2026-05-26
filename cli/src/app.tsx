@@ -638,7 +638,7 @@ function AppInner({
     return unsubscribe
   }, [client])
 
-  const tasks = useTasks({
+  const { items: tasks, activeWorkerCount } = useTasks({
     client,
   })
 
@@ -1360,6 +1360,7 @@ function AppInner({
             interruptedMessage={lastInterruptedMessage}
             isThinking={isThinking}
             isWorkerStarting={isWorkerStarting}
+            activeWorkerCount={activeWorkerCount}
           />
           <ChatController
             isBlockingOverlayActive={isBlockingOverlayActive}

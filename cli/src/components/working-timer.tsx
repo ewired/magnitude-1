@@ -19,6 +19,7 @@ interface WorkingTimerProps {
   interruptedMessage?: InterruptedMessage | null
   isThinking?: boolean
   isWorkerStarting?: boolean
+  activeWorkerCount?: number
 }
 
 function formatElapsed(totalSeconds: number): string {
@@ -36,15 +37,7 @@ function formatDuration(seconds: number): string {
 }
 
 function buildSummaryLine(stats: ChainStats, durationSeconds: number): string {
-  const parts: string[] = []
-
-  parts.push(`Worked for ${formatDuration(durationSeconds)}`)
-
-  if (stats.workersStarted > 0) {
-    parts.push(`${stats.workersStarted} worker${stats.workersStarted === 1 ? '' : 's'} started`)
-  }
-
-  return parts.join(' · ')
+  return `Worked for ${formatDuration(durationSeconds)}`
 }
 
 export const WorkingTimer = memo(function WorkingTimer({
@@ -55,6 +48,7 @@ export const WorkingTimer = memo(function WorkingTimer({
   interruptedMessage,
   isThinking,
   isWorkerStarting,
+  activeWorkerCount,
 }: WorkingTimerProps) {
   const theme = useTheme()
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -121,11 +115,10 @@ export const WorkingTimer = memo(function WorkingTimer({
         <text style={{ fg: theme.muted }}>
           <span style={{ fg: THINKING_PULSE_COLORS[dotPulseIndex] }}>{'●'}</span>
           {` Working... ${formatElapsed(elapsedSeconds)}`}
-          {isThinking && (
+          {activeWorkerCount != null && activeWorkerCount > 0 && (
             <>
               {' · '}
-              <span style={{ fg: THINKING_PULSE_COLORS[pulseIndex] }}>{'◎'}</span>
-              {' Thinking'}
+              {`${activeWorkerCount} worker${activeWorkerCount === 1 ? '' : 's'} running`}
             </>
           )}
           {isWorkerStarting && (
@@ -133,6 +126,13 @@ export const WorkingTimer = memo(function WorkingTimer({
               {' · '}
               <span style={{ fg: theme.muted }}>{BRAILLE_FRAMES[brailleIndex]}</span>
               {' Starting worker'}
+            </>
+          )}
+          {isThinking && (
+            <>
+              {' · '}
+              <span style={{ fg: THINKING_PULSE_COLORS[pulseIndex] }}>{'◎'}</span>
+              {' Thinking'}
             </>
           )}
         </text>
