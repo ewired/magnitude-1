@@ -89,7 +89,7 @@ export const shellDisplay = createToolDisplay<ShellState>({
             </span>
           )}
           {isError && <span style={{ fg: theme.error }}>{' ✗ Error'}</span>}
-          {isRejected && <span style={{ fg: theme.muted }}>{' · Rejected'}</span>}
+          {isRejected && <span style={{ fg: theme.muted }}>{' · Rejected (Permission Policy)'}</span>}
           {isInterrupted && <span style={{ fg: theme.muted }}>{' · Interrupted'}</span>}
         </text>
 
@@ -115,12 +115,7 @@ export const shellDisplay = createToolDisplay<ShellState>({
           </text>
         )}
 
-        {/* Rejected message */}
-        {isRejected && state.errorMessage && (
-          <text style={{ fg: theme.muted, marginTop: 1, paddingLeft: 2 }}>
-            {state.errorMessage}
-          </text>
-        )}
+
       </box>
     );
   },
@@ -128,7 +123,7 @@ export const shellDisplay = createToolDisplay<ShellState>({
     const command = state.command.trim();
     if (state.phase === 'streaming' || state.phase === 'executing') return command ? `$ ${command}` : 'Run shell command';
     if (state.phase === 'error') return command ? `Shell error: $ ${command}` : 'Shell error';
-    if (state.phase === 'rejected') return command ? `Rejected: $ ${command}` : 'Shell command rejected';
+    if (state.phase === 'rejected') return command ? `Rejected (Permission Policy): $ ${command}` : 'Shell command rejected';
     return command ? `$ ${command}` : 'Run shell command';
   },
 });
