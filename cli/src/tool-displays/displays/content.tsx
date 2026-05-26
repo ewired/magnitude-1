@@ -72,7 +72,7 @@ export const contentDisplay = createToolDisplay<ContentState>({
               onMouseOut={() => setIsHovered(false)}
             >
               <text>
-                <span style={{ fg: isHovered ? theme.link : theme.muted }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
+                <span style={{ fg: isHovered ? theme.link : theme.primary }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
               </text>
             </Button>
             <text>
@@ -96,7 +96,7 @@ export const contentDisplay = createToolDisplay<ContentState>({
             onMouseOut={() => setIsHovered(false)}
           >
             <text>
-              <span style={{ fg: isHovered ? theme.link : theme.muted }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
+              <span style={{ fg: isHovered ? theme.link : theme.primary }} attributes={TextAttributes.UNDERLINE}>{displayPath}</span>
             </text>
           </Button>
           <text>
@@ -153,13 +153,13 @@ export const contentDisplay = createToolDisplay<ContentState>({
               {isError ? (
                 <>
                   <span style={{ fg: theme.foreground }}>{'Wrote '}</span>
-                  <span style={{ fg: theme.muted }}>{String(path ?? '...')}</span>
+                  <span style={{ fg: isHovered ? theme.link : theme.primary }} attributes={TextAttributes.UNDERLINE}>{String(path ?? '...')}</span>
                   <span style={{ fg: theme.error }}>{' · Error'}</span>
                 </>
               ) : (
                 <>
                   <span style={{ fg: theme.foreground }}>{'Writing '}</span>
-                  <span style={{ fg: theme.muted }}>{String(path ?? '...')}</span>
+                  <span style={{ fg: isHovered ? theme.link : theme.primary }} attributes={TextAttributes.UNDERLINE}>{String(path ?? '...')}</span>
                   <ShimmerText text="..." interval={SHIMMER_INTERVAL_MS} primaryColor={theme.secondary} />
                 </>
               )}
